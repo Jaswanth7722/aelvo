@@ -1,0 +1,27 @@
+# AELVO — The Automated Engineering & Logic-Verification OS
+# Core Infrastructure Stack
+pydantic>=2.0.0
+python-dotenv
+pyyaml
+filelock
+requests
+
+# The Intelligence Engines (LLM SDKs)
+openai
+anthropic
+google-generativeai
+
+# The Hybrid Vector RAG Stack
+chromadb>=0.4.0
+
+# The Industrial Speed Scraper Stack
+scrapy
+scrapy-playwright
+selectolax
+markdownify
+urllib3
+
+# Utilities
+tqdm
+aiohttp
+rich
