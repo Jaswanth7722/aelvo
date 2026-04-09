@@ -2,7 +2,6 @@
 > **Deterministic Project Intelligence with Hybrid Adaptive Memory.**
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![NVIDIA AI](https://img.shields.io/badge/Provider-NVIDIA-green.svg)](https://www.nvidia.com/)
 [![ChromaDB](https://img.shields.io/badge/Vector-ChromaDB-purple.svg)](https://www.trychroma.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -54,25 +53,6 @@ graph TD
 ```
 
 ---
-
-## 🕹️ Kernel Commands
-AELVO provides a set of **Atomic Commands** (prefixed with `#`) for direct state manipulation:
-
-| Command | Args | Description |
-| :--- | :--- | :--- |
-| `#set_state` | `key`, `value` | Manually inject a key-value state for the agent. |
-| `#save_constraint` | `tag`, `rule` | Add a new semantic constraint to the project anchor. |
-| `#search_memory` | `query` | Manually trigger a conceptual search cross-memory. |
-| `#list_projects` | - | Manage isolation between multiple agent workspaces. |
-| `#resync` | - | Reconcile the anchor hash with the kernel state. |
-
----
-
-## 🛠️ Getting Started
-
-### 1. Requirements
-*   Python 3.10+
-*   `chromadb`, `scrapy`, `pydantic`, `openai`, `anthropic`, `google-generativeai`
 
 ### 2. Installation
 ```bash
