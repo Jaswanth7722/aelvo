@@ -8,6 +8,7 @@ No provider-specific formats leak above the adapter layer.
 
 from __future__ import annotations
 
+import abc
 import time
 import enum
 from typing import (
@@ -635,15 +636,25 @@ class ModelCapability(BaseModel):
 class AuthCredentials(BaseModel):
     """Credentials returned from an auth flow."""
     provider_id: str
-    api_key: Optional[str] = None
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    id_token: Optional[str] = None
-    session_token: Optional[str] = None
+    api_key: Optional[str] = Field(default=None, repr=False)
+    access_token: Optional[str] = Field(default=None, repr=False)
+    refresh_token: Optional[str] = Field(default=None, repr=False)
+    id_token: Optional[str] = Field(default=None, repr=False)
+    session_token: Optional[str] = Field(default=None, repr=False)
     expires_at: Optional[float] = None
     scopes: str = ""
     token_type: str = "bearer"
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode='after')
+    def _require_at_least_one_credential(self) -> 'AuthCredentials':
+        if not any([self.api_key, self.access_token, self.refresh_token,
+                     self.id_token, self.session_token]):
+            raise ValueError(
+                "At least one credential (api_key, access_token, refresh_token, "
+                "id_token, or session_token) must be provided"
+            )
+        return self
 
 
 class ProviderAuthStatus(BaseModel):
@@ -676,21 +687,21 @@ class ProviderEvent(BaseModel):
 # ADAPTER INTERFACES
 # ============================================================================
 
-class ProviderAdapter:
-    """Interface for provider-specific adapters."""
-    
+class ProviderAdapter(abc.ABC):
+    """Abstract interface for provider-specific adapters."""
+
+    @abc.abstractmethod
     def to_canonical_request(self, request: CanonicalRequest, config: ProviderConfig) -> Any:
-        """Convert canonical request to provider-specific format."""
-        raise NotImplementedError
-    
+        ...
+
+    @abc.abstractmethod
     def from_canonical_response(self, response: Any, provider: str, model: str) -> CanonicalResponse:
-        """Convert provider-specific response to canonical format."""
-        raise NotImplementedError
-    
+        ...
+
+    @abc.abstractmethod
     def stream_to_canonical(self, chunks: AsyncIterator[Any], provider: str, model: str) -> AsyncIterator[StreamEvent]:
-        """Convert provider-specific stream chunks to canonical stream events."""
-        raise NotImplementedError
-    
+        ...
+
+    @abc.abstractmethod
     def from_canonical_error(self, error: Exception, provider: str, model: str) -> ProviderError:
-        """Convert provider-specific error to canonical provider error."""
-        raise NotImplementedError
+        ...

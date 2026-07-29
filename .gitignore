@@ -9,6 +9,7 @@ auth.json
 
 # 2. Local State & Project Data
 workspace/
+auth_credentials.db
 memory.db
 chroma_db/
 global_memory.db

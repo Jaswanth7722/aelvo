@@ -24,7 +24,7 @@ import os
 import sqlite3
 import threading
 import time
-import uuid
+import uuid as _uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -33,6 +33,8 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 from auth.types import Credential, CredentialType
 
 log = logging.getLogger("aelvo.auth.cred_storage")
+
+_SCHEMA_VERSION = 1
 
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -45,24 +47,57 @@ def _generate_salt() -> bytes:
     return os.urandom(16)
 
 
+_MACHINE_ID_CACHE: Optional[str] = None
+_MACHINE_ID_PATH: str = ""
+
+
 def _machine_id() -> str:
-    """Get a machine-specific identifier for key derivation."""
+    """Get a machine-specific identifier for key derivation.
+
+    Caches the result so credentials remain recoverable even if the
+    source becomes temporarily unavailable (permissions, registry access, etc).
+    """
+    global _MACHINE_ID_CACHE, _MACHINE_ID_PATH
+    if _MACHINE_ID_CACHE is not None:
+        return _MACHINE_ID_CACHE
+
+    mid: Optional[str] = None
     try:
         if os.name == "nt":
-            # Windows: use machine GUID
             import winreg
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                                r"SOFTWARE\Microsoft\Cryptography") as key:
-                return winreg.QueryValueEx(key, "MachineGuid")[0]
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Cryptography",
+            ) as key:
+                mid = winreg.QueryValueEx(key, "MachineGuid")[0]
         else:
-            # Unix: use /etc/machine-id or /var/lib/dbus/machine-id
             for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
                 if os.path.exists(path):
                     with open(path) as f:
-                        return f.read().strip()
-    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
-    # Fallback: use hostname + uuid
-    return f"{os.uname().nodename}-{uuid.uuid4().hex}" if hasattr(os, "uname") else uuid.uuid4().hex
+                        mid = f.read().strip()
+                        break
+    except Exception:
+        pass
+
+    if mid is None:
+        # Try reading a previously persisted machine ID
+        persisted = _MACHINE_ID_PATH
+        if persisted and os.path.exists(persisted):
+            try:
+                with open(persisted) as f:
+                    mid = f.read().strip()
+            except Exception:
+                pass
+
+    if mid is None:
+        raise RuntimeError(
+            "Cannot determine machine ID for credential encryption. "
+            "On Windows ensure the Cryptography registry key is readable. "
+            "On Linux ensure /etc/machine-id exists and is readable."
+        )
+
+    _MACHINE_ID_CACHE = mid
+    return mid
 
 
 def _derive_key(master_secret: str, salt: bytes) -> bytes:
@@ -141,10 +176,17 @@ class CredentialStore:
         return f"{mid}::aelvo-auth::default"
 
     def _init_db(self) -> None:
-        """Initialize the SQLite database."""
+        """Initialize the SQLite database with WAL mode and schema versioning."""
         os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
         with self._get_db() as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA busy_timeout=5000")
             conn.executescript("""
+                CREATE TABLE IF NOT EXISTS schema_version (
+                    version INTEGER PRIMARY KEY,
+                    applied_at REAL NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS credentials (
                     id TEXT PRIMARY KEY,
                     provider TEXT NOT NULL,
@@ -170,13 +212,30 @@ class CredentialStore:
                     ON credentials(provider);
                 CREATE INDEX IF NOT EXISTS idx_cred_type
                     ON credentials(credential_type);
+                CREATE INDEX IF NOT EXISTS idx_audit_timestamp
+                    ON credential_audit(timestamp);
             """)
+            # Check current schema version and migrate if needed
+            row = conn.execute(
+                "SELECT MAX(version) FROM schema_version"
+            ).fetchone()
+            current_version = row[0] if row and row[0] else 0
+            if current_version < _SCHEMA_VERSION:
+                conn.execute(
+                    "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                    (_SCHEMA_VERSION, time.time()),
+                )
 
     @contextmanager
     def _get_db(self) -> Iterator[sqlite3.Connection]:
-        """Get a database connection with auto-commit and proper cleanup."""
-        conn: sqlite3.Connection = sqlite3.connect(self.db_path, check_same_thread=False)
+        """Get a database connection with WAL, retry, and proper cleanup."""
+        conn: sqlite3.Connection = sqlite3.connect(
+            self.db_path,
+            check_same_thread=False,
+            timeout=5,
+        )
         try:
+            conn.execute("PRAGMA journal_mode=WAL")
             yield conn
             conn.commit()
         except Exception:
@@ -515,30 +574,29 @@ class CredentialStore:
         with self._lock:
             try:
                 self._check_lock()
-                # Get all credentials
+                new_secret = self._build_master_secret(new_passphrase)
                 with self._get_db() as conn:
                     rows = conn.execute(
                         "SELECT id, provider, credential_type, encrypted_value, salt FROM credentials"
                     ).fetchall()
 
-                # Decrypt each with old key, re-encrypt with new key
-                new_secret = self._build_master_secret(new_passphrase)
-                for row in rows:
-                    cid, provider, ctype, encrypted, old_salt = row
-                    decrypted = _decrypt(encrypted, self._master_secret, old_salt)
-                    if decrypted is None:
-                        log.error(f"Key rotation failed for credential {cid}: decryption error")
-                        return False
+                    for row in rows:
+                        cid, provider, ctype, encrypted, old_salt = row
+                        decrypted = _decrypt(encrypted, self._master_secret, old_salt)
+                        if decrypted is None:
+                            log.error(f"Key rotation failed for credential {cid}: decryption error")
+                            return False
 
-                    new_salt = _generate_salt()
-                    new_encrypted = _encrypt(decrypted, new_secret, new_salt)
-                    conn.execute(
-                        "UPDATE credentials SET encrypted_value = ?, salt = ? WHERE id = ?",
-                        (new_encrypted, new_salt, cid),
-                    )
+                        new_salt = _generate_salt()
+                        new_encrypted = _encrypt(decrypted, new_secret, new_salt)
+                        conn.execute(
+                            "UPDATE credentials SET encrypted_value = ?, salt = ? WHERE id = ?",
+                            (new_encrypted, new_salt, cid),
+                        )
+
+                    self._audit(conn, "__rotation__", "key_rotation", "All credentials re-encrypted")
 
                 self._master_secret = new_secret
-                self._audit(conn, "__rotation__", "key_rotation", "All credentials re-encrypted")
                 log.info("CredentialStore key rotation completed successfully")
                 self._touch()
                 return True

@@ -46,6 +46,8 @@ from .config import (
 )
 from .cred_storage import EncryptedCredentialStorage
 from .auth.provider import ProviderAuthOrchestrator
+from .ratelimiter import RateLimiter, RateLimitConfig, get_global_limiter
+from .circuit_breaker import CircuitBreaker, CircuitBreakerRegistry, CircuitState, get_global_registry
 
 __all__ = [
     "ProviderKind",
@@ -85,4 +87,11 @@ __all__ = [
     "get_cloud_providers",
     "EncryptedCredentialStorage",
     "ProviderAuthOrchestrator",
+    "RateLimiter",
+    "RateLimitConfig",
+    "get_global_limiter",
+    "CircuitBreaker",
+    "CircuitBreakerRegistry",
+    "CircuitState",
+    "get_global_registry",
 ]

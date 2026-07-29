@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-main.py â€” AELVO System Entry Point
+main.py - AELVO System Entry Point
 ===================================
 Wires the four pillars (Kernel, FileSystem, Scraper, Commands) to any
 LLM API via a universal multi-provider adapter.
