@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #21262d transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #21262d;
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply border border-surface-border rounded-lg bg-surface-alt p-4;
+  }
+
+  .event-feed {
+    @apply flex flex-col gap-1 overflow-y-auto;
+  }
+
+  .event-entry {
+    @apply px-3 py-1.5 rounded text-sm hover:bg-surface-border/30 transition-colors duration-150;
+  }
+}

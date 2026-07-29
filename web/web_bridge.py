@@ -1,0 +1,373 @@
+"""
+web_bridge.py — AELVO WebSocket Event Bridge
+
+Runs an asyncio WebSocket server that subscribes to the runtime EventBus
+and forwards every event as JSON to all connected web clients.
+
+Designed to be launched as a background task from main.py alongside the TUI.
+
+Protocol:
+    Server → Client: JSON events.
+        { "type": "finding_published", "specialist": "ORACLE",
+          "action": "Found 3 vulnerabilities",
+          "data": { ... }, "timestamp": 1234567890.0 }
+
+    Client → Server: JSON commands.
+        { "type": "ping" } → server responds { "type": "pong" }
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import time
+from typing import Any, Dict, Optional, Set
+
+import websockets
+from websockets.server import WebSocketServerProtocol
+
+from runtime_next.models.events import BaseEvent
+
+log = logging.getLogger("aelvo.web.bridge")
+
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 8765
+
+# Attributes that are part of the BaseEvent metaclass, not event-specific data
+_PYDANTIC_SKIP = {
+    "model_dump", "model_dump_json", "model_copy", "model_fields",
+    "model_fields_set", "model_extra", "model_computed_fields",
+    "model_post_init", "model_config", "model_parametrized_name",
+    "model_json_schema", "model_validate", "model_validate_json",
+    "model_rebuild", "model_construct", "model_namespace",
+    "validate", "dict", "json", "schema", "update_forward_refs",
+    "clean", "construct", "copy", "from_orm", "schema_json",
+    "validate_model",
+}
+
+# Well-known runtime event type attributes to extract for action/specialist
+_ACTION_ATTRS = (
+    "summary", "action", "recommendation", "command", "reason",
+    "classification", "session_title", "challenged_claim",
+)
+
+_SOURCE_ATTRS = (
+    "specialist", "node_id", "consumer", "challenger", "source",
+)
+
+
+class WebBridge:
+    """Asyncio WebSocket server that bridges runtime events to web clients.
+
+    Usage:
+        bridge = WebBridge(host="127.0.0.1", port=8765)
+        bridge.subscribe_to_runtime(runtime_bus)
+        await bridge.start()
+        ...
+        await bridge.stop()
+    """
+
+    def __init__(
+        self,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+    ):
+        self._host = host
+        self._port = port
+        self._server: websockets.WebSocketServer | None = None
+        self._connections: Set[WebSocketServerProtocol] = set()
+        self._runtime_bus = None
+        self._running = False
+
+    @property
+    def url(self) -> str:
+        return f"ws://{self._host}:{self._port}"
+
+    def subscribe_to_runtime(self, runtime_bus) -> None:
+        """Subscribe to a runtime EventBus to forward all events to web clients.
+
+        The runtime bus must have a subscribe_all(callback) method.
+        """
+        self._runtime_bus = runtime_bus
+        if hasattr(runtime_bus, "subscribe_all"):
+            runtime_bus.subscribe_all(self._on_runtime_event)
+            log.info("WebBridge subscribed to runtime EventBus")
+
+    async def start(self) -> None:
+        """Start the WebSocket server."""
+        if self._running:
+            return
+        self._running = True
+
+        self._server = await websockets.serve(
+            self._handle_connection,
+            self._host,
+            self._port,
+            ping_interval=30,
+            ping_timeout=10,
+        )
+        log.info("WebBridge server started on %s", self.url)
+
+    async def stop(self) -> None:
+        """Stop the WebSocket server and disconnect all clients."""
+        self._running = False
+
+        if self._connections:
+            await asyncio.gather(
+                *[ws.close(1001, "Server shutting down") for ws in self._connections],
+                return_exceptions=True,
+            )
+            self._connections.clear()
+
+        if self._server is not None:
+            self._server.close()
+            await self._server.wait_closed()
+            self._server = None
+
+        log.info("WebBridge server stopped")
+
+    async def _handle_connection(
+        self, websocket: WebSocketServerProtocol
+    ) -> None:
+        """Handle a new WebSocket client connection."""
+        client_info = f"{websocket.remote_address}"
+        self._connections.add(websocket)
+        log.info(
+            "WebBridge client connected: %s (total: %d)",
+            client_info, len(self._connections),
+        )
+
+        try:
+            # Send welcome event immediately
+            await self._send_raw(
+                websocket,
+                {
+                    "type": "system_online",
+                    "source": "web_bridge",
+                    "specialist": "",
+                    "action": "Connected to AELVO WebSocket bridge",
+                    "data": {"server_url": self.url},
+                    "timestamp": time.time(),
+                    "icon": "●",
+                    "color": "#00e38c",
+                },
+            )
+
+            # Listen for incoming messages from the client
+            async for raw_message in websocket:
+                try:
+                    message = json.loads(raw_message)
+                    msg_type = message.get("type", "")
+
+                    if msg_type == "ping":
+                        await websocket.send(
+                            json.dumps({
+                                "type": "pong",
+                                "timestamp": time.time(),
+                            })
+                        )
+                except json.JSONDecodeError:
+                    log.debug("WebBridge invalid JSON from %s", client_info)
+
+        except websockets.exceptions.ConnectionClosed:
+            log.info("WebBridge client disconnected: %s", client_info)
+        except Exception as exc:
+            log.warning("WebBridge connection error for %s: %s", client_info, exc)
+        finally:
+            self._connections.discard(websocket)
+
+    async def _on_runtime_event(self, runtime_event: BaseEvent) -> None:
+        """Callback invoked by the runtime EventBus for every event.
+
+        NON-BLOCKING: The broadcast is wrapped in create_task so this
+        returns immediately and does not stall the runtime event bus.
+        """
+        if not self._running or not self._connections:
+            return
+
+        payload = self._event_to_payload(runtime_event)
+        if payload is None:
+            return
+
+        # Schedule broadcast as background task so we don't block the event bus
+        asyncio.ensure_future(self._broadcast(payload))
+
+    async def _broadcast(self, payload: Dict[str, Any]) -> None:
+        """Broadcast a payload to all connected clients.
+
+        Uses a short per-client timeout so one slow client never
+        delays the broadcast to others.
+        """
+        if not self._connections:
+            return
+
+        message = json.dumps(payload, default=str)
+        dead_connections: Set[WebSocketServerProtocol] = set()
+
+        for ws in self._connections:
+            try:
+                await asyncio.wait_for(ws.send(message), timeout=2.0)
+            except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
+                dead_connections.add(ws)
+            except Exception as exc:
+                log.warning("WebBridge broadcast error: %s", exc)
+                dead_connections.add(ws)
+
+        if dead_connections:
+            self._connections -= dead_connections
+
+    async def _send_raw(
+        self, websocket: WebSocketServerProtocol, payload: Dict[str, Any]
+    ) -> None:
+        """Send a raw payload to a specific client."""
+        try:
+            await websocket.send(json.dumps(payload, default=str))
+        except Exception as exc:
+            log.warning("WebBridge send error: %s", exc)
+
+    @staticmethod
+    def _event_to_payload(event: BaseEvent) -> Optional[Dict[str, Any]]:
+        """Convert a runtime BaseEvent to a JSON-serialisable dict."""
+        try:
+            etype = getattr(event, "type", None)
+            if etype is None:
+                return None
+
+            etype_str = str(etype.value) if hasattr(etype, "value") else str(etype)
+
+            action = _extract_action(event, etype_str)
+            specialist = _extract_source(event)
+            data = _extract_data(event)
+
+            # Note: Consumption trail matching between blackboard_publication
+            # and finding_consumed events requires the backend to carry the
+            # same entry identifier in both event types.
+            return {
+                "type": etype_str,
+                "source": getattr(event, "source", "") or "runtime",
+                "specialist": specialist,
+                "action": action[:120],
+                "data": data,
+                "timestamp": getattr(event, "timestamp", time.time()),
+                "icon": _get_icon(etype_str),
+                "color": _get_color(etype_str),
+            }
+
+        except Exception as exc:
+            log.debug("WebBridge event conversion error: %s", exc)
+            return None
+
+
+# ── Conversion Helpers ───────────────────────────────────────────
+
+def _extract_action(event: BaseEvent, etype: str) -> str:
+    """Extract a human-readable action summary from a runtime event."""
+    for attr in _ACTION_ATTRS:
+        val = getattr(event, attr, None)
+        if val:
+            return str(val)
+    return etype.replace("_", " ").title()
+
+
+def _extract_source(event: BaseEvent) -> str:
+    """Extract the source/specialist identifier from a runtime event."""
+    for attr in _SOURCE_ATTRS:
+        val = getattr(event, attr, None)
+        if val:
+            return str(val)
+    return ""
+
+
+def _extract_data(event: BaseEvent) -> Dict[str, Any]:
+    """Extract event-specific data fields as a JSON-serialisable dict.
+
+    Uses model_dump() for Pydantic models, then strips out the known
+    metaclass fields so only the event-specific attributes remain.
+    """
+    data: Dict[str, Any] = {}
+
+    try:
+        # Pydantic v2 models have model_dump()
+        raw = event.model_dump() if hasattr(event, "model_dump") else {}
+    except Exception:
+        raw = {}
+
+    # If model_dump worked, use it and filter
+    if raw:
+        for key, val in raw.items():
+            if key in ("type", "timestamp", "event_id", "correlation_id"):
+                continue
+            if val is None:
+                continue
+            data[key] = val
+        return data
+
+    # Fallback: walk attributes manually (for non-Pydantic events)
+    for attr_name in dir(event):
+        if attr_name.startswith("_") or attr_name in _PYDANTIC_SKIP:
+            continue
+        try:
+            val = getattr(event, attr_name)
+            if val is None or callable(val):
+                continue
+            if attr_name in ("type", "timestamp", "event_id", "correlation_id"):
+                continue
+            # Test serialisability
+            json.dumps(val)
+            data[attr_name] = val
+        except (TypeError, ValueError):
+            pass
+
+    return data
+
+
+_EVENT_ICONS: Dict[str, str] = {
+    "blackboard_publication": "◆",
+    "finding_consumed": "▷",
+    "challenge_raised": "⚠",
+    "consensus_formed": "↻",
+    "architect_decision": "◉",
+    "execution_started": "▶",
+    "execution_completed": "✓",
+    "report_generated": "★",
+    "recovery_initiated": "🔄",
+    "recovery_completed": "✅",
+    "node_transition": "◈",
+    "graph_completed": "✓",
+    "graph_started": "▶",
+    "task_created": "○",
+    "task_assigned": "→",
+    "task_completed": "✓",
+    "task_failed": "✗",
+    "system_online": "●",
+}
+
+_EVENT_COLORS: Dict[str, str] = {
+    "blackboard_publication": "#8c5cff",
+    "finding_consumed": "#00d889",
+    "challenge_raised": "#ff5c7a",
+    "consensus_formed": "#19f5a5",
+    "architect_decision": "#3b82f6",
+    "execution_started": "#f7b731",
+    "execution_completed": "#00e38c",
+    "report_generated": "#39c8ff",
+    "recovery_initiated": "#3b82f6",
+    "recovery_completed": "#00e38c",
+    "node_transition": "#a565ff",
+    "graph_completed": "#00e38c",
+    "graph_started": "#f7b731",
+    "task_created": "#52627f",
+    "task_assigned": "#a565ff",
+    "task_completed": "#00e38c",
+    "task_failed": "#ff5c7a",
+    "system_online": "#00e38c",
+}
+
+
+def _get_icon(etype: str) -> str:
+    return _EVENT_ICONS.get(etype, "•")
+
+
+def _get_color(etype: str) -> str:
+    return _EVENT_COLORS.get(etype, "#52627f")

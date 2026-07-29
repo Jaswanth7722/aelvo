@@ -1,0 +1,88 @@
+# memory/__init__.py - Memory type registry for AELVO OMEGA
+"""Constants and Pydantic re-exports for the memory subsystem."""
+
+from memory.types import (
+    MemoryEntry,
+    CodePatternEntry,
+    UserPreferenceEntry,
+    ResearchFindingEntry,
+    SecurityRuleEntry,
+    SystemDecisionEntry,
+    DevOpsPatternEntry,
+    VoluntaryMemoryEntry,
+    SemanticMemoryEntry,
+)
+
+# Canonical memory type strings used everywhere ChromaDB metadata is written.
+MEMORY_TYPE_CODE_PATTERN = "code_pattern"
+MEMORY_TYPE_ERROR_RECOVERY = "error_recovery"
+MEMORY_TYPE_CONVENTION = "convention"
+MEMORY_TYPE_DEVOPS_PATTERN = "devops_pattern"
+MEMORY_TYPE_USER_PREFERENCE = "user_preference"
+MEMORY_TYPE_RESEARCH_FINDING = "research_finding"
+MEMORY_TYPE_SECURITY_RULE = "security_rule"
+MEMORY_TYPE_SYSTEM_DECISION = "system_decision"
+MEMORY_TYPE_ARCHITECTURE_MAP = "architecture_map"
+MEMORY_TYPE_SESSION_SUMMARY = "session_summary"
+MEMORY_TYPE_VOLUNTARY = "voluntary"
+MEMORY_TYPE_SEMANTIC = "semantic"
+MEMORY_TYPE_CONSENSUS_RECORD = "consensus_record"
+MEMORY_TYPE_COLLABORATION_PATTERN = "collaboration_pattern"
+MEMORY_TYPE_SPECIALIST_EFFECTIVENESS = "specialist_effectiveness"
+MEMORY_TYPE_REVIEW_PATTERN = "review_pattern"
+
+ALL_MEMORY_TYPES = (
+    MEMORY_TYPE_CODE_PATTERN,
+    MEMORY_TYPE_ERROR_RECOVERY,
+    MEMORY_TYPE_CONVENTION,
+    MEMORY_TYPE_DEVOPS_PATTERN,
+    MEMORY_TYPE_USER_PREFERENCE,
+    MEMORY_TYPE_RESEARCH_FINDING,
+    MEMORY_TYPE_SECURITY_RULE,
+    MEMORY_TYPE_SYSTEM_DECISION,
+    MEMORY_TYPE_ARCHITECTURE_MAP,
+    MEMORY_TYPE_SESSION_SUMMARY,
+    MEMORY_TYPE_VOLUNTARY,
+    MEMORY_TYPE_SEMANTIC,
+    MEMORY_TYPE_CONSENSUS_RECORD,
+    MEMORY_TYPE_COLLABORATION_PATTERN,
+    MEMORY_TYPE_SPECIALIST_EFFECTIVENESS,
+    MEMORY_TYPE_REVIEW_PATTERN,
+)
+
+SPECIALIST_OWNED_TYPES: dict[str, tuple[str, ...]] = {
+    "FORGE": (MEMORY_TYPE_CODE_PATTERN, MEMORY_TYPE_ERROR_RECOVERY, MEMORY_TYPE_CONVENTION, MEMORY_TYPE_REVIEW_PATTERN),
+    "TERMINUS": (MEMORY_TYPE_DEVOPS_PATTERN,),
+    "HERMES": (MEMORY_TYPE_USER_PREFERENCE,),
+    "ORACLE": (MEMORY_TYPE_RESEARCH_FINDING,),
+    "SENTINEL": (MEMORY_TYPE_SECURITY_RULE, MEMORY_TYPE_REVIEW_PATTERN),
+    "ARCHITECT": (MEMORY_TYPE_SYSTEM_DECISION, MEMORY_TYPE_ARCHITECTURE_MAP, MEMORY_TYPE_CONSENSUS_RECORD, MEMORY_TYPE_COLLABORATION_PATTERN),
+    "HERALD": (),  # HERALD reads only
+    "ORCHESTRATOR": (MEMORY_TYPE_SESSION_SUMMARY, MEMORY_TYPE_SPECIALIST_EFFECTIVENESS),
+}
+
+__all__ = [
+    "MemoryEntry",
+    "CodePatternEntry",
+    "UserPreferenceEntry",
+    "ResearchFindingEntry",
+    "SecurityRuleEntry",
+    "SystemDecisionEntry",
+    "DevOpsPatternEntry",
+    "VoluntaryMemoryEntry",
+    "SemanticMemoryEntry",
+    "MEMORY_TYPE_CODE_PATTERN",
+    "MEMORY_TYPE_ERROR_RECOVERY",
+    "MEMORY_TYPE_CONVENTION",
+    "MEMORY_TYPE_DEVOPS_PATTERN",
+    "MEMORY_TYPE_USER_PREFERENCE",
+    "MEMORY_TYPE_RESEARCH_FINDING",
+    "MEMORY_TYPE_SECURITY_RULE",
+    "MEMORY_TYPE_SYSTEM_DECISION",
+    "MEMORY_TYPE_ARCHITECTURE_MAP",
+    "MEMORY_TYPE_SESSION_SUMMARY",
+    "MEMORY_TYPE_VOLUNTARY",
+    "MEMORY_TYPE_SEMANTIC",
+    "ALL_MEMORY_TYPES",
+    "SPECIALIST_OWNED_TYPES",
+]
