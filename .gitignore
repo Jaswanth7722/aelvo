@@ -9,14 +9,21 @@ auth.json
 
 # 2. Local State & Project Data
 workspace/
+
+# Database files & runtime artifacts
+.aelvo_runtime/
 auth_credentials.db
 memory.db
-chroma_db/
+llm_cache.db
+mcp_memory.db
+mcp_registry.db
 global_memory.db
+chroma_db/
 global_anchor.md
 backups/
 dump.py
 benchmarks/
+sandbox_audit.jsonl
 
 # 3. Python Artifacts
 __pycache__/
