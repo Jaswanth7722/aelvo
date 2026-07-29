@@ -6,7 +6,7 @@ import enum
 import time
 import logging
 import threading
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional
 
 log = logging.getLogger("aelvo.auth.circuit_breaker")
 

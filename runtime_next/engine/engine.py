@@ -124,7 +124,7 @@ class ExecutionGraph:
             node.add_history(from_state, node.state, reason)
         log.info("Node %s: %s -> %s (%s)", node_id, from_str, to_str, reason[:80] if reason else "")
         if self.bus:
-            from runtime_next.models.events import NodeTransitionEvent, EventType
+            from runtime_next.models.events import NodeTransitionEvent
             event = NodeTransitionEvent(
                 id=f"trans_{node_id}_{int(time.time())}",
                 node_id=node_id,
@@ -245,7 +245,7 @@ class ExecutionEngine:
             if hasattr(node, "add_history"):
                 node.add_history(from_state, node.state, reason)
         if self.graph.bus:
-            from runtime_next.models.events import NodeTransitionEvent, EventType
+            from runtime_next.models.events import NodeTransitionEvent
             from_str = from_state.value if isinstance(from_state, Enum) else str(from_state)
             to_str = node.state.value if isinstance(node.state, Enum) else str(node.state)
             event = NodeTransitionEvent(

@@ -8,7 +8,7 @@ Verification results are immutable once emitted.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 

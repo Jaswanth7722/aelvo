@@ -12,7 +12,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from typing import Dict, List
+from typing import List
 
 from ui.core.ui_event import UIEvent, UIEventType
 from ui.core.ui_dispatcher import UIEventDispatcher

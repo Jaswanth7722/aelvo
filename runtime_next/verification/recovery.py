@@ -8,7 +8,6 @@ Recovery strategies are typed, observable, replayable, interruptible.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import time
@@ -19,10 +18,6 @@ from .types import (
     FailureClassification,
     RecoveryStrategy,
     RecoveryAction,
-    Confidence,
-    Severity,
-    Retryability,
-    DEFAULT_RECOVERY_MAP,
 )
 
 log = logging.getLogger("aelvo.runtime.verification.recovery")

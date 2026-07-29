@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable
 from ui.events import EventBus, Event, EventType, get_event_bus
 from ui.events.event_factory import create_collaboration_event
 

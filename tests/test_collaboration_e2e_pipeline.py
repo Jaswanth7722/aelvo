@@ -148,7 +148,6 @@ class TestChallengeToConsensusPipeline:
         from specialists.architect import ArchitectSpecialist
         from cognition.consensus_extended import (
             ExtendedConsensusEngine, ResolutionStrategy,
-            ConsensusOutcomeType,
         )
 
         architect = ArchitectSpecialist()
@@ -503,7 +502,7 @@ class TestPipelineIntegration:
     def test_11_pipeline_phase_handoffs(self):
         """Pipeline has correctly ordered phases with defined handoffs."""
         from core.orchestration.task_board_pipeline import (
-            TaskBoardPipeline, PipelinePhase, MODE_A, MODE_B,
+            PipelinePhase, MODE_A, MODE_B,
         )
 
         # Verify mode constants

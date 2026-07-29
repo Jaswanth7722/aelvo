@@ -3,14 +3,12 @@
 
 import time
 import logging
-from typing import Dict, List, Set, Optional, Any, Tuple
-from pathlib import Path
-from collections import defaultdict
+from typing import Dict, List, Set, Optional, Tuple
 import re
 
 from repo_intelligence.types import (
     SymbolNode, SymbolEdge, EdgeType, ConfidenceLevel,
-    GraphSnapshot, ContextPacket, QueryResult, FileDependencyInfo,
+    GraphSnapshot, ContextPacket, FileDependencyInfo,
     ArchitectureMap, CallGraphSnapshot, DependencyGraphSnapshot,
     PerformanceMetrics
 )

@@ -13,11 +13,10 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from .dashboard import RuntimeDashboard, DashboardSnapshot
-from .health import RuntimeHealthMonitor, HealthStatus
-from .alerting import AlertManager, AlertSeverity, Alert
+from .dashboard import RuntimeDashboard
+from .alerting import AlertSeverity
 
 log = logging.getLogger("aelvo.runtime.monitoring.cli")
 

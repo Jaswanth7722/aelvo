@@ -5,12 +5,12 @@ import time
 import logging
 import sqlite3
 import json
-from typing import Dict, List, Optional, Set
+from typing import List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
 from pathlib import Path
 
-from repo_intelligence.types import PerformanceMetrics, ConfidenceLevel
+from repo_intelligence.types import PerformanceMetrics
 from repo_intelligence.types_extended import (
     ModificationRecord, ModificationPattern, Hotspot, ComponentBreakage,
     FragileComponent, BreakagePattern, ArchitecturalDecision, DecisionEvolution,

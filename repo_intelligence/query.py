@@ -3,15 +3,15 @@
 
 import time
 import logging
-from typing import Dict, List, Set, Optional, Any, Tuple
+from typing import Dict, List, Optional
 from pathlib import Path
 from collections import defaultdict
 
 from repo_intelligence.types import (
-    SymbolNode, SymbolEdge, EdgeType, ConfidenceLevel,
-    GraphSnapshot, ImpactReport, ArchitectureMap, FileDependencyInfo,
+    SymbolEdge, EdgeType, ConfidenceLevel,
+    GraphSnapshot, FileDependencyInfo,
     DependencyGraphSnapshot, CallGraphSnapshot, QueryResult, QueryProvenance,
-    PerformanceMetrics, IndexStatus, RiskLevel, ParsedFile, FileId
+    PerformanceMetrics, ParsedFile
 )
 
 log = logging.getLogger("aelvo.repo_intelligence.query")

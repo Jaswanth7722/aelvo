@@ -1,6 +1,5 @@
 """Tests for conversion adapters."""
 
-import pytest
 from auth.adapters.messages import MessageAdapter
 from auth.adapters.streaming import StreamingAdapter
 from auth.adapters.tool_calls import ToolCallAdapter

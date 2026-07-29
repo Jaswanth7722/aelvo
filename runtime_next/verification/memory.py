@@ -29,7 +29,6 @@ from .types import (
     FailureClassification,
     RecoveryAction,
     RecoveryStrategy,
-    Confidence,
 )
 
 log = logging.getLogger("aelvo.runtime.verification.memory")

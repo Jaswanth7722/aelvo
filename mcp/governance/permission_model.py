@@ -128,7 +128,7 @@ class PermissionModel:
             if not perm.allowed:
                 return PermissionCheckResult(
                     allowed=False,
-                    reason=perm.reason or f"Denied by permission rule",
+                    reason=perm.reason or "Denied by permission rule",
                     matching_rule=perm,
                 )
 

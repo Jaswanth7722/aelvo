@@ -16,12 +16,8 @@ from cognition.blackboard import CognitiveBlackboard
 from cognition.types import EntryType, Provenance, ProvenanceType
 from shared_task_board import (
     SharedTaskBoard,
-    Task,
-    TaskSpec,
-    TaskType,
     TaskStatus,
     SpecialistName,
-    BoardState,
 )
 
 log = logging.getLogger("aelvo.collab.herald")

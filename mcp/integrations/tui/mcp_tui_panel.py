@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List
 from rich.table import Table
 from rich.text import Text
 from textual.reactive import reactive

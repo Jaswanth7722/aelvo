@@ -16,10 +16,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 from core.health.system_health_monitor import (
     SystemHealthMonitor,
@@ -262,7 +262,7 @@ class SystemDashboard:
         lines = [
             "",
             "  ╔══════════════════════════════════════════════════════════╗",
-            f"  ║           AELVO SYSTEM MONITORING DASHBOARD            ║",
+            "  ║           AELVO SYSTEM MONITORING DASHBOARD            ║",
             "  ╚══════════════════════════════════════════════════════════╝",
             f"  {status_color} Status: {status_text}  |  "
             f"Refreshed: {now}  |  "

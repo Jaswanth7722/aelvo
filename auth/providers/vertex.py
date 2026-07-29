@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator
 
 from ..types import CapabilityFlag, ModelFamily, ModelInfo, ProviderCapabilities, ProviderConfig, ProviderInfo, ProviderType
 from .base import BaseProvider
@@ -41,10 +41,9 @@ class VertexProvider(BaseProvider):
         ModelClass = self._get_model()
         gen_model = ModelClass(model_name=model)
 
-        system_instruction = None
         chat_messages = messages
         if messages and messages[0].get("role") == "system":
-            system_instruction = messages[0]["content"]
+            messages[0]["content"]
             chat_messages = messages[1:]
 
         contents = []

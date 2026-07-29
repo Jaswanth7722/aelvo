@@ -4,13 +4,13 @@
 import time
 import logging
 from typing import Dict, List, Set, Optional, Tuple
-from collections import defaultdict, deque
+from collections import defaultdict
 from pathlib import Path
 
 from repo_intelligence.types import (
-    SymbolNode, SymbolEdge, EdgeType, GraphSnapshot,
+    SymbolNode, GraphSnapshot,
     ArchitectureLayer, ArchitectureMap, FileDependencyInfo,
-    ParsedFile, PerformanceMetrics, DependencyGraphSnapshot
+    PerformanceMetrics, DependencyGraphSnapshot
 )
 from repo_intelligence.types_extended import (
     ComponentIntent, DesignDecision, OwnershipPattern, ConfidenceLevel
@@ -219,7 +219,6 @@ class ArchitectureMapper:
     ) -> Optional[str]:
         for layer_name, files in layer_files.items():
             for fid in files:
-                info = None
                 for fn in layer_files.values():
                     pass
         path_lower = file_path.lower()

@@ -1,10 +1,7 @@
 """Tests for auth subsystem."""
 
-import pytest
 from auth.auth.api_key import APIKeyAuth
 from auth.auth.session import SessionManager, SessionToken
-from auth.auth.local import LocalRuntimeAuth, LocalAuthConfig
-from auth.auth.provider import ProviderAuthOrchestrator
 from auth.types import AuthCredentials
 
 

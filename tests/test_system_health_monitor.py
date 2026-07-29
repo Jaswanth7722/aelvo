@@ -5,10 +5,7 @@ and autonomous healing integration.
 """
 
 import asyncio
-import time
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.health.system_health_monitor import (
     SystemHealthMonitor,

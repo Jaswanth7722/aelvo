@@ -9,7 +9,6 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from ..types import TokenUsage
 
 logger = logging.getLogger(__name__)
 

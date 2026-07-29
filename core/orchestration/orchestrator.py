@@ -14,12 +14,11 @@ import json
 import hashlib
 import asyncio
 import logging
-from pathlib import Path
 
 log = logging.getLogger("aelvo.orchestrator")
 from typing import List, Dict, Tuple, Any, Optional
-from config.settings import CACHE_TREE_EXPIRY_SECONDS, ACTIVATION_THRESHOLD_DEFAULT
-from specialists import SPECIALIST_REGISTRY, get_specialist
+from config.settings import CACHE_TREE_EXPIRY_SECONDS
+from specialists import get_specialist
 from memory.user_model import UserModelManager
 from cognition.hermes_context import HermesContext
 from cognition.architect_decision import ExecutionMode
@@ -27,13 +26,12 @@ from cognition.architect_decision import ExecutionMode
 # New Runtime Integration
 from runtime_next.events.bus import EventBus
 from runtime_next.capability.registry import CapabilityRegistry
-from runtime_next.models.events import BaseEvent, NodeTransitionEvent, EventType as RuntimeEventType
+from runtime_next.models.events import BaseEvent, EventType as RuntimeEventType
 from runtime_next.recovery.engine import RecoveryEngine
 from runtime_next.verification.pipeline import VerificationPipeline
 from runtime_next.verification.sandbox_verifier import register_sandbox_verifier
 from runtime_next.verification.types import (
-    VerificationType, VerificationManifest, VerificationScope, Severity,
-    VerificationResult, Confidence, Retryability,
+    VerificationType, VerificationManifest, VerificationScope, VerificationResult,
 )
 from runtime_next.verification.events import VerificationFailedEvent as VerifFailedEvent
 from runtime_next.engine.file_mutex import FileMutex
@@ -69,7 +67,7 @@ from runtime_next.plan.calibration import PlanCalibrationSystem
 
 # UI Integration (direct, no bridge layer)
 try:
-    from ui.events import get_event_bus, create_task_event, create_specialist_event, EventType as UIEventType
+    from ui.events import get_event_bus
     UI_AVAILABLE = True
 except ImportError:
     UI_AVAILABLE = False
@@ -538,7 +536,7 @@ class Orchestrator:
         self._turn_counter += 1
         self.session_manager.increment_turn()
         self.runtime_runner.agent = agent
-        turn_start = time.time()
+        time.time()
 
         # 1. Preparation (UI, Force-Route, Mode Detection)
         task_id = f"turn_{self._turn_counter}"
@@ -1046,7 +1044,6 @@ class Orchestrator:
 
     def get_health_status(self) -> Dict[str, Any]:
         """Expose system health checking databases, filesystem, bus, and specialists."""
-        import sqlite3
         status = {
             "status": "healthy",
             "timestamp": time.time(),
@@ -1116,7 +1113,6 @@ class Orchestrator:
         """Unified, async-safe execution loop that runs LLM-generated tool calls or kernel commands."""
         from core.orchestration.parser import parse_llm_output
         from core.rag import MemorySearcher
-        import hashlib
         import sqlite3
         import datetime
 

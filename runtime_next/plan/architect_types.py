@@ -11,7 +11,7 @@ contract and are validated more strictly before execution.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
@@ -299,7 +299,7 @@ class ExecutionStrategySection(BaseModel):
         phase_ids = {p.id for p in self.phases}
         in_degree: Dict[str, int] = {pid: 0 for pid in phase_ids}
         adj: Dict[str, List[str]] = {pid: [] for pid in phase_ids}
-        effort: Dict[str, int] = {p.id: p.estimated_effort for p in self.phases}
+        {p.id: p.estimated_effort for p in self.phases}
 
         for dep in self.dependency_edges:
             if dep.source in phase_ids and dep.target in phase_ids:

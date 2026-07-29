@@ -15,17 +15,13 @@ deterministic replay fails, or repeated failures show instability.
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from .types import (
     FailureClassification,
     RetryDecision,
     Retryability,
-    Confidence,
 )
 
 log = logging.getLogger("aelvo.runtime.verification.retry_safety")

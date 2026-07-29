@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 from datetime import datetime, timezone
 
 from .execution_request import MCPExecutionRequest

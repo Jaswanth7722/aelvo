@@ -9,7 +9,7 @@ reports, recovery actions, user messages, responses.
 
 import textwrap
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from rich.markup import escape
 from textual.containers import VerticalScroll
@@ -23,7 +23,6 @@ from ui.models.collaboration_event import (
     EVENT_COLORS,
     SPECIALIST_COLORS,
 )
-from ui.models.trust_indicator import TrustIndicator
 from ui.core.ui_event import UIEvent, UIEventType
 
 MAX_VISIBLE_EVENTS = 20
@@ -316,8 +315,7 @@ class ConversationFeed(VerticalScroll):
             )
 
         elif etype == CollaborationEventType.EXECUTION_ACTION:
-            status = ev.metadata.get("status", "running")
-            status_color = "#00e38c" if status == "success" else "#f7b731"
+            ev.metadata.get("status", "running")
             result.append(
                 f"[#52627f]{timestamp}[/] [{color}]{icon}[/] "
                 f"[{spec_color}]{specialist}[/] [#8fa0c5]executed[/] "

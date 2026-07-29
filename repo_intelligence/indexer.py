@@ -4,9 +4,7 @@
 import asyncio
 import time
 import logging
-from typing import Dict, List, Set, Optional, Callable, Any
-from datetime import datetime
-from collections import defaultdict
+from typing import Dict, List, Set, Optional, Callable
 
 from repo_intelligence.types import (
     FileScanResult, ParsedFile, FileId, PerformanceMetrics,

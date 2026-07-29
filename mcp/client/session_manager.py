@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
-from ..transport.base_transport import MCPMessage
 from ..registry.models import CapabilityProfile
 
 log = logging.getLogger("aelvo.mcp.client.session")

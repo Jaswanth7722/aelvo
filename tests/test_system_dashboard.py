@@ -3,34 +3,24 @@
 Tests the SystemDashboard, DashboardDataSource, and all dashboard sections.
 """
 
-import asyncio
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 
 from core.health.system_health_monitor import (
     SystemHealthMonitor,
-    SystemHealthReport,
-    ComponentHealth,
     ComponentStatus,
-    HealthCheck,
 )
 from core.execution.tool_registry import (
     ToolExecutionRegistry,
     ToolSpec,
     ToolResult,
     ToolCategory,
-    RetryPolicy,
 )
 from core.execution.sandbox_session import (
     PersistentSandboxSession,
-    SandboxSessionState,
-    SessionStatus,
 )
 from core.execution.experience_pipeline import (
     ExperienceLearningPipeline,
-    ErrorCategory,
-    PatternSeverity,
 )
 from core.monitoring.system_dashboard import (
     SystemDashboard,
@@ -454,7 +444,7 @@ class TestSystemDashboardIntegration:
         dashboard = SystemDashboard(data_source=DashboardDataSource())
         await dashboard.refresh()
         display = dashboard.to_terminal_display()
-        data = dashboard.to_dict()
+        dashboard.to_dict()
 
         assert len(display) > 100
         assert "Not connected" in display

@@ -14,16 +14,13 @@ Each test class focuses on a specific transition point in the pipeline.
 from __future__ import annotations
 
 import asyncio
-import hashlib
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict, List
+from unittest.mock import MagicMock
 
-import pytest
 
 # ── Cognitive Engine ─────────────────────────────────────────────────────
 from cognition.engine import CognitiveEngine, CognitiveEngineConfig
-from cognition.types import Goal, SubGoal, GoalStatus
+from cognition.types import GoalStatus
 
 # ── Architect Plan ───────────────────────────────────────────────────────
 from runtime_next.plan.architect import ArchitectOrchestrator
@@ -58,7 +55,6 @@ from runtime_next.plan.architect_types import (
 from runtime_next.engine.engine import ExecutionGraph, ExecutionEngine, EngineState
 from runtime_next.engine.runner import NodeRunner
 from runtime_next.models.node import NodeDefinition, NodeState
-from runtime_next.models.plan import ExecutionPlan, ExecutionNode, NodeType, Criticality, ExecutionEdge
 
 # ── Verification Pipeline ─────────────────────────────────────────────────
 from runtime_next.verification.pipeline import VerificationPipeline
@@ -73,7 +69,6 @@ from runtime_next.verification.types import (
 )
 
 # ── Event System ──────────────────────────────────────────────────────────
-from runtime_next.events.bus import EventBus
 from runtime_next.models.events import (
     BaseEvent,
     EventType,

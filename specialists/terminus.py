@@ -2,14 +2,13 @@
 
 import logging
 import time
-import os
 import shutil
 import re
 import json
 import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 from specialists.base import BaseSpecialist
-from tools.git_tools import get_git_state, generate_commit_message
+from tools.git_tools import get_git_state
 from memory import MEMORY_TYPE_DEVOPS_PATTERN
 
 
@@ -293,7 +292,7 @@ TERMINUS RULES:
                         (f"[TERMINUS:devops_pattern|{project}] {doc[:800]}",),
                     )
                 audits.append("devops_pattern saved")
-            except Exception as exc:
+            except Exception:
                 try:
                     memory_engine.memory_collection.delete(ids=[m_id])
                 except Exception as _ex: print("Silenced exception: %s", _ex)

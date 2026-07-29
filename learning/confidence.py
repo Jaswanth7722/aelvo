@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
-import time
 import math
 import logging
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from learning.types import (
     EngineeringPattern, ConfidenceUpdate, ValidationState,

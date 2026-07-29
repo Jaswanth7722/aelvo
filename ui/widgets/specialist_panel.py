@@ -10,7 +10,6 @@ Shows:
 
 from textual.widgets import Static
 from textual.reactive import reactive
-from collections import defaultdict
 
 
 SPECIALIST_ORDER = ["HERMES", "ARCHITECT", "ORACLE", "FORGE", "SENTINEL", "TERMINUS", "HERALD"]

@@ -99,7 +99,7 @@ async def test_recovery_stress(test_dir):
     from runtime_next.engine.file_mutex import FileMutex
     from runtime_next.engine.engine import ExecutionGraph
     from runtime_next.recovery.engine import RecoveryEngine
-    from runtime_next.models.node import NodeDefinition, NodeState
+    from runtime_next.models.node import NodeDefinition
 
     bus = EventBus()
     mutex = FileMutex()

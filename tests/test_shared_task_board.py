@@ -9,7 +9,6 @@ Tests the SharedTaskBoard package including:
   - EventBus integration
 """
 
-import json
 import os
 import tempfile
 import time
@@ -27,11 +26,11 @@ from shared_task_board.board import (
 )
 from shared_task_board.context_schemas import (
     ResearchContext, ImplementContext, SecurityReviewContext,
-    ExecuteContext, ConsensusContext, ReportContext,
+    ExecuteContext, ConsensusContext,
 )
 from shared_task_board.result_schemas import (
     ResearchResult, ImplementResult, SecurityReviewResult,
-    ExecuteResult, ConsensusResult, ReportResult,
+    ExecuteResult, ConsensusResult,
 )
 
 
@@ -293,7 +292,7 @@ class TestSharedTaskBoard:
     def test_get_active_tasks(self, board):
         """get_active_tasks() returns non-terminal tasks."""
         t1 = board.create_task(task_type=TaskType.RESEARCH, title="R1")
-        t2 = board.create_task(task_type=TaskType.IMPLEMENT, title="I1")
+        board.create_task(task_type=TaskType.IMPLEMENT, title="I1")
         board.assign_task(t1.id, "ORACLE")
         board.start_task(t1.id)
 

@@ -6,10 +6,8 @@ import json
 import logging
 import sqlite3
 import os
-import time
-from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ..execution.execution_result import MCPExecutionResult
 from ..registry.models import CapabilityProfile

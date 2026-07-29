@@ -14,19 +14,14 @@ Dangerous recovery actions require confirmation.
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
 from typing import Any, Dict, List, Optional, Set
-from datetime import datetime
 
 from .types import (
     FailureClassification,
     GovernanceDecision,
     RecoveryStrategy,
     Confidence,
-    Severity,
-    Retryability,
 )
 
 log = logging.getLogger("aelvo.runtime.verification.governance")
@@ -191,9 +186,9 @@ class RecoveryGovernance:
                 danger_assessment="reversible",
                 requires_user_intervention=True,
                 suggested_message=(
-                    f"An architecture violation was detected. "
-                    f"This requires your review to determine "
-                    f"the best course of action."
+                    "An architecture violation was detected. "
+                    "This requires your review to determine "
+                    "the best course of action."
                 ),
             )
 

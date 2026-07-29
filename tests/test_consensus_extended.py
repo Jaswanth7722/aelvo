@@ -19,19 +19,15 @@ import json
 import os
 import pytest
 import tempfile
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List
 
 from cognition.consensus_extended import (
     ExtendedConsensusEngine,
-    ConsensusRequest,
     ConsensusOutcome,
     ConsensusPosition,
     ConsensusOutcomeType,
     ResolutionStrategy,
 )
 from cognition.blackboard import CognitiveBlackboard
-from cognition.types import EntryType
 
 
 # ===========================================================================

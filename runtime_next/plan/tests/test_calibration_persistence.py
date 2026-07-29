@@ -16,7 +16,8 @@ Verifies:
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict
+from pathlib import Path
 
 import pytest
 
@@ -24,7 +25,6 @@ from runtime_next.plan.calibration import (
     PlanCalibrationSystem,
     LearningEntry,
     DeviationType,
-    CalibrationAdjustment,
     CALIBRATION_DATA_FILENAME,
 )
 
@@ -554,7 +554,7 @@ class TestVerificationCalibrationIntegration:
             plan_id="v_persist",
             verification_type_failures={"typecheck": 1, "security_scan": 3},
         ))
-        learning_count_before = len(cal._learnings)
+        len(cal._learnings)
 
         del cal
         cal2 = make_calibration(tmp_path)
@@ -619,7 +619,7 @@ class TestVerificationCalibrationIntegration:
 
     def test_unnecessary_specialist_deviation_produces_adjustments(self, tmp_cal):
         """UNNECESSARY_SPECIALIST learnings must produce specialist_activation adjustments."""
-        outcome = tmp_cal.record_outcome(**sample_outcome_kwargs(
+        tmp_cal.record_outcome(**sample_outcome_kwargs(
             task_type="refactor",
             planned_specialists=["FORGE", "SENTINEL", "ORACLE", "HERMES"],
             actual_specialists=["FORGE"],

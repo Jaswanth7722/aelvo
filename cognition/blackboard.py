@@ -7,12 +7,11 @@ import logging
 import sqlite3
 import os
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Set, Callable
+from typing import Dict, List, Optional, Any, Callable
 from pydantic import BaseModel, Field, field_validator
 
 from cognition.types import (
-    BlackboardEntry, BlackboardSlot, EntryType, Provenance, ProvenanceType,
-    ConflictRecord, ConflictSeverity,
+    BlackboardEntry, BlackboardSlot, EntryType, Provenance, ConflictRecord, ConflictSeverity,
 )
 
 try:
@@ -315,12 +314,10 @@ class CognitiveBlackboard:
         """
         # Find the entry in any slot
         entry = None
-        slot_name = ""
         for sname, slot in self._slots.items():
             for e in slot.entries:
                 if e.id == entry_id:
                     entry = e
-                    slot_name = sname
                     break
             if entry:
                 break
@@ -738,7 +735,6 @@ class CognitiveBlackboard:
             CollaborationEvidence, VerificationStatus,
             EvidenceLifecycleStatus, EvidenceTimeline,
         )
-        from datetime import timezone
 
         result: List[Any] = []
 

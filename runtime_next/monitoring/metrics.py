@@ -13,8 +13,8 @@ import logging
 import time
 from collections import deque, defaultdict
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Set, Tuple
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 log = logging.getLogger("aelvo.runtime.monitoring.metrics")
 

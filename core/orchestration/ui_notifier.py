@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Any, Dict, Optional
+from typing import Optional
 
 try:
     from ui.events import create_task_event, create_specialist_event, EventType as UIEventType

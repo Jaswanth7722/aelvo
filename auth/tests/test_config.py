@@ -1,6 +1,5 @@
 """Tests for auth config module."""
 
-import pytest
 from auth.config import PROVIDER_REGISTRY, MODEL_REGISTRY
 from auth.config import (
     get_provider,

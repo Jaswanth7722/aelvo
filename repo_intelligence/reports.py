@@ -3,14 +3,13 @@
 
 import time
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 from datetime import datetime
 import json
 
-from repo_intelligence.types import GraphSnapshot, PerformanceMetrics
+from repo_intelligence.types import PerformanceMetrics
 from repo_intelligence.types_extended import (
-    HealthReport, DriftReport, EvolutionReport,
-    RepositoryCognitionReport, RiskLevel
+    HealthReport, RepositoryCognitionReport, RiskLevel
 )
 
 log = logging.getLogger("aelvo.repo_intelligence.reports")
@@ -528,7 +527,7 @@ class ReportGenerator:
         evolution_report_data = self.generate_evolution_report()
         
         # Convert to proper types
-        health_report = HealthReport(
+        HealthReport(
             repository_id=str(self.engine.workspace_root),
             overall_health_score=health_report_data["overall_health"]["overall_health_score"],
             complexity_score=health_report_data["overall_health"]["complexity_score"],
@@ -540,7 +539,7 @@ class ReportGenerator:
         )
         
         drift_report = self.engine.detect_architectural_drift()
-        evolution_report = self.engine.generate_evolution_report()
+        self.engine.generate_evolution_report()
         
         # Generate repository reasoning summary
         repository_reasoning_summary = {

@@ -7,10 +7,10 @@ EventBus via the event_publisher module.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
-from .event_schemas import DiscoverySource, DisconnectReason, FailureType
+from .event_schemas import DiscoverySource, DisconnectReason
 
 
 class MCPEvent(BaseModel):

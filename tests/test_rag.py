@@ -1,13 +1,9 @@
 """Comprehensive tests for the production-grade RAG system."""
 
 import time
-import re
-import pytest
-from typing import Dict, List, Any
 
 from core.rag.types import (
-    Document, Chunk, RetrievalResult, RAGContext, IngestResult,
-    ChunkingStrategy, RetrievalStrategy, FusionStrategy, ReRankStrategy,
+    Document, Chunk, RetrievalResult, ChunkingStrategy, RetrievalStrategy, FusionStrategy, ReRankStrategy,
     RAGConfig,
 )
 from core.rag.chunking import chunk_document, estimate_tokens
@@ -428,7 +424,7 @@ class TestRAGEngine:
         config = RAGConfig(enable_cache=True, cache_ttl_seconds=60)
         engine = RAGEngine(col, config=config)
         engine.ingest("Python is a programming language")
-        ctx1 = engine.retrieve("python", strategy=RetrievalStrategy.DENSE)
+        engine.retrieve("python", strategy=RetrievalStrategy.DENSE)
         ctx2 = engine.retrieve("python", strategy=RetrievalStrategy.DENSE)
         assert ctx2.durations.get("cache_hit", None) is not None or True
 

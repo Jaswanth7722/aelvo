@@ -2,15 +2,13 @@
 # Layer 0+: Complete type system for repository reasoning capabilities
 
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple, Any
-from pydantic import BaseModel, Field, field_validator
-from datetime import datetime, timedelta
-import hashlib
+from typing import Dict, List, Optional, Tuple, Any
+from pydantic import BaseModel, Field
+from datetime import datetime
 
 # Import base types to avoid duplication
 from repo_intelligence.types import (
-    ConfidenceLevel, RiskLevel, SymbolId, FileId, SymbolNode, 
-    PerformanceMetrics, GraphSnapshot, EdgeType
+    ConfidenceLevel, RiskLevel
 )
 
 # ===========================================================================

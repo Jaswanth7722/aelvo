@@ -4,11 +4,10 @@
 import time
 import logging
 from typing import Dict, List, Set, Optional, Tuple
-from pathlib import Path
-from collections import defaultdict, deque
+from collections import defaultdict
 
 from repo_intelligence.types import (
-    SymbolNode, SymbolEdge, EdgeType, ConfidenceLevel, GraphSnapshot
+    EdgeType, ConfidenceLevel
 )
 from repo_intelligence.types_extended import (
     RuntimeDependency, ExecutionPath, DataFlowPath, PerformanceMetrics

@@ -20,12 +20,11 @@ Usage:
 from __future__ import annotations
 
 import os
-import sys
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from auth.config import PROVIDER_REGISTRY, MODEL_REGISTRY, get_provider, get_model
+from auth.config import PROVIDER_REGISTRY, MODEL_REGISTRY, get_provider
 from auth.cred_storage import CredentialStore
 from auth.runtime.registry import ProviderRegistry
 from auth.runtime.health import ProviderHealthRuntime
@@ -47,16 +46,9 @@ from auth.diagnostics.capability_inspector import CapabilityInspector
 from auth.diagnostics.comparison_reports import ComparisonReportGenerator
 from auth.diagnostics.health_checks import HealthCheckRunner
 from auth.types import (
-    AuthMethod,
-    Capability,
-    Credential,
-    CredentialType,
-    HealthStatus,
     ProviderConfig,
     ProviderInfo,
     ProviderKind,
-    ProviderStatus,
-    Usage,
 )
 
 logger = logging.getLogger("aelvo.provider_runtime")
@@ -419,7 +411,7 @@ class ProviderRuntime:
         for all registered providers in a concise format.
         """
         result: dict[str, Any] = {}
-        auth = self.get_auth_diagnostics()
+        self.get_auth_diagnostics()
         for pid in self.provider_configs:
             result[pid] = {
                 "has_credentials": self.has_credentials(pid),
@@ -672,7 +664,7 @@ async def init_provider_runtime(
             version="1.0.0",
         )
         # Build capabilities from provider config
-        from auth.types import CapabilityFlag, ModelCapability, ProviderCapabilities, ProviderStatus
+        from auth.types import CapabilityFlag, ProviderCapabilities
         capabilities = ProviderCapabilities(
             capabilities={CapabilityFlag[cap.name] for cap in config.capabilities if cap.name in CapabilityFlag.__members__},
             model_families=set(),

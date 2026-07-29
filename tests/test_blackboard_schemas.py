@@ -9,7 +9,6 @@ Covers:
 
 import json
 import pytest
-from datetime import datetime, timezone
 
 from cognition.types import (
     EntryType, Provenance, ProvenanceType,
@@ -107,7 +106,7 @@ class TestGetArchivedEntries:
     """``get_archived_entries()`` returns only archived entries."""
 
     def test_get_archived_returns_archived(self, bb: CognitiveBlackboard, provenance: Provenance):
-        e1 = bb.publish("slot", "active", EntryType.FACT, provenance)
+        bb.publish("slot", "active", EntryType.FACT, provenance)
         e2 = bb.publish("slot", "gone", EntryType.FACT, provenance)
         bb.archive(e2.id)
         archived = bb.get_archived_entries()
@@ -131,7 +130,7 @@ class TestGetArchivedEntries:
     def test_archive_does_not_affect_other_slots(
         self, bb: CognitiveBlackboard, provenance: Provenance,
     ):
-        e1 = bb.publish("keep_slot", "active data", EntryType.FACT, provenance)
+        bb.publish("keep_slot", "active data", EntryType.FACT, provenance)
         e2 = bb.publish("archive_slot", "to archive", EntryType.FACT, provenance)
         bb.archive(e2.id)
         assert len(bb.read("keep_slot")) == 1
@@ -436,7 +435,7 @@ class TestIntegration:
         self, bb: CognitiveBlackboard, provenance: Provenance,
     ):
         e1 = bb.publish("s1", "data1", EntryType.FACT, provenance)
-        e2 = bb.publish("s1", "data2", EntryType.FACT, provenance)
+        bb.publish("s1", "data2", EntryType.FACT, provenance)
         bb.archive(e1.id)
         snap = bb.snapshot()
         # active_entry_count should be 1 (only e2 is active)

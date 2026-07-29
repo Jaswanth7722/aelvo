@@ -6,7 +6,7 @@ import json
 import logging
 import sqlite3
 from typing import Any, Dict, List, Optional
-from ..registry.models import CapabilityProfile, ToolDefinition, PromptDefinition, ResourceDefinition, TemplateDefinition
+from ..registry.models import CapabilityProfile, ToolDefinition
 from .mcp_memory_store import MCPMemoryStore
 
 log = logging.getLogger("aelvo.mcp.memory.capability")

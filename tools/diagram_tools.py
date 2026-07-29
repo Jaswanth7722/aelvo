@@ -1,6 +1,5 @@
 # diagram_tools.py - Mermaid Diagramming & Structural Synthesis for AELVO OMEGA
 
-import re
 from typing import Dict, Any, List, Tuple
 
 def validate_mermaid(diagram: str) -> Tuple[bool, str]:

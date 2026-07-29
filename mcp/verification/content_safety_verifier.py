@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict
 from .verification_result import VerificationResult
 from ..events.event_schemas import VerificationAction
 

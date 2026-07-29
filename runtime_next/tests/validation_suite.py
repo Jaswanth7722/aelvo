@@ -1,11 +1,8 @@
 import asyncio
 import logging
-import os
 import shutil
 import random
-import json
 from pathlib import Path
-from datetime import datetime
 
 from runtime_next.events.bus import EventBus
 from runtime_next.capability.registry import CapabilityRegistry
@@ -118,7 +115,7 @@ class ValidationSuite:
         
         log_path = str(self.test_dir / "events.log")
         # Ensure some events exist
-        event = NodeDefinition(id="REPLAY_TEST", description="Replay", specialist="FORGE")
+        NodeDefinition(id="REPLAY_TEST", description="Replay", specialist="FORGE")
         # ... just publish some events
         from runtime_next.models.events import BaseEvent, EventType
         await self.bus.publish(BaseEvent(id="E1", type=EventType.LOG_MESSAGE, payload={"m": "hello"}))

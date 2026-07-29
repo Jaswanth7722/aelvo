@@ -33,19 +33,16 @@ import time
 import yaml
 import sqlite3
 import datetime
-from datetime import timedelta
-from typing import Optional, List, Dict, Any, Union, Tuple
+from typing import Optional
 
 # --- AELVO Imports ---
 from core.execution import AelvoKernel
 from core.filesystem import AelvoFileSystem
 from core.scraping import execute_heavy_crawl, execute_light_scrape
 from core.governance import MemoryEngine
-from core.registry import MODEL_REGISTRY
 from core.provider_runtime import init_provider_runtime, format_provider_table, format_comparison_table
 from tools import build_extended_tool_registry
 from core.orchestration import Orchestrator
-from core.rag import MemorySearcher
 from ui import select_project_interactive, detect_provider, show_boot_logo
 from cognition import CognitiveEngine, CognitiveEngineConfig
 from repo_intelligence import RepoIntelligenceEngine
@@ -146,7 +143,7 @@ def get_system_prompt(user_query=""):
 
     # --- SECRETARY: Active Semantic Injection (DYNAMIC RAG ONLY) ---
 
-    return f"""
+    return """
 You are AELVO, a deterministic AI agent operating inside a hardened execution environment on the user's local host machine (Windows OS).
 NOTE: Do not confuse your local operating environment with the user's target project environments. While your tools are jailed to your local workspace, the USER is free to code, deploy, or move their ML projects to external platforms (e.g., Kaggle, AWS, cloud servers). You should fully assist them with code or logic meant for those platforms without claiming it's unsupported.
 Your creator and authorized developer is defined in the anchor constraints below.
@@ -942,7 +939,7 @@ async def main_async():
         tool_registry={}, # Will populate in step 4
         project_name=_ws_name
     )
-    log.info(f"âœ“ MemoryEngine initialized (hybrid: SQLite + Vector)")
+    log.info("âœ“ MemoryEngine initialized (hybrid: SQLite + Vector)")
 
     # 4. Tool Registry â€” maps tool names to implementations
     tool_registry = build_tool_registry(fs, aelvo_kernel, memory_engine)
@@ -995,7 +992,8 @@ async def main_async():
         if provider_runtime and api_key and provider_name:
             try:
                 from auth.types import Credential, CredentialType
-                import uuid, time
+                import uuid
+                import time
                 cred = Credential(
                     id=f"key_{provider_name}_{uuid.uuid4().hex[:8]}",
                     provider=provider_name,
@@ -1275,7 +1273,7 @@ async def main_async():
                             result = {"status": "SUCCESS", "msg": f"Listed {len(models)} models"}
                         elif subcmd == "monitoring" or subcmd == "mon":
                             m = provider_runtime.monitoring_summary()
-                            print(f"\n[PROVIDERS] Monitoring Dashboard:")
+                            print("\n[PROVIDERS] Monitoring Dashboard:")
                             print(f"  Health Monitor: {'âœ… Running' if m['health_monitor_running'] else 'â¹ Stopped'}")
                             print(f"  Total Alerts:   {m['total_alerts']}")
                             print()
@@ -1293,7 +1291,7 @@ async def main_async():
                             result = {"status": "SUCCESS", "msg": "Monitoring dashboard displayed"}
                         elif subcmd == "summary" or subcmd == "info":
                             s = provider_runtime.summary()
-                            print(f"\n[PROVIDERS] Runtime Summary:")
+                            print("\n[PROVIDERS] Runtime Summary:")
                             print(f"  Providers:  {s['providers_count']}")
                             print(f"  Models:     {s['models_count']}")
                             print(f"  Active:     {s['active_providers']}")
@@ -1305,7 +1303,7 @@ async def main_async():
                             print()
                             result = {"status": "SUCCESS", "msg": "Summary displayed"}
                         else:
-                            result = {"status": "REJECTED", "msg": f"Unknown #providers subcommand. Use: list, health, creds [provider], models [provider], monitoring, summary"}
+                            result = {"status": "REJECTED", "msg": "Unknown #providers subcommand. Use: list, health, creds [provider], models [provider], monitoring, summary"}
                     else:
                         result = {"status": "REJECTED", "msg": "Provider runtime not initialized"}
                     print(f"\n[KERNEL] {json.dumps(result, indent=2)}\n")
@@ -1325,7 +1323,7 @@ async def main_async():
                         target = parts[2].strip() if len(parts) > 2 else None
 
                         if subcmd == "scan":
-                            print(f"\n[DOCTOR] Running full diagnostic scan...")
+                            print("\n[DOCTOR] Running full diagnostic scan...")
                             reports = await provider_runtime.doctor_scan(target)
                             for pid, report in reports.items():
                                 print(f"\n  â”€â”€ {pid} â”€â”€")
@@ -1337,18 +1335,18 @@ async def main_async():
                                 if report.capabilities:
                                     print(f"  Capabilities: {', '.join(report.capabilities)}")
                                 if report.issues:
-                                    print(f"  âš  Issues:")
+                                    print("  âš  Issues:")
                                     for issue in report.issues:
                                         print(f"     - {issue}")
                                 if report.recommendations:
-                                    print(f"  ðŸ’¡ Recommendations:")
+                                    print("  ðŸ’¡ Recommendations:")
                                     for rec in report.recommendations:
                                         print(f"     - {rec}")
                             print()
                             result = {"status": "SUCCESS", "msg": f"Diagnosed {len(reports)} provider(s)"}
                         elif subcmd == "list" or subcmd == "ls":
                             summary = provider_runtime.diagnostics_summary()
-                            print(f"\n[DOCTOR] Diagnostic Summary:")
+                            print("\n[DOCTOR] Diagnostic Summary:")
                             header = f"  {'Provider':20s} | {'Status':12s} | {'Latency':8s} | {'Uptime%':8s} | {'Err%':8s} | {'Models'}"
                             sep = f"  {'-'*20}-+-{'-'*12}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'------'}"
                             print(header)
@@ -1362,7 +1360,7 @@ async def main_async():
                             print()
                             result = {"status": "SUCCESS", "msg": f"Summary for {len(summary)} providers"}
                         else:
-                            result = {"status": "REJECTED", "msg": f"Unknown #doctor subcommand. Use: scan [provider], list"}
+                            result = {"status": "REJECTED", "msg": "Unknown #doctor subcommand. Use: scan [provider], list"}
                     else:
                         result = {"status": "REJECTED", "msg": "Provider runtime not initialized"}
                     print(f"\n[KERNEL] {json.dumps(result, indent=2)}\n")
@@ -1399,7 +1397,7 @@ async def main_async():
                             else:
                                 all_auth = await auth.diagnose_all()
                                 table = auth.summary(all_auth)
-                                print(f"\n[DIAGNOSTICS] Auth Configuration Summary:")
+                                print("\n[DIAGNOSTICS] Auth Configuration Summary:")
                                 header = f"  {'Provider':20s} | {'Valid':8s} | {'Env':8s} | {'Reg':8s} | Issues"
                                 sep = f"  {'-'*20}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'------'}"
                                 print(header)
@@ -1443,7 +1441,7 @@ async def main_async():
                                 generator = provider_runtime.get_comparison_generator()
                                 report = generator.compare(provider_ids)
                                 table_str = format_comparison_table(report)
-                                print(f"\n[DIAGNOSTICS] Comparison Report:")
+                                print("\n[DIAGNOSTICS] Comparison Report:")
                                 print(table_str)
                                 print()
                                 result = {"status": "SUCCESS", "msg": f"Compared {len(provider_ids)} providers, winner: {report.winner}"}
@@ -1517,7 +1515,7 @@ async def main_async():
             # ========================================
             # ROUTE 2: Natural language → Claude → Executor
             # ========================================
-            log.info(f"Routing task through Orchestrator coordination loop...")
+            log.info("Routing task through Orchestrator coordination loop...")
             print("[UI] Orchestrator executing turn")
             
             # AWAIT the execution turn (Phase 5, Layer 3) with spinner
@@ -1549,7 +1547,7 @@ async def main_async():
                     sys.stdout.write("\r" + " " * 40 + "\r")
                     sys.stdout.flush()
             
-            raw_output = turn_result["output"]
+            turn_result["output"]
             log.info(f"Active Specialists: {turn_result['specialists_active']}")
             
             if hasattr(orchestrator, 'get_ui_status'):

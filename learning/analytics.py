@@ -5,18 +5,16 @@
 from __future__ import annotations
 
 import time
-import math
 import logging
 import threading
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from collections import defaultdict
-from statistics import mean
 
 from learning.types import (
-    EngineeringPattern, SessionRecord, CalibrationBin, TrendPoint,
+    SessionRecord, CalibrationBin, TrendPoint,
     TrendDirection, TrendSeries, FirstAttemptRecord,
-    SpecialistLearningCurve, ValidationState,
+    SpecialistLearningCurve,
 )
 
 log = logging.getLogger("aelvo.learning.analytics")

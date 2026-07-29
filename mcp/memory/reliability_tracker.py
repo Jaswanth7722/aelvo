@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import sqlite3
 from typing import Any, Dict, Optional
-from ..execution.execution_result import MCPExecutionResult
 from .mcp_memory_store import MCPMemoryStore
 
 log = logging.getLogger("aelvo.mcp.memory.reliability")

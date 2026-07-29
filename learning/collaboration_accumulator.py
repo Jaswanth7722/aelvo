@@ -102,7 +102,7 @@ class CollaborationAccumulator:
             CollaborationPattern (new, updated, or None if below threshold).
         """
         with self._lock:
-            start = time.time()
+            time.time()
 
             # Build an observation from the consensus record
             outcome_label = "success" if record.outcome in (

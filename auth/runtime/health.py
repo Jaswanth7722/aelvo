@@ -231,7 +231,7 @@ class ProviderHealthRuntime:
     def get_recommendation(self, provider_id: str) -> str:
         """Get a human-readable health recommendation."""
         status = self.get_status(provider_id)
-        uptime = self.uptime_percentage(provider_id)
+        self.uptime_percentage(provider_id)
         latency = self.average_latency(provider_id)
 
         if status == ProviderStatus.HEALTHY:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
@@ -10,7 +9,7 @@ from typing import Any, Callable, Optional
 
 import httpx
 
-from ..types import AuthCredentials, ProviderAuthStatus
+from ..types import AuthCredentials
 
 logger = logging.getLogger(__name__)
 

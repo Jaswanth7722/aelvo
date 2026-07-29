@@ -20,10 +20,8 @@ import hashlib
 import logging
 import time
 from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field
 
 from ..architect_types import (
     ArchitectPlan,
@@ -31,36 +29,18 @@ from ..architect_types import (
     CurrentUnderstandingSection,
     ImpactAnalysisSection,
     ImpactItem,
-    RiskSection,
-    RiskItem,
     RiskLevel,
     BlastRadius,
     ExecutionStrategySection,
-    ExecutionPhase,
-    DependencyEdge,
-    SpecialistAssignment,
     SpecialistAssignmentsSection,
     SpecialistRole,
     VerificationPlanSection,
     VerificationCheck,
     VerificationMethod,
-    RecoveryPlanSection,
-    FailureModeStrategy,
-    RecoveryStrategyType,
     CompletionCriteriaSection,
     SelfReviewSection,
-    SelfReviewIssue,
     PlanStatus,
-    ContextAnalysisSection,
-    RepositoryAnalysisSection,
-    ArchitecturalAnalysisSection,
-    DependencyAnalysisSection,
-    GovernanceAnalysisSection,
-    LongTermImpactSection,
     FinalApprovedPlanSection,
-    StrategicRoadmapSection,
-    Milestone,
-    GoalHierarchyNode,
 )
 
 log = logging.getLogger("aelvo.plan.brain")
@@ -479,7 +459,7 @@ class ArchitectIntelligenceBrain:
                 f"brain_{objective}_{datetime.now(timezone.utc).isoformat()}".encode()
             ).hexdigest()[:16]
 
-        task_types = _classify_task_type(objective)
+        _classify_task_type(objective)
 
         # Build the objective section
         objective_section = ObjectiveSection(

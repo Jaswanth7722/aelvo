@@ -3,12 +3,12 @@
 
 import time
 import logging
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Optional
 from collections import defaultdict, deque
 
 from repo_intelligence.types import (
     SymbolNode, SymbolEdge, EdgeType, ConfidenceLevel,
-    GraphSnapshot, CallGraphSnapshot, ParsedFile, PerformanceMetrics
+    GraphSnapshot, CallGraphSnapshot, PerformanceMetrics
 )
 
 log = logging.getLogger("aelvo.repo_intelligence.call_graph")

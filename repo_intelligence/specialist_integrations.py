@@ -4,27 +4,24 @@
 
 import time
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime
+from pathlib import Path
 
-from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics, ConfidenceLevel
+from repo_intelligence.types import PerformanceMetrics, ConfidenceLevel
 from repo_intelligence.types_extended import (
     # ARCHITECT integration types
     PlanningContext, ImplementationStep, ImplementationOrder, RollbackStep, RollbackPlan,
     # FORGE integration types
-    ModificationGuidance, ValidationResult,
-    # SENTINEL integration types
-    TrustBoundary, AttackSurfaceMap, SecurityContext,
+    ModificationGuidance, TrustBoundary, AttackSurfaceMap, SecurityContext,
     # TERMINUS integration types
-    ExecutionPathAnalysis, DestructiveRiskAssessment,
-    # HERMES integration types
-    RepositoryPreferences, CommunicationStyle, CommunicationContext,
+    ExecutionPathAnalysis, RepositoryPreferences, CommunicationStyle, CommunicationContext,
     # ORACLE integration types
     ArchitectureEvidence, KnowledgeItem, SearchResult,
     # Verification Runtime integration types
     Change, ValidationScope, TestScope, RegressionRiskAssessment,
     # Recovery Runtime integration types
-    Failure, RollbackTarget, RollbackPath, RecoveryPriority,
+    Failure, RollbackTarget, RecoveryPriority,
     RiskLevel
 )
 

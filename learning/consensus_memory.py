@@ -8,7 +8,6 @@ import logging
 import time
 import threading
 from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
 
 from config.settings import (
     IMPORTANCE_CONSENSUS_RECORD,

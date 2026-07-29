@@ -7,23 +7,17 @@ Covers:
 - RecoveryEngine integration: hooks wired, default policies loaded
 """
 
-import pytest
-from typing import Any, Dict, List
 
 from runtime_next.governance.policy_engine import (
     GovernancePolicyEngine,
     PolicyRule,
-    PolicyResult,
-    PolicyEvaluation,
     PolicyEffect,
     PolicyScope,
-    PolicySeverity,
     create_default_policies,
 )
 from runtime_next.governance.recovery_hooks import (
     RecoveryGovernanceHooks,
     HookResult,
-    HookOutcome,
 )
 
 
@@ -601,7 +595,6 @@ class TestRecoveryEngineGovernanceIntegration:
     def test_governance_hooks_integrated_with_consensus(self):
         """Governance hooks can be used alongside consensus recovery."""
         from runtime_next.recovery.engine import RecoveryEngine
-        from runtime_next.recovery.consensus_recovery import ConsensusFailureType
 
         engine = RecoveryEngine()
 
@@ -675,8 +668,7 @@ class TestRecoveryEngineGovernanceIntegration:
         """Governance hooks don't interfere with normal recovery operations."""
         from runtime_next.recovery.engine import RecoveryEngine
         from runtime_next.recovery.consensus_recovery import ConsensusFailureType
-        from runtime_next.recovery.specialist_recovery import SpecialistRecoveryAction
-        from runtime_next.recovery.task_recovery import TaskRecoveryAction, TaskRecoveryTrigger
+        from runtime_next.recovery.task_recovery import TaskRecoveryTrigger
 
         engine = RecoveryEngine()
 

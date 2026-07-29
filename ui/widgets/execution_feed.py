@@ -1,6 +1,5 @@
 from textual.widgets import Static
 from textual.reactive import reactive
-from rich.text import Text
 
 
 class ExecutionFeed(Static):

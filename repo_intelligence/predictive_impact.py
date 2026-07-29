@@ -3,11 +3,12 @@
 
 import time
 import logging
-from typing import Dict, List, Optional, Set
+from typing import List, Set
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 
-from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics
+from repo_intelligence.types import EdgeType, PerformanceMetrics
 from repo_intelligence.types_extended import (
     ProposedChange, BlastRadiusAnalysis, FailurePath, PredictiveImpactReport,
     ConfidenceLevel, RiskLevel

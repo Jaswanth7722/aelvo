@@ -13,7 +13,6 @@ from typing import Any, Dict, List, Optional
 
 from cognition.blackboard import CognitiveBlackboard
 from cognition.types import EntryType, Provenance, ProvenanceType
-from shared_task_board.models import SpecialistName
 
 log = logging.getLogger("aelvo.collab.oracle")
 

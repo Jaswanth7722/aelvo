@@ -9,15 +9,13 @@ from __future__ import annotations
 
 import pytest
 import sqlite3
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from pytest import approx
 
 from learning.types import (
     ConsensusOutcome,
     CollaborationEventType,
     CollaborationSignature,
-    CollaborationObservation,
     CollaborationPattern,
     ConsensusMemoryRecord,
     SpecialistEffectivenessRecord,

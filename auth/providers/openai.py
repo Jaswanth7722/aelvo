@@ -8,7 +8,6 @@ from openai import AsyncOpenAI
 
 from ..types import (
     CapabilityFlag,
-    ModelCapability,
     ModelFamily,
     ModelInfo,
     ProviderCapabilities,

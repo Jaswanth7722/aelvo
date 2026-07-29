@@ -11,7 +11,7 @@ A passing test means the TUI specialist panels WILL show live activity.
 import asyncio
 import sys
 import os
-from typing import List, Dict, Any
+from typing import List
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -465,7 +465,7 @@ async def test_orchestrator_notifications_fire_events():
     score_events = [e for e in received if e.event_type == EventType.SPECIALIST_ACTIVATED
                     and "score" in e.data]
     if score_events:
-        results.append(f"PASS: Specialist activation scores present in events")
+        results.append("PASS: Specialist activation scores present in events")
     else:
         results.append("FAIL: No activation scores found in specialist events")
 

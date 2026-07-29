@@ -11,22 +11,16 @@ Tests cover:
 from __future__ import annotations
 
 import time
-import json
-import asyncio
 import pytest
-from pathlib import Path
-from typing import Dict, Any
 
 from core.security.execution_governance import (
     ExecutionGovernance,
     PolicyDecision,
     RiskLevel,
     TrustLevel,
-    SecurityClassification,
 )
 from core.security.security_memory import (
     SecurityMemory,
-    SecurityMemoryEntry,
     MemoryEntryType,
 )
 from core.security.security_analytics import (
@@ -35,9 +29,7 @@ from core.security.security_analytics import (
 )
 from core.security.approval_manager import (
     ApprovalManager,
-    ApprovalRequest,
     ApprovalState,
-    EscalationPath,
 )
 from core.security.security_orchestrator import (
     SecurityOrchestrator,
@@ -241,7 +233,7 @@ class TestSecurityMemory:
     def test_record_risky_action(self):
         """Approved risky actions can be recorded."""
         mem = SecurityMemory()
-        entry_id = mem.record_risky_action(
+        mem.record_risky_action(
             target="pip install tensorflow",
             specialist="FORGE",
             tool_name="bash_exec",
@@ -304,7 +296,7 @@ class TestSecurityMemory:
             reason="Test",
         )
         violation_id = mem.record_violation(decision)
-        recovery_id = mem.record_recovery_outcome(
+        mem.record_recovery_outcome(
             violation_id=violation_id,
             success=True,
             strategy="rollback",
@@ -599,7 +591,7 @@ class TestApprovalManager:
     def test_expire_stale_requests(self):
         """Stale requests are automatically expired."""
         mgr = ApprovalManager(default_timeout=0.01)  # Very short timeout
-        request = mgr.request_approval(decision=self._make_decision())
+        mgr.request_approval(decision=self._make_decision())
         time.sleep(0.02)  # Wait for it to expire
         expired = mgr.expire_stale_requests()
         assert len(expired) >= 1
@@ -1115,7 +1107,7 @@ class TestFullPipeline:
     @pytest.mark.asyncio
     async def test_approval_with_blocked_action_skipped(self):
         """BLOCKED actions skip the approval process entirely."""
-        mgr = ApprovalManager()
+        ApprovalManager()
         decision = PolicyDecision(
             decision_id="pd_blocked",
             action_type="bash_exec",

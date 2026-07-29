@@ -3,12 +3,11 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Set, Tuple, Callable
+from typing import Dict, List, Optional, Any
 from enum import Enum
 
 from cognition.types import (
     ConsensusEvent, ConsensusResult, ConflictRecord, ConflictSeverity,
-    BlackboardEntry, EntryType,
 )
 
 log = logging.getLogger("aelvo.cognition.consensus")

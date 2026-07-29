@@ -1,5 +1,6 @@
 # impact.py - Change Impact Analyzer
 # Layer 7: Answers "what will be affected if I make this change"
+from __future__ import annotations
 
 import time
 import logging
@@ -8,8 +9,8 @@ from collections import deque
 from pathlib import Path
 
 from repo_intelligence.types import (
-    SymbolNode, SymbolEdge, EdgeType, ConfidenceLevel, RiskLevel,
-    GraphSnapshot, ImpactReport, ParsedFile, FileDependencyInfo,
+    EdgeType, ConfidenceLevel, RiskLevel,
+    GraphSnapshot, ImpactReport, FileDependencyInfo,
     PerformanceMetrics
 )
 
@@ -198,11 +199,9 @@ class ChangeImpactAnalyzer:
         elif total_tests > 0:
             score += 1
 
-        entry_point_hit = False
         for fid in affected_files:
             info = file_info.get(fid)
             if info and info.is_entry_point:
-                entry_point_hit = True
                 score += 3
                 reasoning.append(f"Entry point affected: {info.file_path}")
                 break
@@ -212,11 +211,9 @@ class ChangeImpactAnalyzer:
             score += 2
             reasoning.append("Changed file is an entry point")
 
-        high_indegree = False
         for fid in affected_files:
             info = file_info.get(fid)
             if info and len(info.imported_by) > 10:
-                high_indegree = True
                 score += 2
                 reasoning.append(f"Highly depended-on file affected: {info.file_path} (used by {len(info.imported_by)} files)")
                 break

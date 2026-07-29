@@ -30,9 +30,8 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Callable, Awaitable
+from typing import Any, Dict, List, Optional
 
 from .types import (
     FailureClassification,
@@ -45,10 +44,7 @@ from .types import (
     VerificationResult,
     VerificationScope,
     VerificationManifest,
-    Confidence,
-    Severity,
     Retryability,
-    DEFAULT_RECOVERY_MAP,
 )
 from .classifier import FailureClassifier
 from .recovery import RecoveryStrategyEngine

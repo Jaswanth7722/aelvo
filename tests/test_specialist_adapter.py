@@ -2,24 +2,15 @@
 
 from __future__ import annotations
 
-import time
-import pytest
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from learning.types import (
-    EditCategory, EngineeringPattern, PatternQuery, PatternQueryResult,
-    ValidationState, DeltaSource, EditCategorySignature, SubgraphSpec,
-    DependencyGraphDelta, GraphDeltaEdge, SubgraphNode, SubgraphEdge,
-    FreshnessConfig,
+    EditCategory, EngineeringPattern, ValidationState, EditCategorySignature, SubgraphSpec,
+    SubgraphNode, SubgraphEdge,
 )
 from learning.engine import PatternExtractionEngine
-from learning.accumulator import PatternAccumulator
-from learning.confidence import ConfidenceSystem
 from learning.knowledge_graph import KnowledgeGraph
-from learning.delta import DeltaComputer
-from learning.classifier import EditClassifier
-from learning.subgraph import SubgraphExtractor, SubgraphSimilarity
 from learning.specialist_adapter import (
     KnowledgeAdapter,
     SPECIALIST_PATTERN_CATEGORIES,
@@ -27,7 +18,7 @@ from learning.specialist_adapter import (
     SPECIALIST_DESCRIPTIONS,
 )
 
-from repo_intelligence.types import EdgeType, SymbolKind, GraphSnapshot
+from repo_intelligence.types import EdgeType, SymbolKind
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

@@ -25,7 +25,6 @@ from tools.diagram_tools import validate_mermaid, generate_mermaid_mindmap
 from cognition.architect_decision import (
     ArchitectDecision,
     ArchitectDecisionOutcome,
-    ExecutionMode,
     ModeSelectionCriteria,
 )
 

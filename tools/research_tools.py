@@ -1,15 +1,14 @@
 # research_tools.py - Advanced Academic Research & Knowledge Compiler for AELVO OMEGA
 
-import re
 import datetime
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 
 def decompose_query(query: str) -> Dict[str, Any]:
     """Decomposes a complex research query into 3 to 5 highly structured sub-queries covering all facets."""
     # Heuristics for decomposition based on query keywords
     sub_queries = []
     
-    clean = query.lower()
+    query.lower()
     
     # 1. Historical/Factual baseline
     sub_queries.append(f"Core concepts, definitions, and underlying specifications for: {query}")

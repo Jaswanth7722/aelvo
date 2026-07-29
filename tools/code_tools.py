@@ -12,12 +12,10 @@ import logging
 import os
 import re
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from config.settings import (
-    BASE_DIR,
     RUFF_BINARY,
     MYPY_BINARY,
     PYTEST_BINARY,
@@ -31,7 +29,6 @@ from config.settings import (
     FORMATTER_TIMEOUT_SECONDS,
     TYPE_CHECKER_TIMEOUT_SECONDS,
     TEST_RUNNER_TIMEOUT_SECONDS,
-    SYMBOL_GRAPH_TIMEOUT_SECONDS,
 )
 
 log = logging.getLogger("aelvo.forge.tools")
@@ -336,8 +333,8 @@ def run_tests(
         result = _run(cmd, cwd=workspace, timeout=TEST_RUNNER_TIMEOUT_SECONDS)
 
         # Parse pytest summary line
-        passed = failed = errors = 0
-        summary_match = re.search(
+        passed = failed = 0
+        re.search(
             r"(\d+) passed|(\d+) failed|(\d+) error", result["stdout"]
         )
         if result["stdout"]:

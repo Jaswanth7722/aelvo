@@ -16,14 +16,12 @@ Recovery is part of execution history.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import time
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
 from .types import (
-    FailureClassification,
     RecoveryAction,
     RecoveryStrategy,
 )

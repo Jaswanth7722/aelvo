@@ -15,8 +15,7 @@ Run:  python -m pytest tests/test_e2e_recovery_smoke.py -v
 
 from __future__ import annotations
 
-import pytest
-from typing import Dict, List
+from typing import List
 
 from runtime_next.recovery.engine import RecoveryEngine
 from runtime_next.recovery.consensus_recovery import (
@@ -25,7 +24,6 @@ from runtime_next.recovery.consensus_recovery import (
 )
 from runtime_next.recovery.specialist_recovery import (
     SpecialistRecoveryAction,
-    SpecialistState,
 )
 from runtime_next.recovery.task_recovery import (
     TaskRecoveryAction,

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 
-from ..registry.models import MCPServerRecord, HealthState, TrustLevel
+from ..registry.models import HealthState, TrustLevel
 from ..registry.server_registry import ServerRegistry
 from ..capability.capability_engine import CapabilityEngine
 from ..memory.routing_intelligence import RoutingIntelligence

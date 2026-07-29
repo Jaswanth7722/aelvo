@@ -11,7 +11,6 @@ Displays a scrollable, timestamped feed of:
 
 from textual.widgets import Static
 from textual.reactive import reactive
-from collections import deque
 import time
 
 MAX_TIMELINE = 100

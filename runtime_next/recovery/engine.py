@@ -14,12 +14,11 @@ from runtime_next.verification.injector import RecoveryNodeInjector
 from runtime_next.verification.memory import LearnedRecoveryMemory
 from runtime_next.verification.governance import RecoveryGovernance
 from runtime_next.verification.types import FailureClassification, Retryability, RecoveryStrategy
-from .consensus_recovery import ConsensusRecoveryEngine, ConsensusFailureType
-from .specialist_recovery import SpecialistRecoveryEngine, SpecialistState, SpecialistRecoveryAction
-from .task_recovery import TaskRecoveryEngine, TaskRecoveryTrigger, TaskRecoveryAction
-from runtime_next.governance import RecoveryGovernanceHooks, GovernancePolicyEngine, PolicyScope, PolicyEffect, create_default_policies, HookResult
+from .consensus_recovery import ConsensusRecoveryEngine
+from .specialist_recovery import SpecialistRecoveryEngine
+from .task_recovery import TaskRecoveryEngine
+from runtime_next.governance import RecoveryGovernanceHooks, GovernancePolicyEngine, create_default_policies
 from runtime_next.monitoring import RuntimeMetricsCollector, RuntimeHealthMonitor, AlertManager, AlertSeverity, RuntimeDashboard, HealthCheckPolicy, HealthCheckResult, RuntimeCLI
-from runtime_next.monitoring import MetricType
 
 # Phase 15: Security Hardening
 from runtime_next.security import (
@@ -679,7 +678,7 @@ class RecoveryEngine:
                     "decompose": "retry",
                     "abort": "escalate",
                 }
-                action_type = action_type_map.get(strategy_name, "retry")
+                action_type_map.get(strategy_name, "retry")
 
                 # Build a RecoveryStrategy and register it
                 strat_id = f"plan_{fc.value}_{max_retries}"

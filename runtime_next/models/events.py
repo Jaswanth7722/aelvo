@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Any, Dict, Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime
-from .plan import NodeState, NodeType, Criticality
 
 
 class EventType(str, Enum):

@@ -3,15 +3,12 @@ from __future__ import annotations
 import re
 import math
 import logging
-import hashlib
-import time
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Any, Set, Tuple, Callable
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any, Callable
 
 from core.rag.types import (
-    Chunk, RetrievalResult, RetrievalStrategy, FusionStrategy,
-    RAGConfig, ReRankStrategy,
+    Chunk, RetrievalResult, FusionStrategy,
+    ReRankStrategy,
 )
 
 log = logging.getLogger("aelvo.rag.retrieval")
@@ -382,7 +379,6 @@ def _mmr_rerank(
     while remaining and len(selected) < top_k:
         mmr_scores = []
         for i, r in enumerate(remaining):
-            rel = r.score
             doc_tokens = set(re.findall(r'\w+', r.content.lower()))
             query_sim = len(query_tokens & doc_tokens) / max(1, len(query_tokens | doc_tokens))
             max_div = 0.0

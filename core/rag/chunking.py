@@ -3,10 +3,9 @@ from __future__ import annotations
 import re
 import hashlib
 import logging
-from typing import Dict, List, Optional, Any, Set, Callable
-from datetime import datetime
+from typing import List
 
-from core.rag.types import Document, Chunk, ChunkingStrategy, RAGConfig
+from core.rag.types import Document, Chunk, ChunkingStrategy
 
 log = logging.getLogger("aelvo.rag.chunking")
 

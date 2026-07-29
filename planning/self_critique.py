@@ -25,14 +25,13 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 from planning.memory_types import (
     SelfCritiqueDefect,
     DefectType,
     HierarchyLevel,
     PlanNodeState,
-    StrategicPlanEntry,
     MEMORY_TYPE_CRITIQUE_AUDIT,
     IMPORTANCE_CRITIQUE_AUDIT,
 )

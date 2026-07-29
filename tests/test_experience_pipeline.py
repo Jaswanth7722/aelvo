@@ -4,18 +4,14 @@ Tests the ExperienceLearningPipeline, ExperienceRecord, FailurePattern,
 and RetrySuggestion classes.
 """
 
-import time
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 from core.execution.tool_registry import (
     ToolExecutionRegistry,
     ToolSpec,
     ToolResult,
     RetryPolicy,
-    ToolCategory,
-    ExecutionStrategy,
 )
 from core.execution.experience_pipeline import (
     ExperienceLearningPipeline,

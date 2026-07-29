@@ -8,10 +8,7 @@
 
 from __future__ import annotations
 
-import time
 import pytest
-from unittest.mock import MagicMock
-from typing import Any, Dict, List
 
 from runtime_next.recovery.consensus_recovery import (
     ConsensusRecoveryEngine,
@@ -155,7 +152,7 @@ class TestConsensusRecoveryEngine:
 
         # Trigger escalation by exhausting strategies for ESCALATED type
         for _ in range(2):  # Escalated has 1 strategy with max_attempts=1
-            result = consensus_recovery.handle_consensus_failure(
+            consensus_recovery.handle_consensus_failure(
                 consensus_id="cons_cb",
                 failure_type=ConsensusFailureType.ESCALATED,
             )

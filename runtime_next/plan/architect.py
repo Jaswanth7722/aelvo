@@ -31,37 +31,15 @@ import asyncio
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
-from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from ..models.events import ArchitectPlanEvent, EventType
 from .architect_types import (
     ArchitectPlan,
-    ObjectiveSection,
-    CurrentUnderstandingSection,
-    ImpactAnalysisSection,
-    ImpactItem,
-    RiskSection,
-    RiskItem,
-    RiskLevel,
-    BlastRadius,
-    ExecutionStrategySection,
-    ExecutionPhase,
-    DependencyEdge,
-    SpecialistAssignment,
-    SpecialistAssignmentsSection,
     SpecialistRole,
-    VerificationPlanSection,
-    VerificationCheck,
-    VerificationMethod,
-    RecoveryPlanSection,
-    RecoveryStrategyType,
-    CompletionCriteriaSection,
-    SelfReviewSection,
-    SelfReviewIssue,
     PlanStatus,
 )
-from .brain import ArchitectIntelligenceBrain, StrategicOutput, _classify_task_type
+from .brain import ArchitectIntelligenceBrain, _classify_task_type
 from .calibration import PlanCalibrationSystem
 
 log = logging.getLogger("aelvo.plan.architect")

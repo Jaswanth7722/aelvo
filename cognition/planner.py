@@ -8,12 +8,11 @@ from enum import Enum
 
 from runtime_next.models.plan import (
     ExecutionPlan, ExecutionNode, ExecutionEdge, ExecutionPattern,
-    NodeType, Criticality, NodeState, EdgeCondition, EdgeConditionType,
-    OutputContract, RetryPolicy,
+    NodeType, Criticality,
 )
 
 from cognition.types import (
-    Goal, SubGoal, GoalStatus, PlanStep, PlanDependency, PlanStatus,
+    Goal, SubGoal, PlanStep, PlanDependency,
 )
 
 log = logging.getLogger("aelvo.cognition.planner")

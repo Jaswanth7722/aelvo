@@ -167,7 +167,6 @@ class AdditionalVerifier:
                 diagnostics.append("Security scan PASSED — no critical vulnerabilities detected.")
 
         elif self.vtype == VerificationType.DEPENDENCY_VALIDATION:
-            import sys
             import ast
             for f in affected_files:
                 if not f.endswith(".py"):

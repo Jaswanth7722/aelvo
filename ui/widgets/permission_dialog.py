@@ -5,7 +5,7 @@ Shows when AELVO wants to execute a tool that requires approval.
 
 from textual.screen import ModalScreen
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.widgets import Static
 
 

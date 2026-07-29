@@ -1,18 +1,15 @@
 # engine.py - Repository Intelligence Engine
 # Main entry point that coordinates all subsystems
 
-import asyncio
 import time
-import os
 import logging
-from typing import Dict, List, Set, Optional, Any, Tuple
+from typing import Dict, List, Set, Optional
 from pathlib import Path
 from datetime import datetime
 
 from repo_intelligence.types import (
-    LanguageId, SymbolId, FileId, SymbolNode, SymbolEdge, EdgeType,
-    ConfidenceLevel, ParsedFile, GraphSnapshot, ImpactReport,
-    ArchitectureMap, ContextPacket, FileScanResult, FileDependencyInfo,
+    FileId, ConfidenceLevel, GraphSnapshot, ImpactReport,
+    ArchitectureMap, ContextPacket, FileDependencyInfo,
     CallGraphSnapshot, DependencyGraphSnapshot, IndexStatus,
     QueryResult, PerformanceMetrics
 )

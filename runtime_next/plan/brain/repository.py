@@ -16,51 +16,12 @@ Usage:
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List
 
-from pydantic import BaseModel, Field
 
 from ..architect_types import (
-    ArchitectPlan,
-    ObjectiveSection,
-    CurrentUnderstandingSection,
-    ImpactAnalysisSection,
-    ImpactItem,
-    RiskSection,
-    RiskItem,
-    RiskLevel,
-    BlastRadius,
-    ExecutionStrategySection,
-    ExecutionPhase,
-    DependencyEdge,
-    SpecialistAssignment,
-    SpecialistAssignmentsSection,
-    SpecialistRole,
-    VerificationPlanSection,
-    VerificationCheck,
-    VerificationMethod,
-    RecoveryPlanSection,
-    FailureModeStrategy,
-    RecoveryStrategyType,
-    CompletionCriteriaSection,
-    SelfReviewSection,
-    SelfReviewIssue,
-    PlanStatus,
-    ContextAnalysisSection,
     RepositoryAnalysisSection,
-    ArchitecturalAnalysisSection,
-    DependencyAnalysisSection,
-    GovernanceAnalysisSection,
-    LongTermImpactSection,
-    FinalApprovedPlanSection,
-    StrategicRoadmapSection,
-    Milestone,
-    GoalHierarchyNode,
 )
 
 log = logging.getLogger("aelvo.plan.brain")
@@ -200,8 +161,8 @@ class RepositoryIntelligenceBridge:
 
         # Risk data
         stability_risk = _safe(repo, "compute_stability_risk")
-        dep_risk = _safe(repo, "compute_dependency_risk")
-        evolution = _safe(repo, "generate_evolution_report")
+        _safe(repo, "compute_dependency_risk")
+        _safe(repo, "generate_evolution_report")
 
         evidence = [
             f"Repository intelligence status: {_field(stability_risk, 'overall_stability_score', 'unknown')}",

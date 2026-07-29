@@ -1,8 +1,5 @@
 import asyncio
 import logging
-import shutil
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -85,7 +82,7 @@ async def test_recovery_retry_budget_exhausted(graph_and_recovery):
 
 @pytest.mark.asyncio
 async def test_recovery_injects_recovery_node(graph_and_recovery):
-    from runtime_next.models.node import NodeDefinition, NodeState
+    from runtime_next.models.node import NodeDefinition
     graph, recovery, _ = graph_and_recovery
     node = NodeDefinition(id="M1", description="Missing tool", specialist="FORGE")
     graph.add_node(node)

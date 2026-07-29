@@ -14,7 +14,6 @@ from config.settings import (
     BASE_DIR,
     FORGE_ACTION_BUDGET,
     FORGE_ACTIVATION_THRESHOLD,
-    FORGE_MAX_MEMORY_HITS_IN_PROMPT,
     FORGE_MAX_PATTERN_DESCRIPTION_CHARS,
     FORGE_MAX_TREE_CHARS_IN_PROMPT,
     FORGE_MIN_PATTERN_LINES,
@@ -24,13 +23,6 @@ from config.settings import (
 from memory import MEMORY_TYPE_CODE_PATTERN, MEMORY_TYPE_ERROR_RECOVERY
 from memory.forge_memory import ForgeMemory, MEMORY_TYPE_CONVENTION
 from specialists.base import BaseSpecialist
-from tools.code_tools import (
-    run_linter,
-    run_formatter,
-    run_type_checker,
-    run_tests,
-    build_symbol_graph,
-)
 
 
 log = logging.getLogger("aelvo.forge")

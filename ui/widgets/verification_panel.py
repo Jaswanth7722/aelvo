@@ -10,7 +10,6 @@ Shows:
 
 from textual.widgets import Static
 from textual.reactive import reactive
-from collections import Counter
 
 
 VERIFICATION_TYPES = ["lint", "typecheck", "test", "security", "sandbox", "consistency"]

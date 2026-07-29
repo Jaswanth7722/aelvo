@@ -6,7 +6,7 @@ Currently a placeholder for future mDNS-based and registry-query-based discovery
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List
 from ..registry.server_registry import ServerRegistry
 from ..events.event_schemas import DiscoverySource
 

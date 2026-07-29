@@ -9,7 +9,7 @@ confidence, and lifecycle stage per the Phase 5 specification.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from rich.text import Text
 from rich.style import Style
@@ -18,7 +18,6 @@ from textual.widgets import Static
 
 from ui.core.ui_event import UIEvent, UIEventType
 from ui.models.work_queue import (
-    WorkQueueEntry,
     STATUS_COLORS,
     STATUS_LABELS,
     PRIORITY_COLORS,
@@ -102,7 +101,7 @@ def _task_card(entry: Dict[str, Any], now: float) -> Text:
     # Confidence if available
     conf = entry.get("confidence", 0.0)
     if conf > 0:
-        t.append(f" conf:", style="dim")
+        t.append(" conf:", style="dim")
         pct = int(conf * 100)
         conf_color = "green" if pct >= 80 else "yellow" if pct >= 50 else "red"
         t.append(f" {pct}%", style=f"bold {conf_color}")

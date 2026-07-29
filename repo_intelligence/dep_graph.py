@@ -3,12 +3,12 @@
 
 import time
 import logging
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Set, Optional
 from collections import defaultdict, deque
 from pathlib import Path
 
 from repo_intelligence.types import (
-    SymbolEdge, EdgeType, ParsedFile, GraphSnapshot,
+    EdgeType, GraphSnapshot,
     DependencyGraphSnapshot, FileDependencyInfo, PerformanceMetrics
 )
 

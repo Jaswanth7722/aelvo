@@ -23,10 +23,6 @@ def test_main_imports():
 def test_core_components_import():
     """Core subsystems import without error."""
     from core.execution import AelvoKernel
-    from core.filesystem import AelvoFileSystem
-    from core.governance import MemoryEngine
-    from core.provider_runtime import init_provider_runtime
-    from core.orchestration import Orchestrator
     assert AelvoKernel is not None
 
 

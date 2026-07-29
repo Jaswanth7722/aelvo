@@ -14,7 +14,6 @@ The runtime cannot trust itself blindly.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import time
@@ -24,7 +23,6 @@ from datetime import datetime, timezone
 from .types import (
     ConsistencyResult,
     Severity,
-    Confidence,
 )
 
 log = logging.getLogger("aelvo.runtime.verification.consistency")
@@ -196,7 +194,7 @@ class RuntimeConsistencyValidator:
                         {
                             "check": "graph_integrity",
                             "node_id": node_id,
-                            "detail": f"Terminal node missing end_time",
+                            "detail": "Terminal node missing end_time",
                         }
                     )
 
@@ -280,7 +278,7 @@ class RuntimeConsistencyValidator:
         """Validate mutex/correctness."""
         violations: List[Dict[str, Any]] = []
 
-        held_locks = mutex_state.get("held_locks", {})
+        mutex_state.get("held_locks", {})
         waiting = mutex_state.get("waiting", {})
 
         # Check for deadlock cycles in waiting graph

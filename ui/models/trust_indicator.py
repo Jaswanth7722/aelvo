@@ -12,7 +12,7 @@ models to the TUI display layer.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 
 # ── Verification status display helpers ─────────────────────────

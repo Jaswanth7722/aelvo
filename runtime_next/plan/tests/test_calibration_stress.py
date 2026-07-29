@@ -191,7 +191,7 @@ class TestCalibrationStress100:
             cal.record_outcome(**make_outcome_kwargs(f"load_100_{i:04d}", i))
 
         outcomes_before = dict(cal._outcomes)
-        learnings_before = dict(cal._learnings)
+        dict(cal._learnings)
         summary_before = cal.get_calibration_summary()
 
         del cal  # simulate restart

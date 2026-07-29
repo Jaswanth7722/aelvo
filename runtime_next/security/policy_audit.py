@@ -19,8 +19,8 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Set, Tuple
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 log = logging.getLogger("aelvo.runtime.security.policy_audit")
 

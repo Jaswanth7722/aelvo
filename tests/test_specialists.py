@@ -2,7 +2,6 @@
 Unit and Integration Tests for HERMES and HERALD Specialists
 Run with: pytest tests/test_specialists.py -v
 """
-import pytest
 from specialists.hermes import HermesSpecialist
 from specialists.herald import HeraldSpecialist
 

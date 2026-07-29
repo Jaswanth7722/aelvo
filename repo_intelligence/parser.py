@@ -6,7 +6,7 @@ import re
 import asyncio
 import time
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple, Any, Set
+from typing import List, Optional, Dict, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor
 import logging
 
@@ -127,7 +127,6 @@ class PythonASTParser(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         module = node.module if node.module else ''
-        level = node.level if node.level else 0
         for alias in node.names:
             imported_name = alias.name
             imported_as = alias.asname if alias.asname else imported_name

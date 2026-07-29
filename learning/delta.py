@@ -9,8 +9,7 @@ from typing import Dict, List, Set, Optional, Tuple
 from collections import defaultdict
 
 from repo_intelligence.types import (
-    GraphSnapshot, SymbolEdge, EdgeType, ConfidenceLevel,
-    DependencyGraphSnapshot, ParsedFile,
+    GraphSnapshot, SymbolEdge, EdgeType, DependencyGraphSnapshot,
 )
 from learning.types import (
     GraphDeltaEdge, DependencyGraphDelta, DeltaSource,

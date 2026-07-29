@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
-from ..types import ProviderStatus
 from .health import ProviderHealthRuntime
 from .retry import RetryEngine
 

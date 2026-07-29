@@ -6,7 +6,7 @@ Async event bus for real-time UI updates and inter-component communication.
 
 import asyncio
 import time
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 from collections import deque

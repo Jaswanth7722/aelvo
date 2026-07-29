@@ -1,9 +1,9 @@
 """Tests for monitoring subsystem."""
 
 import pytest
-from auth.monitoring.health import HealthMonitor, HealthCheckPolicy, AlertLevel
+from auth.monitoring.health import HealthMonitor, HealthCheckPolicy
 from auth.monitoring.metrics import MetricsCollector
-from auth.monitoring.degradation import DegradationDetector, DegradationLevel
+from auth.monitoring.degradation import DegradationDetector
 
 
 class TestHealthMonitor:
@@ -72,7 +72,7 @@ class TestDegradationDetector:
 
     def test_error_burst(self, detector):
         for _ in range(6):
-            signal = detector.record_error("openai", "timeout")
+            detector.record_error("openai", "timeout")
         # After 6 errors, should have burst detection
         # The signal might be None if not enough in the window
         assert detector.is_degraded("openai") or True

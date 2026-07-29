@@ -3,15 +3,13 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Set, Tuple, Callable
-from pydantic import BaseModel, Field
+from typing import Dict, List, Optional, Any
+from pydantic import BaseModel
 
 from cognition.types import (
-    Goal, SubGoal, GoalStatus, PlanStatus, EntryType, Provenance, ProvenanceType,
-    BlackboardEntry, ConsensusEvent, ConflictRecord, ConflictSeverity,
-    ResearchHypothesis, ResearchFinding, HypothesisStatus,
-    StrategicMemoryEntry, MemoryType, UncertaintyClass,
-    CognitiveStateSnapshot, ExecutionHypothesis, BlockedPath,
+    Goal, SubGoal, GoalStatus, EntryType, Provenance, ProvenanceType,
+    ConflictRecord, ConflictSeverity,
+    ResearchHypothesis, ResearchFinding, StrategicMemoryEntry, MemoryType, CognitiveStateSnapshot, BlockedPath,
 )
 from cognition.blackboard import CognitiveBlackboard
 from cognition.state import CognitiveStateEngine
@@ -19,11 +17,11 @@ from cognition.planner import LongHorizonPlanner, DecompositionStrategy
 from cognition.strategy_memory import StrategicMemory
 from cognition.research import AutonomousResearchRuntime
 from cognition.replan import DynamicReplanningEngine, ReplanTrigger
-from cognition.coordination import SpecialistCoordinationRuntime, DelegationMode
+from cognition.coordination import SpecialistCoordinationRuntime
 from cognition.consensus import MultiAgentConsensusSystem, GovernanceDecision
 from cognition.autonomous_learning import AutonomousLearningPipeline
 
-from runtime_next.models.plan import ExecutionPlan, ExecutionNode, NodeType, Criticality
+from runtime_next.models.plan import ExecutionPlan, ExecutionNode, NodeType
 
 log = logging.getLogger("aelvo.cognition.engine")
 

@@ -13,7 +13,7 @@ Tests cover:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import List
 from datetime import datetime
 
 import pytest
@@ -1095,10 +1095,10 @@ class TestPlanLifecycleEvents:
         bus = MockEventBus()
         orchestrator = ArchitectOrchestrator(event_bus=bus)
 
-        plan1 = orchestrator.create_plan(objective="Plan one")
+        orchestrator.create_plan(objective="Plan one")
         assert len(bus.events) == 1
 
-        plan2 = orchestrator.create_plan(objective="Plan two")
+        orchestrator.create_plan(objective="Plan two")
         assert len(bus.events) == 2
 
         events = bus.events
@@ -1126,7 +1126,6 @@ class TestPlanLifecycleEvents:
     def test_event_has_timestamp(self):
         """Events must have a valid timestamp."""
         from runtime_next.models.events import ArchitectPlanEvent, EventType
-        from datetime import datetime
         event = ArchitectPlanEvent(
             id="test_event_002",
             type=EventType.PLAN_CREATED,
@@ -1177,7 +1176,7 @@ class TestEventPayloadContents:
         """PLAN_CREATED event must include plan summary data."""
         bus = MockEventBus()
         orchestrator = ArchitectOrchestrator(event_bus=bus)
-        plan = orchestrator.create_plan(
+        orchestrator.create_plan(
             objective="Refactor auth module to async",
             context={"active_specialists": ["ARCHITECT", "FORGE", "SENTINEL"]},
         )

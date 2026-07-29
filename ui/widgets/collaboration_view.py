@@ -12,14 +12,12 @@ Displays:
 - Report generation
 """
 
-from typing import Optional, Dict, List, Any
+from typing import Optional, List
 from textual.widgets import Static
 from textual.reactive import reactive
-from rich.text import Text
-from collections import deque
 import time
 
-from ui.models.trust_indicator import TrustIndicator, confidence_color
+from ui.models.trust_indicator import TrustIndicator
 
 
 SPECIALIST_TREE = ["Architect", "Oracle", "Forge", "Sentinel", "Terminus", "Herald"]
@@ -130,7 +128,6 @@ class CollaborationView(Static):
             text += f" ({confidence:.2f})"
         # Append trust indicators
         if trust:
-            ver_color = trust.verification_color
             ver_label = trust.verification_label
             text += f" [{ver_label}]"
             if trust.source:

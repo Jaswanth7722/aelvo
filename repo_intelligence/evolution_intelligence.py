@@ -3,13 +3,10 @@
 
 import time
 import logging
-from typing import Dict, List, Optional, Set
+from typing import List
 from collections import defaultdict
-from pathlib import Path
-from datetime import datetime
-import math
 
-from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics, ConfidenceLevel
+from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics
 from repo_intelligence.types_extended import (
     ScalingBottleneck,
     MaintenanceEffortPrediction, TechnicalDebtPrediction,
@@ -350,9 +347,9 @@ class RepositoryEvolutionIntelligence:
         
         # Normalize effort
         if total_symbols > 0:
-            effort_per_symbol = total_effort / total_symbols
+            total_effort / total_symbols
         else:
-            effort_per_symbol = 0
+            pass
         
         # Build contributing factors
         factors = []
@@ -568,14 +565,13 @@ class RepositoryEvolutionIntelligence:
         bottlenecks = self.predict_bottlenecks(symbol_graph)
         scaling_issues = self.predict_scaling_issues(symbol_graph)
         maintenance = self.predict_maintenance_effort(symbol_graph)
-        tech_debt = self.predict_technical_debt(symbol_graph)
+        self.predict_technical_debt(symbol_graph)
         dep_growth = self.predict_dependency_growth(symbol_graph)
-        obsolete = self.predict_obsolete_dependencies(symbol_graph)
+        self.predict_obsolete_dependencies(symbol_graph)
         
         # Calculate overall evolution risk score
-        bottleneck_risk = len(bottlenecks) / max(len(symbol_graph.symbols), 1) * 10
-        scaling_risk = len(scaling_issues) / max(len(symbol_graph.symbols), 1) * 10
-        debt_risk = tech_debt.current_debt
+        len(bottlenecks) / max(len(symbol_graph.symbols), 1) * 10
+        len(scaling_issues) / max(len(symbol_graph.symbols), 1) * 10
         
         maintenance_cost_risk = min(maintenance.predicted_effort / 100.0, 1.0) if maintenance.predicted_effort else 0.5
         dependency_growth_risk = min(dep_growth.growth_rate * 3, 1.0) if dep_growth.growth_rate else 0.5

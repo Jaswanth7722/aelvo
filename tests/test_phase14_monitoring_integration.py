@@ -9,14 +9,11 @@ Covers:
 """
 
 import time
-import pytest
-from typing import Any, Dict, List
+from typing import List
 
 from runtime_next.monitoring.metrics import (
     RuntimeMetricsCollector,
     MetricType,
-    MetricPoint,
-    MetricSeries,
 )
 from runtime_next.monitoring.health import (
     RuntimeHealthMonitor,
@@ -33,7 +30,6 @@ from runtime_next.monitoring.alerting import (
 from runtime_next.monitoring.dashboard import (
     RuntimeDashboard,
     DashboardSnapshot,
-    SubsystemHealth,
 )
 from runtime_next.monitoring.cli import RuntimeCLI
 
@@ -142,7 +138,7 @@ class TestRuntimeMetricsCollector:
     def test_rate_tracking(self):
         """Rate tracking computes events per second."""
         collector = RuntimeMetricsCollector()
-        now = time.time()
+        time.time()
 
         # Simulate events
         collector.record_rate("requests")

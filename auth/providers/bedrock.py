@@ -38,7 +38,7 @@ class BedrockProvider(BaseProvider):
         return self._runtime
 
     async def chat_completion(self, model, messages, tools=None, stream=False, temperature=None, max_tokens=None, **kwargs) -> dict[str, Any]:
-        runtime = self._get_runtime()
+        self._get_runtime()
         body = {"anthropic_version": "bedrock-2023-05-31", "messages": messages, "max_tokens": max_tokens or 4096}
         if temperature is not None: body["temperature"] = temperature
         if tools: body["tools"] = tools

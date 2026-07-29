@@ -18,18 +18,13 @@ import pytest
 
 from runtime_next.verification.types import (
     FailureClassification,
-    RecoveryStrategy,
-    RecoveryAction,
     VerificationType,
     VerificationResult,
-    VerificationScope,
-    VerificationManifest,
     Confidence,
     Severity,
     Retryability,
 )
-from runtime_next.verification.recovery import RecoveryStrategyEngine
-from runtime_next.verification.memory import LearnedRecoveryMemory, RecoveryMemoryEntry
+from runtime_next.verification.memory import RecoveryMemoryEntry
 
 from runtime_next.recovery.engine import RecoveryEngine
 

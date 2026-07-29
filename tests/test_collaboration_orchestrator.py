@@ -4,18 +4,16 @@ Tests the CollaborationOrchestrator, CollaborationSession, IntelligentRouter,
 and their integration with SharedTaskBoard, CognitiveBlackboard, and consensus.
 """
 
-import time
 import pytest
 from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
-from shared_task_board.task import Task, TaskStatus, TaskType, TaskPriority
+from shared_task_board.task import Task, TaskStatus, TaskType
 from shared_task_board.board import SharedTaskBoard, TaskBoardConfig
 from shared_task_board.collaboration_orchestrator import (
     CollaborationSession,
     CollaborationOrchestrator,
     IntelligentRouter,
-    RoutingDecision,
     RoutingStrategy,
     SessionStatus,
     CollaborationPhase,
@@ -24,9 +22,9 @@ from shared_task_board.collaboration_orchestrator import (
 
 from cognition.blackboard import CognitiveBlackboard
 from cognition.consensus import MultiAgentConsensusSystem
-from cognition.coordination import SpecialistCoordinationRuntime, DelegationMode
+from cognition.coordination import SpecialistCoordinationRuntime
 from cognition.types import (
-    ConflictRecord, ConflictSeverity, EntryType, Provenance, ProvenanceType,
+    ConflictRecord, ConflictSeverity,
 )
 
 
@@ -395,7 +393,7 @@ class TestCollaborationOrchestrator:
     def test_get_active_sessions(self, orchestrator):
         """get_active_sessions() returns only active sessions."""
         s1 = orchestrator.create_session(goal_description="Active goal")
-        s2 = orchestrator.create_session(goal_description="Another active goal")
+        orchestrator.create_session(goal_description="Another active goal")
 
         # Create a task in s1 to activate it
         orchestrator.create_routed_task(

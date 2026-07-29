@@ -25,16 +25,13 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from planning.memory_types import (
     SelfCritiqueDefect,
     DefectType,
     HierarchyLevel,
     PlanNodeState,
-    RevisionRecord,
-    MEMORY_TYPE_CRITIQUE_AUDIT,
-    IMPORTANCE_CRITIQUE_AUDIT,
 )
 from planning.goal_hierarchy import GoalHierarchyEngine
 from planning.plan_evolution import (
@@ -268,7 +265,7 @@ def _auto_fix_floating_task(
             trigger_type=EvolutionTrigger.USER_DIRECTIVE.value,
             trigger_summary=f"Auto-remediation: attached floating task to milestone '{best_parent.title}'",
             changes_made=f"parent_id: None → {best_parent.node_id}",
-            rationale=f"Self-critique detected floating task; auto-attached to best-matching milestone",
+            rationale="Self-critique detected floating task; auto-attached to best-matching milestone",
         )
         hierarchy._persist_node_update(node)
         hierarchy._persist_node_update(best_parent)
@@ -464,7 +461,7 @@ class SelfCritiqueEvolutionPipeline:
 
         # Phase 2-4: Iterate critique → evolve → verify
         current_critique = initial_critique
-        has_critical_defects = any(
+        any(
             DEFECT_TO_SEVERITY.get(d.defect_type, SeverityLevel.LOW) == SeverityLevel.CRITICAL
             for d in defects_to_process
         )

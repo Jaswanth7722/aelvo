@@ -11,22 +11,15 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import os
-import sys
-import tempfile
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import pytest
 
 from runtime_next.security import (
     RuntimeSecurityScanner,
-    SecurityFinding,
     SecurityCategory,
     SecuritySeverity,
     ScanResult,
     PolicyAuditTrail,
-    AuditRecord,
     AuditAction,
     AuditDecision,
     AuditQuery,
@@ -39,7 +32,7 @@ from runtime_next.security import (
 )
 from runtime_next.recovery.engine import RecoveryEngine
 from runtime_next.monitoring import (
-    AlertSeverity, HealthStatus, HealthCheckResult,
+    HealthCheckResult,
 )
 
 
@@ -445,7 +438,6 @@ class TestSandboxIntegrityVerifier:
 
     def test_binary_hash_match(self):
         """Hash match is verified."""
-        import hashlib
         self.verifier._binary_path = __file__
         actual_hash = self._compute_file_hash(__file__)
         self.verifier.set_expected_hash(actual_hash)
@@ -455,7 +447,6 @@ class TestSandboxIntegrityVerifier:
 
     def test_binary_known_hash(self):
         """Known-good hash list works."""
-        import hashlib
         self.verifier._binary_path = __file__
         actual_hash = self._compute_file_hash(__file__)
         self.verifier.add_known_hash(actual_hash)
@@ -556,7 +547,7 @@ class TestSandboxIntegrityVerifier:
 
     def _make_audit_chain(self, count: int) -> List[Dict[str, Any]]:
         """Create a valid hash-chain of audit records."""
-        import hashlib, json
+        import hashlib
         records = []
         prev_hash = ""
         for i in range(count):
@@ -764,7 +755,7 @@ class TestRecoveryEngineSecurityIntegration:
         """Policy audit trail is wired into governance hooks."""
         engine = RecoveryEngine()
         # Verify audit records are created when governance hooks fire
-        outcome = engine.governance_hooks.pre_consensus_recovery(
+        engine.governance_hooks.pre_consensus_recovery(
             consensus_id="test_consensus",
             action_type="test_action",
             consensus_type="test_type",
@@ -803,7 +794,7 @@ class TestRecoveryEngineSecurityIntegration:
             text_targets=["api_key = 'sk-abc123def456'"],
         )
         # Alerts should have been created in the alert manager
-        alerts = engine.alert_manager.get_alerts(subsystem="security", limit=10)
+        engine.alert_manager.get_alerts(subsystem="security", limit=10)
         # Verify the callback didn't crash and alerts were created
         # (alert count depends on threshold, but at minimum we verify
         # the alert manager was invoked without error)

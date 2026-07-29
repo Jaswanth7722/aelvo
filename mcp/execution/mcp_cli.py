@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
-from ..registry.models import TrustLevel, MCPServerConfig, TransportType, HealthState
+from typing import Any, Dict, List
+from ..registry.models import TrustLevel, MCPServerConfig, HealthState
 from ..events.event_schemas import DiscoverySource
 
 log = logging.getLogger("aelvo.mcp.cli")

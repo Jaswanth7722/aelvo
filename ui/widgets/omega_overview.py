@@ -12,7 +12,7 @@ recovery, event trace, uptime, health indicators.
 """
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from textual.containers import VerticalScroll
 from textual.reactive import reactive

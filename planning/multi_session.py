@@ -23,7 +23,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from planning.memory_types import (
     SessionBoundaryRecord,
@@ -31,7 +31,6 @@ from planning.memory_types import (
     IMPORTANCE_SESSION_BOUNDARY,
 )
 from planning.goal_hierarchy import GoalHierarchyEngine
-from config.settings import MEMORY_NOISE_FLOOR
 
 log = logging.getLogger("aelvo.planning.multi_session")
 

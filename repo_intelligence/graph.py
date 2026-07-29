@@ -1,17 +1,16 @@
 # graph.py - Symbol Graph Engine for Repository Intelligence Engine
 # Layer 3: Builds integrated graph of symbols and their relationships
 
-import asyncio
 import time
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Set, Optional
 from pathlib import Path
 import logging
 import json
 from collections import defaultdict, deque
 
 from repo_intelligence.types import (
-    SymbolId, FileId, SymbolNode, SymbolEdge, EdgeType, ConfidenceLevel,
-    ParsedFile, GraphSnapshot, SymbolMap, PerformanceMetrics
+    SymbolNode, SymbolEdge, EdgeType, ConfidenceLevel,
+    ParsedFile, GraphSnapshot, PerformanceMetrics
 )
 from repo_intelligence.types_extended import (
     OwnershipInfo, ResponsibilityBoundary, OwnershipChange, OwnershipPattern

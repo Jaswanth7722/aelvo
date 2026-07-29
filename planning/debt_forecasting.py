@@ -19,10 +19,8 @@ Architecture:
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from planning.memory_types import (
     DebtForecastEntry,
@@ -135,7 +133,7 @@ class TechnicalDebtForecaster:
         This is the primary integration point between debt forecasting and the
         goal hierarchy — debt evidence directly generates planned work.
         """
-        from planning.memory_types import HierarchyLevel, PlanNodeState
+        from planning.memory_types import HierarchyLevel
 
         title = f"Debt Remediation: {forecast.subsystem}"
         content = (

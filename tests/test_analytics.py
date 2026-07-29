@@ -6,16 +6,23 @@ from __future__ import annotations
 import time
 import pytest
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
 
 from learning.types import (
-    EngineeringPattern, SessionRecord, CalibrationBin, TrendPoint,
-    TrendDirection, TrendSeries, FirstAttemptRecord,
-    SpecialistLearningCurve, EditCategory, ValidationState,
+    TrendPoint,
+    TrendDirection, EditCategory,
 )
 from learning.analytics import AnalyticsEngine
 from learning.engine import PatternExtractionEngine
 from learning.knowledge_graph import KnowledgeGraph
+from repo_intelligence.types import (
+    FileId, SymbolNode, ConfidenceLevel, ParsedFile, LanguageId, SymbolEdge,
+)
+from repo_intelligence.graph import (
+    GraphSnapshot, DependencyGraphDelta, GraphDeltaEdge,
+)
+from learning.engine import (
+    PatternAccumulator, EditCategorySignature, SubgraphSpec,
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -533,8 +540,7 @@ class TestEngineAnalyticsIntegration:
 
         # Create a minimal before/after with a change
         from repo_intelligence.types import (
-            GraphSnapshot, SymbolNode, SymbolEdge, EdgeType,
-            ConfidenceLevel, ParsedFile, FileId, LanguageId,
+            EdgeType,
         )
 
         fid_a = FileId.create("a.py")
@@ -664,10 +670,6 @@ class TestEngineAnalyticsIntegration:
         engine.accumulator = PatternAccumulator(min_observations_for_pattern=2)
 
         # Create two different patterns in the same category
-        from learning.types import (
-            EditCategorySignature, DependencyGraphDelta, SubgraphSpec,
-            DeltaSource,
-        )
 
         # Pattern A imported edges
         sig_a = EditCategorySignature(category=EditCategory.ADD_IMPORT_DEPENDENCY)
@@ -695,9 +697,6 @@ class TestEngineAnalyticsIntegration:
 
 
 # Pull in imports needed for the integration test
-from learning.accumulator import PatternAccumulator
-from learning.types import EditCategorySignature, DependencyGraphDelta, SubgraphSpec, GraphDeltaEdge
 from repo_intelligence.types import (
-    EdgeType, SymbolKind, SymbolNode, SymbolEdge, GraphSnapshot,
-    ParsedFile, FileId, LanguageId, ConfidenceLevel,
+    EdgeType, SymbolKind,
 )

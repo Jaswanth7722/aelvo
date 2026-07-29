@@ -63,7 +63,7 @@ class CapabilityRegistry:
             pass
 
     async def refresh(self) -> CapabilitySnapshot:
-        real_cwd = Path(os.getcwd()).resolve()
+        Path(os.getcwd()).resolve()
 
         specialists = self._detect_specialists()
         readable, writable = self._check_files()

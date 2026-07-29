@@ -2,12 +2,10 @@
 # Per spec: "The engine is testable in isolation. Every subsystem must be
 # testable without the full AELVO stack."
 
-import asyncio
 import os
 import tempfile
 import shutil
 from pathlib import Path
-from datetime import datetime
 
 import pytest
 
@@ -15,10 +13,8 @@ from repo_intelligence.types import (
     LanguageId, EdgeType, ConfidenceLevel, SymbolKind, RiskLevel, IndexStatus,
     SymbolId, FileId, ArgumentInfo,
     SymbolNode, SymbolEdge, ParsedFile, GraphSnapshot, FileScanResult,
-    ImpactReport, ContextPacket, ArchitectureLayer, ArchitectureMap,
+    ImpactReport, ContextPacket, ArchitectureMap,
     CallGraphSnapshot, DependencyGraphSnapshot, FileDependencyInfo,
-    PerformanceMetrics, QueryProvenance, QueryResult, GenerationRecord,
-    IndexerState,
 )
 from repo_intelligence.scanner import FileScanner
 from repo_intelligence.parser import PythonASTParser, TypeScriptRegexParser, ASTParser
@@ -487,9 +483,9 @@ def get_size() -> int:
     pass
 '''
         fid = FileId.create("test.py")
-        parser = PythonASTParser("test.py", fid)
+        PythonASTParser("test.py", fid)
         try:
-            tree = ast.parse(content)
+            ast.parse(content)
         except SyntaxError:
             pass
 
@@ -915,7 +911,7 @@ class TestCallGraphEngine:
         )
         sym_engine._add_edge(call_edge)
         call_engine = CallGraphEngine()
-        call_graph = call_engine.build_from_symbol_graph(sym_engine.graph)
+        call_engine.build_from_symbol_graph(sym_engine.graph)
         calls = call_engine.get_calls_from(caller.symbol_id)
         assert len(calls) >= 1
 

@@ -1,9 +1,8 @@
 # security_tools.py - Hardened Security Scanners & Attack Simulators for AELVO OMEGA
 
-import os
 import re
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any
 
 # --- REGEX COMPILED PATTERNS ---
 SECRET_PATTERNS = {

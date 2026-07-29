@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-import hashlib
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Set, Tuple
+from typing import Dict, List, Optional, Any
 from enum import Enum
 from pydantic import BaseModel, Field
 
 from runtime_next.models.plan import (
     ExecutionPlan, ExecutionNode, ExecutionEdge,
-    NodeType, NodeState, Criticality, EdgeCondition, EdgeConditionType,
+    NodeState,
 )
 
-from cognition.types import (
-    Goal, GoalStatus, BlockedPath,
-)
 
 log = logging.getLogger("aelvo.cognition.replan")
 
@@ -114,7 +110,7 @@ class DynamicReplanningEngine:
     ) -> Optional[ReplanResult]:
         if node_id not in plan.nodes:
             return None
-        old_node = plan.nodes[node_id]
+        plan.nodes[node_id]
 
         outgoing = plan.get_outgoing_edges(node_id)
         incoming = plan.get_incoming_edges(node_id)

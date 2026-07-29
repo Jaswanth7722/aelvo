@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Set, Tuple, Callable
+from typing import Dict, List, Optional, Any, Callable
 
 from cognition.types import (
     ResearchHypothesis, ResearchFinding, ResearchEvidence,

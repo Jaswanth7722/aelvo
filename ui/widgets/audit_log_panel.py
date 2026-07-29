@@ -290,7 +290,7 @@ class AuditLogPanel(Static):
         lines.append(f"  {' '.join(parts)}")
 
         if not filtered:
-            lines.append(f"  [#666666]awaiting events...[/]")
+            lines.append("  [#666666]awaiting events...[/]")
             self.update("\n".join(lines))
             return
 

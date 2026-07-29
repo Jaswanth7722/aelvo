@@ -17,7 +17,7 @@ Measures: Detection, Containment, Recovery, Escalation, Correction
 """
 
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict
 
 
 class AdversarialTestRunner:
@@ -91,8 +91,8 @@ class AdversarialTestRunner:
         for name, result in self.scenarios.items():
             lines.append(f"### {result.get('description', name)}")
             lines.append("")
-            lines.append(f"| Metric | Result |")
-            lines.append(f"|--------|--------|")
+            lines.append("| Metric | Result |")
+            lines.append("|--------|--------|")
             lines.append(f"| Detected | {'✓' if result['detected'] else '✗'} |")
             lines.append(f"| Contained | {'✓' if result['contained'] else '✗'} |")
             lines.append(f"| Recovered | {'✓' if result['recovered'] else '✗'} |")
@@ -109,8 +109,8 @@ class AdversarialTestRunner:
 
         lines.append("### Summary")
         lines.append("")
-        lines.append(f"| Metric | Value |")
-        lines.append(f"|--------|-------|")
+        lines.append("| Metric | Value |")
+        lines.append("|--------|-------|")
         lines.append(f"| Total Scenarios | {total} |")
         lines.append(f"| Detection Rate | {detected}/{total} ({detected/total:.0%})" if total > 0 else "| Detection Rate | N/A |")
         lines.append(f"| Containment Rate | {contained}/{total} ({contained/total:.0%})" if total > 0 else "| Containment Rate | N/A |")

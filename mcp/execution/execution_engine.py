@@ -16,17 +16,15 @@ Any step failure triggers the Recovery Engine before propagating errors.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from ..transport.base_transport import MCPMessage, BaseTransport
-from ..registry.models import MCPServerRecord, HealthState, TrustLevel, MCPServerConfig
+from ..registry.models import HealthState, MCPServerConfig
 from ..registry.server_registry import ServerRegistry
 from ..registry.health_tracker import HealthTracker
 from ..client.connection_manager import ConnectionManager
-from ..client.session_manager import SessionManager
 from ..client.timeout_manager import TimeoutManager
 from ..capability.capability_engine import CapabilityEngine
 from ..governance.governance_layer import MCPGovernanceLayer
@@ -165,7 +163,7 @@ class MCPExecutionEngine:
         try:
             mcp_message = MCPMessage(
                 id=f"{request.server_id}:{request.request_id}",
-                method=f"tools/call",
+                method="tools/call",
                 params={
                     "name": request.tool_name,
                     "arguments": request.arguments,

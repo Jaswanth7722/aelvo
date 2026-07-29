@@ -1,7 +1,7 @@
 """Tests for fallback routing."""
 
 import pytest
-from auth.runtime.fallback import FallbackRouter, FallbackConfig
+from auth.runtime.fallback import FallbackRouter
 from auth.runtime.health import ProviderHealthRuntime
 
 

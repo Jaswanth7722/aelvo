@@ -1,5 +1,15 @@
 #commands.py
-import json, sqlite3, yaml, hashlib, time, os, shutil, tempfile, threading
+import json
+import sqlite3
+import yaml
+import hashlib
+import time
+import os
+import shutil
+import tempfile
+import threading
+import logging
+log = logging.getLogger(__name__)
 try:
     from filelock import FileLock as FileLockImpl
 except ImportError:

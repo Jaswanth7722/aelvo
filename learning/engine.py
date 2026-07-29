@@ -6,14 +6,12 @@ from __future__ import annotations
 import time
 import logging
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 from datetime import datetime, timezone
 
 from learning.types import (
-    EditCategory, EditCategorySignature, DependencyGraphDelta,
-    EngineeringPattern, PatternObservation, ConfidenceUpdate,
-    SubgraphSpec, SubgraphNode, SubgraphEdge,
-    ValidationState, PatternQuery, PatternQueryResult,
+    DependencyGraphDelta,
+    EngineeringPattern, ValidationState, PatternQuery, PatternQueryResult,
     DeltaSource, ContradictionRecord,
 )
 from learning.delta import DeltaComputer
@@ -114,7 +112,7 @@ class PatternExtractionEngine:
                 persistent_patterns = self.knowledge_graph.load_patterns(
                     min_confidence=0.3, limit=500,
                 )
-                loaded_count = self.accumulator.load_from_persistence(persistent_patterns)
+                self.accumulator.load_from_persistence(persistent_patterns)
 
                 # Track loaded pattern IDs to prevent incorrect "created" callbacks
                 for p in persistent_patterns:
@@ -134,7 +132,7 @@ class PatternExtractionEngine:
         """End the learning session, flushing state to persistence."""
         with self._lock:
             if self.knowledge_graph and self._session_id:
-                flushed = self.accumulator.flush()
+                self.accumulator.flush()
                 stats = self.accumulator.get_statistics()
                 self.knowledge_graph.save_session_checkpoint(self._session_id, stats)
             else:

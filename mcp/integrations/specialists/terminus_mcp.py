@@ -6,7 +6,7 @@ import logging
 from ...registry.server_registry import ServerRegistry
 from ...client.connection_manager import ConnectionManager
 from ...recovery.recovery_engine import MCPRecoveryEngine
-from ...registry.models import TrustLevel, HealthState
+from ...registry.models import TrustLevel
 from ...events.event_schemas import FailureType
 from ...execution.execution_request import MCPExecutionRequest
 

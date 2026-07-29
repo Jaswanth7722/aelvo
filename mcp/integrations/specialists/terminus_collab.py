@@ -16,11 +16,8 @@ from cognition.blackboard import CognitiveBlackboard
 from cognition.types import EntryType, Provenance, ProvenanceType
 from shared_task_board import (
     SharedTaskBoard,
-    Task,
-    TaskStatus,
     SpecialistName,
 )
-from shared_task_board.models import ReviewRequest
 
 log = logging.getLogger("aelvo.collab.terminus")
 

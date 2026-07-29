@@ -9,14 +9,13 @@ SENTINEL gains the ability to:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from cognition.blackboard import CognitiveBlackboard
-from cognition.types import EntryType, Provenance, ProvenanceType, ConflictSeverity, ConflictRecord
+from cognition.types import EntryType, Provenance, ProvenanceType
 from shared_task_board import (
     SharedTaskBoard,
     Task,
-    TaskStatus,
     SpecialistName,
 )
 from shared_task_board.models import ReviewRequest

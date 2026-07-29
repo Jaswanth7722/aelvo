@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from ..registry.models import HealthState
 from ..registry.server_registry import ServerRegistry
 from ..registry.health_tracker import HealthTracker
 from ..events.event_publisher import MCPEventPublisher

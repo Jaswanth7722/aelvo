@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .mcp_events import (
@@ -20,16 +19,9 @@ from .mcp_events import (
     MCPToolStarted,
     MCPToolCompleted,
     MCPToolFailed,
-    MCPVerificationPassed,
-    MCPVerificationFailed,
-    MCPRecoveryStarted,
-    MCPRecoverySucceeded,
-    MCPRecoveryFailed,
     MCPTrustChanged,
-    MCPCapabilityNegotiated,
-    MCPCapabilityDriftDetected,
 )
-from .event_schemas import DiscoverySource, DisconnectReason, FailureType
+from .event_schemas import DiscoverySource, DisconnectReason
 
 log = logging.getLogger("aelvo.mcp.events")
 

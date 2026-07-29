@@ -40,7 +40,6 @@ except ImportError:
             return False
 
 from config.settings import (
-    COMMAND_CHAR_LIMIT,
     DEFAULT_TOOL_TIMEOUT_SECONDS,
     MAX_FILE_SIZE_BYTES,
     LOCK_TIMEOUT_SECONDS,

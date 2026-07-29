@@ -3,15 +3,16 @@
 
 import time
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Set
 from collections import defaultdict
 from pathlib import Path
+from datetime import datetime
 
 from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics
 from repo_intelligence.types_extended import (
     FunctionalDuplication, PatternDrift, CompetingSubsystem, SubsystemOverlap,
     UnusedAbstraction, DeadArchitecture, SubsystemDivergence, ArchitecturalDecay,
-    DriftReport, ConfidenceLevel
+    DriftReport
 )
 
 log = logging.getLogger("aelvo.repo_intelligence.drift_detection")
@@ -41,10 +42,10 @@ class DriftDetectionSystem:
         functional_duplications = self.duplicate_detector.detect_functional_duplicates(symbol_graph)
         pattern_drift = self.duplicate_detector.detect_pattern_drift(symbol_graph)
         competing_subsystems = self.competing_detector.identify_competing_subsystems(symbol_graph)
-        subsystem_overlaps = self.competing_detector.analyze_subsystem_overlap(symbol_graph)
+        self.competing_detector.analyze_subsystem_overlap(symbol_graph)
         unused_abstractions = self.unused_detector.detect_unused_abstractions(symbol_graph)
-        dead_architecture = self.unused_detector.detect_dead_architecture(symbol_graph)
-        subsystem_divergence = self.divergence_analyzer.analyze_subsystem_divergence(symbol_graph)
+        self.unused_detector.detect_dead_architecture(symbol_graph)
+        self.divergence_analyzer.analyze_subsystem_divergence(symbol_graph)
         architectural_decay = self.divergence_analyzer.detect_architectural_decay(symbol_graph)
         
         # Calculate overall drift score
@@ -411,7 +412,7 @@ class UnusedAbstractionDetector:
         dead_id = 0
         
         # Identify files/symbols that haven't been modified or used
-        current_time = time.time()
+        time.time()
         
         for file_id, file in symbol_graph.files.items():
             # Check if file has any symbols

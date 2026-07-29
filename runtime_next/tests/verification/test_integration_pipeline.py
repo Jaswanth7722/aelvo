@@ -7,7 +7,6 @@ Each test exercises multiple layers to ensure they compose correctly.
 """
 
 import pytest
-from unittest.mock import MagicMock
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -70,8 +69,8 @@ async def test_full_pipeline_happy_path():
     from runtime_next.verification.retry_safety import RetrySafetyEngine
     from runtime_next.verification.types import (
         VerificationType, VerificationManifest, VerificationScope,
-        VerificationResult, Confidence, Severity, Retryability,
-        FailureClassification, RecoveryStrategy, RecoveryAction,
+        VerificationResult, Confidence, Retryability,
+        FailureClassification,
     )
     from runtime_next.verification.memory import LearnedRecoveryMemory
 
@@ -179,8 +178,6 @@ async def test_blocking_verification_failure():
     triggers classification -> recovery flow."""
     from runtime_next.verification.pipeline import VerificationPipeline
     from runtime_next.verification.classifier import FailureClassifier
-    from runtime_next.verification.governance import RecoveryGovernance
-    from runtime_next.verification.recovery import RecoveryStrategyEngine
     from runtime_next.verification.types import (
         VerificationType, VerificationManifest, VerificationScope,
         VerificationResult, Confidence, Severity,
@@ -237,7 +234,7 @@ async def test_unknown_failure_governance_aborts():
     from runtime_next.verification.governance import RecoveryGovernance
     from runtime_next.verification.recovery import RecoveryStrategyEngine
     from runtime_next.verification.types import (
-        FailureClassification, RecoveryStrategy,
+        FailureClassification,
     )
 
     classifier = FailureClassifier()
@@ -279,7 +276,7 @@ async def test_retry_budget_exhaustion():
     from runtime_next.verification.governance import RecoveryGovernance
     from runtime_next.verification.classifier import FailureClassifier
     from runtime_next.verification.types import (
-        FailureClassification, RecoveryStrategy,
+        FailureClassification,
     )
     from runtime_next.verification.memory import LearnedRecoveryMemory
 
@@ -450,7 +447,7 @@ async def test_retry_safety_graph_inconsistency():
     """Retry safety blocks retry when graph state shows inconsistency."""
     from runtime_next.verification.retry_safety import RetrySafetyEngine
     from runtime_next.verification.classifier import FailureClassifier
-    from runtime_next.verification.types import FailureClassification, Retryability
+    from runtime_next.verification.types import Retryability
 
     retry_safety = RetrySafetyEngine()
     classifier = FailureClassifier()
@@ -511,7 +508,7 @@ async def test_sequential_recoveries_accumulate_memory():
     from runtime_next.verification.recovery import RecoveryStrategyEngine
     from runtime_next.verification.injector import RecoveryNodeInjector
     from runtime_next.verification.memory import LearnedRecoveryMemory
-    from runtime_next.verification.types import FailureClassification, RecoveryStrategy
+    from runtime_next.verification.types import FailureClassification
 
     classifier = FailureClassifier()
     recovery = RecoveryStrategyEngine()
@@ -694,7 +691,7 @@ async def test_recovery_engine_end_to_end(mock_graph):
     flow for an actual node failure."""
     from runtime_next.recovery.engine import RecoveryEngine
     from runtime_next.models.node import NodeDefinition, NodeState
-    from runtime_next.models.events import BaseEvent, EventType, NodeTransitionEvent
+    from runtime_next.models.events import NodeTransitionEvent
 
     # Create a node with retry budget
     node = NodeDefinition(
@@ -807,7 +804,7 @@ async def test_pipeline_event_emission_chain():
     )
 
     pipeline = VerificationPipeline()
-    classifier = FailureClassifier()
+    FailureClassifier()
     events: List[Any] = []
 
     # Track all verification events

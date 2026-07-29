@@ -1,6 +1,5 @@
 """Tests for Layer 10 — Autonomous Recovery Governance."""
 
-import pytest
 
 
 class TestRecoveryGovernance:

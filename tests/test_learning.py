@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-import os
-import time
-import tempfile
 import unittest
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 from learning.types import (
     EditCategory, EditCategorySignature, DependencyGraphDelta, GraphDeltaEdge,
-    SubgraphSpec, SubgraphNode, SubgraphEdge, EngineeringPattern,
-    PatternObservation, ConfidenceUpdate, ContradictionRecord,
+    SubgraphSpec, SubgraphEdge, EngineeringPattern,
+    ConfidenceUpdate, ContradictionRecord,
     ValidationState, FreshnessGrade, FreshnessConfig,
-    PatternQuery, PatternQueryResult, DeltaSource,
+    PatternQuery, DeltaSource,
 )
 from learning.delta import DeltaComputer
 from learning.classifier import EditClassifier
@@ -1243,9 +1240,9 @@ class TestPatternExtractionEngine(unittest.TestCase):
                 self.engine.knowledge_graph.save_pattern
             )
 
-        before = make_snapshot(version=1)
-        after_a = make_snapshot(version=2)
-        after_b = make_snapshot(version=2)
+        make_snapshot(version=1)
+        make_snapshot(version=2)
+        make_snapshot(version=2)
 
         # This is simplified — in production, the actual deltas would differ
         sig_a = EditCategorySignature(category=EditCategory.ADD_FILE)

@@ -6,7 +6,7 @@ virtually all models released across 11+ top-tier companies.
 """
 
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from pydantic import BaseModel
 import os
 

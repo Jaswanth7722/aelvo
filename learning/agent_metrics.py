@@ -16,13 +16,12 @@ to JSON for reporting.
 
 from __future__ import annotations
 
-import time
 import json
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 # ============================================================================

@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("test_node")
@@ -81,7 +80,7 @@ class TestCapabilityModels:
     """Tests for capability models."""
 
     def test_capability_snapshot(self):
-        from runtime_next.models.capability import CapabilitySnapshot, EnvironmentHealth, GitState
+        from runtime_next.models.capability import CapabilitySnapshot, EnvironmentHealth
         snap = CapabilitySnapshot(
             workspace_path="/test",
             health=EnvironmentHealth.FULLY_OPERATIONAL,

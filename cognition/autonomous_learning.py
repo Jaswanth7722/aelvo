@@ -13,10 +13,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from cognition.types import MemoryType, StrategicMemoryEntry
+from cognition.types import StrategicMemoryEntry
 
 log = logging.getLogger("aelvo.cognition.autonomous_learning")
 

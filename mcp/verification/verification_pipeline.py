@@ -18,10 +18,9 @@ On verification failure:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import time
-from typing import Any, Dict, List, Optional, Callable, Awaitable
+from typing import Any, Dict, List, Optional, Callable
 
 from .verification_result import VerificationResult
 from ..events.event_schemas import VerificationAction

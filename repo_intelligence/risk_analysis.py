@@ -3,12 +3,12 @@
 
 import time
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Tuple
 from collections import defaultdict
 from pathlib import Path
 from datetime import datetime
 
-from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics, ConfidenceLevel
+from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics
 from repo_intelligence.types_extended import (
     CouplingRiskReport, RefactorRiskReport, StabilityRiskReport,
     SecurityRiskReport, DependencyRiskReport, RiskLevel
@@ -307,13 +307,13 @@ class RepositoryRiskAnalyzer:
         
         # Determine risk level
         if overall_stability < 0.4:
-            risk_level = RiskLevel.CRITICAL
+            pass
         elif overall_stability < 0.6:
-            risk_level = RiskLevel.HIGH
+            pass
         elif overall_stability < 0.75:
-            risk_level = RiskLevel.MEDIUM
+            pass
         else:
-            risk_level = RiskLevel.LOW
+            pass
         
         elapsed = (time.time() - start) * 1000
         self._record_metric("compute_stability_risk", elapsed)

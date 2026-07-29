@@ -16,51 +16,17 @@ Usage:
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List
 
-from pydantic import BaseModel, Field
 
 from ..architect_types import (
-    ArchitectPlan,
-    ObjectiveSection,
-    CurrentUnderstandingSection,
-    ImpactAnalysisSection,
-    ImpactItem,
     RiskSection,
-    RiskItem,
     RiskLevel,
-    BlastRadius,
     ExecutionStrategySection,
-    ExecutionPhase,
-    DependencyEdge,
-    SpecialistAssignment,
-    SpecialistAssignmentsSection,
-    SpecialistRole,
-    VerificationPlanSection,
-    VerificationCheck,
-    VerificationMethod,
     RecoveryPlanSection,
     FailureModeStrategy,
     RecoveryStrategyType,
-    CompletionCriteriaSection,
-    SelfReviewSection,
-    SelfReviewIssue,
-    PlanStatus,
-    ContextAnalysisSection,
-    RepositoryAnalysisSection,
-    ArchitecturalAnalysisSection,
-    DependencyAnalysisSection,
-    GovernanceAnalysisSection,
-    LongTermImpactSection,
-    FinalApprovedPlanSection,
-    StrategicRoadmapSection,
-    Milestone,
-    GoalHierarchyNode,
 )
 
 log = logging.getLogger("aelvo.plan.brain")

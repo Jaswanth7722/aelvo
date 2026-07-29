@@ -5,14 +5,9 @@ integration patterns.
 """
 
 import asyncio
-import os
-import json
-import tempfile
 import time
 import pytest
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock
 
 from core.execution.tool_registry import (
     ToolExecutionRegistry,

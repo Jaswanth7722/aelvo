@@ -18,7 +18,6 @@ be created.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import time
@@ -28,7 +27,6 @@ from planning.memory_types import (
     StrategicPlanEntry,
     HierarchyLevel,
     PlanNodeState,
-    RiskLevel,
     RiskAssessment,
     VerificationStrategy,
     RevisionRecord,
@@ -39,7 +37,6 @@ from planning.memory_types import (
 from config.settings import (
     CONFLICT_SIMILARITY_DUPLICATE,
     CONFLICT_SIMILARITY_OVERRIDE,
-    MEMORY_NOISE_FLOOR,
 )
 
 log = logging.getLogger("aelvo.planning.hierarchy")

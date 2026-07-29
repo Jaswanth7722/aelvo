@@ -1,8 +1,7 @@
-import pytest
 from runtime_next.plan.builder import PlanBuilder
 from runtime_next.models.plan import (
     ExecutionPlan, ExecutionNode, ExecutionEdge, ExecutionPattern,
-    NodeType, Criticality, NodeState, EdgeCondition, EdgeConditionType,
+    NodeType, Criticality, EdgeCondition, EdgeConditionType,
     OutputContract, RetryPolicy, DataTransformer
 )
 

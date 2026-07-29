@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import time
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 from collections import Counter
 
 from repo_intelligence.types import EdgeType, SymbolKind

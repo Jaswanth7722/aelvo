@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # hermes.py - HERMES Personalized User Calibration Specialist for AELVO OMEGA
 
 import time
@@ -103,7 +105,7 @@ class HermesSpecialist(BaseSpecialist):
         
         # 4. Correction signal
         corrections = {"no", "that's not what i asked", "wrong", "again", "still", "incorrect"}
-        correction_detected = any(any(c in m.lower() for c in corrections) for m in user_msgs[-3:])
+        any(any(c in m.lower() for c in corrections) for m in user_msgs[-3:])
         
         # 5. Emoji and casual
         casual_indicators = {"lol", "yeah", "bro", "yep", "ðŸ˜Š", "ðŸ‘", "thanks", "hey", "hi"}

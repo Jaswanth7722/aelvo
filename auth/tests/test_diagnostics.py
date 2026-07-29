@@ -3,7 +3,7 @@
 import pytest
 from auth.diagnostics.doctor import ProviderDoctor, DoctorReport
 from auth.diagnostics.auth_diag import AuthDiagnostics, AuthDiagnosticResult
-from auth.diagnostics.health_checks import HealthCheckRunner, HealthCheckResult
+from auth.diagnostics.health_checks import HealthCheckRunner
 from auth.diagnostics.capability_inspector import CapabilityInspector, CapabilityReport
 from auth.diagnostics.comparison_reports import ComparisonReportGenerator, ComparisonReport
 from auth.runtime.registry import ProviderRegistry
@@ -11,7 +11,6 @@ from auth.runtime.model_registry import ModelRegistry
 from auth.runtime.health import ProviderHealthRuntime
 from auth.runtime.usage import UsageTracker
 from auth.runtime.capability import CapabilityRegistry
-from auth.types import ProviderStatus
 
 
 class TestProviderDoctor:

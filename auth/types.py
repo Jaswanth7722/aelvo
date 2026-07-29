@@ -14,12 +14,10 @@ import enum
 from typing import (
     Any,
     AsyncIterator,
-    Callable,
     Dict,
     List,
     Optional,
     Set,
-    TYPE_CHECKING,
     Union,
 )
 from pydantic import BaseModel, Field, field_validator, model_validator

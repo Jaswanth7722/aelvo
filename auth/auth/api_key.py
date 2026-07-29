@@ -5,13 +5,10 @@ from __future__ import annotations
 
 import os
 import re
-import time
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from auth.types import (
-    AuthConfig,
-    AuthMethod,
     Credential,
     CredentialType,
     ProviderConfig,

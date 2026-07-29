@@ -6,11 +6,9 @@ from __future__ import annotations
 import time
 import logging
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
-from datetime import datetime, timezone
 
 from learning.types import (
-    EditCategory, EngineeringPattern, PatternQuery, PatternQueryResult,
-    ValidationState, DeltaSource,
+    EditCategory, EngineeringPattern, PatternQuery, ValidationState,
 )
 
 if TYPE_CHECKING:
@@ -209,7 +207,7 @@ class KnowledgeAdapter:
         all_patterns.sort(key=lambda p: (p.confidence, p.freshness), reverse=True)
 
         # Token-budget-aware selection: each pattern ~50 tokens + overhead
-        budget_per_pattern = max(50, max_tokens // max(len(all_patterns), 1))
+        max(50, max_tokens // max(len(all_patterns), 1))
         selected: List[EngineeringPattern] = []
         token_estimate = 0
         header_tokens = 80  # Rough estimate for header text

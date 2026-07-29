@@ -23,7 +23,6 @@ class TrustDowngrade:
         self.name = "TrustDowngrade"
 
     async def execute(self, request: MCPExecutionRequest, failure_type: FailureType, attempt: int) -> bool:
-        record = None  # would be fetched from registry in production
         current = TrustLevel.VERIFIED  # placeholder
         target = TrustLevel.QUARANTINED
 

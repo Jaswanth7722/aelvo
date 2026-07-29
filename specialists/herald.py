@@ -1,8 +1,6 @@
 # herald.py - HERALD Strategic Communication Specialist for AELVO OMEGA
 
 import re
-import hashlib
-import time
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -93,7 +91,7 @@ class HeraldSpecialist(BaseSpecialist):
 
     def draft_variants(self, task: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         classification = self.classify_communication(task)
-        channel = classification["channel"]
+        classification["channel"]
         relationship = classification["relationship"]
         
         variants = []

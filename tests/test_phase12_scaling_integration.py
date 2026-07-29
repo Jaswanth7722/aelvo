@@ -9,7 +9,6 @@ Covers:
 import asyncio
 import time
 import logging
-from typing import Dict, Any
 
 import pytest
 
@@ -265,7 +264,7 @@ async def test_resource_pool_manager():
 async def test_pipeline_single_stage():
     """Single stage executes successfully."""
     from runtime_next.scaling.async_pipeline import (
-        AsyncPipeline, PipelineStage, PipelineTask, StagePriority, StageState,
+        AsyncPipeline, PipelineStage, PipelineTask, StageState,
     )
 
     results = []
@@ -433,7 +432,7 @@ async def test_pipeline_skip_on_failure():
 async def test_pipeline_pause_resume():
     """Pipeline can be paused and resumed."""
     from runtime_next.scaling.async_pipeline import (
-        AsyncPipeline, PipelineStage, PipelineTask, StageState,
+        AsyncPipeline, PipelineStage, PipelineTask,
     )
 
     order = []
@@ -479,7 +478,7 @@ async def test_pipeline_pause_resume():
 async def test_pipeline_cancel():
     """Pipeline can be cancelled."""
     from runtime_next.scaling.async_pipeline import (
-        AsyncPipeline, PipelineStage, PipelineTask, StageState,
+        AsyncPipeline, PipelineStage, PipelineTask,
     )
 
     async def slow_task():
@@ -495,7 +494,7 @@ async def test_pipeline_cancel():
     async def run_and_cancel():
         await pipeline.run()
 
-    task = asyncio.create_task(run_and_cancel())
+    asyncio.create_task(run_and_cancel())
     await asyncio.sleep(0.05)
 
     await pipeline.cancel()
@@ -577,7 +576,7 @@ async def test_pipeline_builder():
 @pytest.mark.asyncio
 async def test_batch_basic():
     """Basic batch processing."""
-    from runtime_next.scaling.batch_processor import BatchProcessor, BatchItemState
+    from runtime_next.scaling.batch_processor import BatchProcessor
 
     async def upper(data: str) -> str:
         return data.upper()
@@ -598,7 +597,7 @@ async def test_batch_basic():
 async def test_batch_sequential_strategy():
     """Sequential strategy processes items one at a time."""
     from runtime_next.scaling.batch_processor import (
-        BatchProcessor, BatchStrategy, BatchItemState,
+        BatchProcessor, BatchStrategy,
     )
 
     order = []
@@ -625,7 +624,7 @@ async def test_batch_sequential_strategy():
 async def test_batch_throttled_strategy():
     """Throttled strategy limits concurrency."""
     from runtime_next.scaling.batch_processor import (
-        BatchProcessor, BatchStrategy, BatchItemState,
+        BatchProcessor, BatchStrategy,
     )
 
     concurrent = {"max": 0, "current": 0}
@@ -689,7 +688,7 @@ async def test_batch_continue_on_error():
 async def test_batch_stop_on_error():
     """STOP_ON_ERROR policy stops at first failure."""
     from runtime_next.scaling.batch_processor import (
-        BatchProcessor, BatchStrategy, BatchErrorPolicy, BatchItemState,
+        BatchProcessor, BatchStrategy, BatchErrorPolicy,
     )
 
     async def fragile(data: int) -> int:
@@ -715,7 +714,7 @@ async def test_batch_stop_on_error():
 @pytest.mark.asyncio
 async def test_batch_retry():
     """Retry mechanism works."""
-    from runtime_next.scaling.batch_processor import BatchProcessor, BatchItemState
+    from runtime_next.scaling.batch_processor import BatchProcessor
 
     attempts = {"count": 0}
 
@@ -870,7 +869,7 @@ async def test_integration_pool_with_pipeline():
     """ResourcePool can provide resources used within a pipeline stage."""
     from runtime_next.scaling.resource_pool import ResourcePool
     from runtime_next.scaling.async_pipeline import (
-        AsyncPipeline, PipelineStage, PipelineTask, StageState,
+        AsyncPipeline, PipelineStage, PipelineTask,
     )
 
     pool_results = []

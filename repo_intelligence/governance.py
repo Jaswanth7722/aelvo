@@ -5,9 +5,8 @@ import time
 import logging
 import sqlite3
 import json
-from typing import Dict, List, Optional, Set
+from typing import List
 from datetime import datetime
-from collections import defaultdict
 from pathlib import Path
 
 from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics, ConfidenceLevel

@@ -24,7 +24,6 @@ async def test_full_integration_flow(test_dir):
     from runtime_next.engine.engine import ExecutionGraph
     from runtime_next.recovery.engine import RecoveryEngine
     from runtime_next.models.node import NodeDefinition, NodeState
-    from runtime_next.models.events import EventType
 
     log_path = test_dir / "events.log"
     bus = EventBus(log_path=str(log_path))

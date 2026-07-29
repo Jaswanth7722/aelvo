@@ -14,11 +14,9 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
-import time
 import unittest
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch, PropertyMock
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock
 
 # Ensure project root is on path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -44,7 +42,6 @@ from planning.memory_types import (
     HierarchyLevel,
     PlanNodeState,
     StrategicPlanEntry,
-    RevisionRecord,
     MEMORY_TYPE_CRITIQUE_AUDIT,
     IMPORTANCE_CRITIQUE_AUDIT,
 )

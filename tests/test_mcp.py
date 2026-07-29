@@ -6,7 +6,7 @@ import asyncio
 import os
 import tempfile
 import pytest
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import AsyncIterator, List
 
 # --- Subsystem Imports ---
 from mcp.registry.models import (
@@ -14,30 +14,25 @@ from mcp.registry.models import (
     CapabilityProfile, ToolDefinition
 )
 from mcp.registry.server_registry import ServerRegistry
-from mcp.registry.trust_manager import TrustManager, TrustChangeReason
+from mcp.registry.trust_manager import TrustManager
 from mcp.registry.health_tracker import HealthTracker
 from mcp.transport.base_transport import BaseTransport, MCPMessage
 from mcp.client.connection_manager import ConnectionManager
 from mcp.discovery.discovery_engine import DiscoveryEngine
-from mcp.discovery.config_discovery import ConfigDiscovery
-from mcp.discovery.filesystem_discovery import FilesystemDiscovery
 from mcp.events.event_publisher import MCPEventPublisher
-from mcp.events.event_schemas import DiscoverySource, FailureType, VerificationAction, CapabilityQueryType
 from mcp.capability.capability_engine import CapabilityEngine
 from mcp.governance.governance_layer import MCPGovernanceLayer
 from mcp.verification.verification_pipeline import MCPVerificationPipeline
-from mcp.verification.verification_result import VerificationResult
 from mcp.recovery.recovery_engine import MCPRecoveryEngine
 from mcp.memory import MCPMemoryStore, ReliabilityTracker, SpecialistPreference, RoutingIntelligence
 from mcp.execution.execution_engine import MCPExecutionEngine
 from mcp.execution.execution_request import MCPExecutionRequest
 from mcp.execution.execution_result import MCPExecutionResult
 from mcp.execution.mcp_cli import MCPCommandLineInterface
-from mcp.integrations.execution_graph.mcp_nodes import MCPToolNode, MCPCapabilityQueryNode, MCPServerHealthNode
+from mcp.integrations.execution_graph.mcp_nodes import MCPToolNode
 from mcp.integrations.execution_graph.node_factory import MCPNodeFactory
 from mcp.integrations.specialists import (
-    HermesMCPInterface, ArchitectMCPInterface, OracleMCPInterface,
-    ForgeMCPInterface, SentinelMCPInterface, TerminusMCPInterface, HeraldMCPInterface
+    HermesMCPInterface
 )
 
 # ============================================================================
@@ -226,7 +221,7 @@ async def test_capability_catalog(mcp_platform):
         tools=[ToolDefinition(name="test_tool", description="A test tool", input_schema={})]
     )
     
-    drifted = await capability_engine.refresh_capabilities("capabilities-server", profile)
+    await capability_engine.refresh_capabilities("capabilities-server", profile)
     assert capability_engine.get_profile("capabilities-server") is not None
     
     servers_with_tool = await capability_engine.find_tool("test_tool")
@@ -287,7 +282,7 @@ async def test_verification_pipeline(mcp_platform):
 async def test_reliability_scoring_and_routing(mcp_platform):
     memory = mcp_platform["memory"]
     registry = mcp_platform["registry"]
-    capability_engine = mcp_platform["capability_engine"]
+    mcp_platform["capability_engine"]
     
     s1 = MCPServerRecord(id="server-1", name="S1", transport_type=TransportType.STDIO, enabled=True, health_state=HealthState.HEALTHY)
     s2 = MCPServerRecord(id="server-2", name="S2", transport_type=TransportType.STDIO, enabled=True, health_state=HealthState.HEALTHY)
@@ -295,7 +290,7 @@ async def test_reliability_scoring_and_routing(mcp_platform):
     registry.register(s2)
     
     # Store successful executions for server-1, failure for server-2
-    tracker = ReliabilityTracker(memory)
+    ReliabilityTracker(memory)
     pref = SpecialistPreference(memory)
     
     r1 = MCPExecutionResult(

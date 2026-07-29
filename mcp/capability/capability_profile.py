@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from ..registry.models import (
     CapabilityProfile,
     ToolDefinition,
     PromptDefinition,
+    PromptArgument,
     ResourceDefinition,
     TemplateDefinition,
 )

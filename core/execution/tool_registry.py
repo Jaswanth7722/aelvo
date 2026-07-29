@@ -17,7 +17,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Awaitable
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 log = logging.getLogger("aelvo.core.execution.tool_registry")
 

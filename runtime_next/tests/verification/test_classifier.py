@@ -90,7 +90,6 @@ async def test_classify_with_exit_code():
 @pytest.mark.asyncio
 async def test_classify_with_graph_state():
     from runtime_next.verification.classifier import FailureClassifier
-    from runtime_next.verification.types import FailureClassification
 
     classifier = FailureClassifier()
     result = await classifier.classify(
@@ -110,7 +109,6 @@ async def test_classify_with_graph_state():
 @pytest.mark.asyncio
 async def test_classify_with_capability_state():
     from runtime_next.verification.classifier import FailureClassifier
-    from runtime_next.verification.types import FailureClassification
 
     classifier = FailureClassifier()
     result = await classifier.classify(
@@ -130,7 +128,6 @@ async def test_classify_with_capability_state():
 @pytest.mark.asyncio
 async def test_classify_stale_runtime():
     from runtime_next.verification.classifier import FailureClassifier
-    from runtime_next.verification.types import FailureClassification
 
     classifier = FailureClassifier()
     result = await classifier.classify(
@@ -143,7 +140,6 @@ async def test_classify_stale_runtime():
 @pytest.mark.asyncio
 async def test_classify_with_alternatives():
     from runtime_next.verification.classifier import FailureClassifier
-    from runtime_next.verification.types import FailureClassification
 
     classifier = FailureClassifier()
     result = await classifier.classify(

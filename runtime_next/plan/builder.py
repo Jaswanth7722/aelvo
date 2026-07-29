@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from ..models.plan import (
     ExecutionPlan,
@@ -19,13 +19,7 @@ from ..models.plan import (
     ExecutionPattern,
     NodeType,
     Criticality,
-    NodeState,
-    EdgeCondition,
-    EdgeConditionType,
-    DataTransformer,
     OutputContract,
-    RetryPolicy,
-    RetryDelayStrategy,
 )
 from ..models.node import NodeDefinition as LegacyNode
 
@@ -33,7 +27,6 @@ from ..models.node import NodeDefinition as LegacyNode
 from cognition.types import (
     ConfidenceLevel,
     Goal,
-    PlanDependency,
     PlanPrecondition,
     PlanStep,
     PlanUncertainty,
@@ -409,7 +402,8 @@ class PlanBuilder:
         has_security = any(w in task_lower for w in ["security", "auth", "oauth", "vulnerability", "permission"])
         has_test = any(w in task_lower for w in ["test", "verify", "validate", "check"])
 
-        nid = lambda base: self._next_id(base)
+        def nid(base):
+            return self._next_id(base)
 
         if is_feature or is_refactor:
             nodes.append(ExecutionNode(
@@ -525,7 +519,7 @@ class PlanBuilder:
         """Analyze and set up dependency edges between nodes."""
         task_lower = task.lower()
         is_refactor = "refactor" in task_lower
-        has_security = any(w in task_lower for w in ["security", "auth", "vulnerability"])
+        any(w in task_lower for w in ["security", "auth", "vulnerability"])
 
         nids = list(plan.nodes.keys())
         edges_added: Set[tuple] = set()

@@ -3,18 +3,15 @@
 
 import time
 import logging
-from typing import Dict, List, Optional, Set
+from typing import List
 from collections import defaultdict
-from pathlib import Path
 
-from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics, ConfidenceLevel
+from repo_intelligence.types import GraphSnapshot, EdgeType, PerformanceMetrics
 from repo_intelligence.types_extended import (
-    ComplexityMetrics, CognitiveComplexityMetrics, ComplexityTrendReport,
-    CouplingMetrics, CohesionMetrics, ArchitecturalCouplingReport,
+    ComplexityMetrics, CognitiveComplexityMetrics, CouplingMetrics, CohesionMetrics, ArchitecturalCouplingReport,
     ExactDuplicationGroup, NearDuplicationGroup, ArchitecturalDuplication,
     MaintainabilityIndex, TechnicalDebtItem, TechnicalDebtReport,
-    CoverageMetrics, UntestedCriticalPath, TestEffectivenessReport,
-    PatternConsistencyReport, ArchitecturalViolation, NamingViolation,
+    CoverageMetrics, UntestedCriticalPath, PatternConsistencyReport, ArchitecturalViolation, NamingViolation,
     NamingConsistencyReport, HealthReport
 )
 

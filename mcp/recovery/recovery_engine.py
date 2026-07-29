@@ -7,18 +7,15 @@ partial failures to the EventBus and TUI.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from ..events.event_publisher import MCPEventPublisher
-from ..events.event_schemas import FailureType, VerificationAction
-from ..registry.models import HealthState, TrustLevel
+from ..events.event_schemas import FailureType
 from ..registry.server_registry import ServerRegistry
 from ..registry.health_tracker import HealthTracker
-from ..registry.trust_manager import TrustManager, TrustChangeReason
+from ..registry.trust_manager import TrustManager
 from ..client.connection_manager import ConnectionManager
-from ..client.reconnect_policy import ReconnectPolicy
 from ..capability.capability_engine import CapabilityEngine
 from ..execution.execution_request import MCPExecutionRequest
 from .reconnect_strategy import ReconnectStrategy

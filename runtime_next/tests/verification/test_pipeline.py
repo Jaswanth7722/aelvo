@@ -78,7 +78,7 @@ async def test_pipeline_blocking_failure():
     from runtime_next.verification.pipeline import VerificationPipeline
     from runtime_next.verification.types import (
         VerificationManifest, VerificationType, VerificationScope,
-        VerificationResult, Confidence, Severity,
+        VerificationResult, Severity,
     )
 
     pipeline = VerificationPipeline()

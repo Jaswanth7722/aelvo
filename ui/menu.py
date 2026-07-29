@@ -3,12 +3,9 @@
 import os
 import sys
 import sqlite3
-import datetime
 from config.settings import BASE_DIR
 from ui.style import (
-    print_styled, draw_header, draw_separator, draw_box_row,
-    C_PRIMARY, C_ACCENT, C_SUCCESS, C_WARNING, C_DANGER, C_MUTED, C_WHITE, C_RESET,
-    BOLD, DIM, SYM_OK, SYM_INFO, SYM_WARN, SYM_FAIL, SYM_BULLET
+    print_styled, draw_header, draw_separator, C_PRIMARY, C_ACCENT, C_SUCCESS, C_WARNING, C_DANGER, C_MUTED, C_WHITE, SYM_OK, SYM_INFO, SYM_WARN, SYM_FAIL, SYM_BULLET
 )
 
 # Paths resolved via BASE_DIR
@@ -109,7 +106,7 @@ def select_project_interactive() -> str:
         if del_choice.isdigit() and 1 <= int(del_choice) <= len(projects):
             del_name = projects[int(del_choice)-1][0]
             print_styled(f"\n{SYM_WARN} WARNING: You are about to permanently delete '{del_name}' and all associated workspace files.", C_WARNING, bold=True)
-            confirm = input(f"Type 'yes' to verify destruction: ").strip().lower()
+            confirm = input("Type 'yes' to verify destruction: ").strip().lower()
             if confirm == "yes":
                 import shutil
                 # Remove from database registry
@@ -191,7 +188,7 @@ def interactive_provider_setup(model_registry: dict) -> tuple:
                 metadata={"source": "wizard_setup"},
             )
             store.store(cred)
-            print_styled(f"\n[SECURITY] Saved API key securely to encrypted vault.", C_SUCCESS)
+            print_styled("\n[SECURITY] Saved API key securely to encrypted vault.", C_SUCCESS)
 
             # Comment out in .env to prevent plaintext storage
             lines.append(f"# {cfg.env_key} (Migrated to encrypted credential store vault)\n")
@@ -233,7 +230,8 @@ def migrate_env_keys():
         
         from auth.cred_storage import CredentialStore
         from auth.types import Credential, CredentialType
-        import uuid, time
+        import uuid
+        import time
         
         db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".aelvo_runtime", "credential_vault.db")
         store = CredentialStore(db_path=db_path)

@@ -22,11 +22,7 @@ from textual.widgets import Input, Static
 from ui.core.bridge import UIBridge
 from ui.widgets.chat_view import ChatView
 from ui.widgets.header_bar import HeaderBar
-from ui.widgets.session_dialog import SessionDialog
 from ui.widgets.model_dialog import ModelDialog
-from ui.widgets.file_changes import FileChangesPanel
-from ui.widgets.permission_dialog import PermissionDialog
-from ui.core.ui_event import UIEventType
 
 log = logging.getLogger("aelvo.ui.app")
 

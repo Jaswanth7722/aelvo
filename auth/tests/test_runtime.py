@@ -7,7 +7,6 @@ from auth.runtime.capability import CapabilityRegistry
 from auth.runtime.health import ProviderHealthRuntime
 from auth.runtime.usage import UsageTracker, ProviderPricing
 from auth.runtime.retry import RetryEngine, RetryConfig
-from auth.runtime.fallback import FallbackRouter, FallbackConfig
 from auth.types import (
     ProviderConfig,
     AuthConfig,

@@ -8,7 +8,7 @@ import os
 import platform
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from ..types import AuthCredentials, ProviderAuthStatus
 

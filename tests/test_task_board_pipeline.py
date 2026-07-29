@@ -11,8 +11,7 @@
 from __future__ import annotations
 
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from core.orchestration.task_board_pipeline import TaskBoardPipeline
 
@@ -476,7 +475,7 @@ class TestPhaseExecution:
 
     def test_execute_research_no_specialist(self, task_board_pipeline):
         """Missing ORACLE returns error PhaseResult."""
-        result = task_board_pipeline.specialists.pop("ORACLE", None)
+        task_board_pipeline.specialists.pop("ORACLE", None)
         # We can't easily test the internal method without specialists loaded
         # but we can verify the create methods work
         pass

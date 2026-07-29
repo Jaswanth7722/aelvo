@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Dict, List, Optional
 from .models import (
     MCPServerRecord,
     MCPServerConfig,
@@ -12,7 +12,6 @@ from .models import (
     TrustLevel,
     HealthState,
     CapabilityProfile,
-    TransportType,
 )
 from .registry_store import RegistryStore
 

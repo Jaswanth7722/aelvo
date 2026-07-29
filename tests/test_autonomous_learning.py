@@ -12,15 +12,13 @@
 
 from __future__ import annotations
 
-import time
 import pytest
-from typing import Dict, List
 from datetime import datetime, timezone, timedelta
 
 from cognition.strategy_memory import StrategicMemory
 from cognition.autonomous_learning import AutonomousLearningPipeline
 from cognition.engine import CognitiveEngine, CognitiveEngineConfig
-from cognition.types import MemoryType, StrategicMemoryEntry
+from cognition.types import MemoryType
 
 
 # =========================================================================
@@ -212,12 +210,12 @@ class TestDecayStaleEntries:
         assert result != 0
 
     def test_prunes_very_stale_entries(self, strategic_memory):
-        entry = strategic_memory.store(
+        strategic_memory.store(
             memory_type=MemoryType.SUCCESS_PATTERN,
             content="Very old pattern to prune",
             importance=0.09,  # Already below threshold
         )
-        result = strategic_memory.decay_stale_entries(
+        strategic_memory.decay_stale_entries(
             stale_days=1, decay_amount=0.01,
         )
         # Should be pruned (importance < 0.1)
@@ -232,7 +230,7 @@ class TestDecayStaleEntries:
         # Set last_accessed to just now
         entry.last_accessed = datetime.now(timezone.utc)
 
-        result = strategic_memory.decay_stale_entries(
+        strategic_memory.decay_stale_entries(
             stale_days=30,
             decay_amount=0.1,
         )
@@ -275,12 +273,12 @@ class TestConsolidateSimilarEntries:
         # Intersection: {Refactored, authentication, module, dependency, injection} = 5
         # Union: {Refactored, authentication, module, using, dependency, injection, with, pattern} = 8
         # Jaccard: 5/8 = 0.625 >= 0.5
-        e1 = strategic_memory.store(
+        strategic_memory.store(
             memory_type=MemoryType.SUCCESS_PATTERN,
             content="Refactored authentication module using dependency injection",
             importance=0.6,
         )
-        e2 = strategic_memory.store(
+        strategic_memory.store(
             memory_type=MemoryType.SUCCESS_PATTERN,
             content="Refactored authentication module with dependency injection pattern",
             importance=0.5,
@@ -293,12 +291,12 @@ class TestConsolidateSimilarEntries:
         assert count >= 1
 
     def test_does_not_consolidate_dissimilar_entries(self, strategic_memory):
-        e1 = strategic_memory.store(
+        strategic_memory.store(
             memory_type=MemoryType.SUCCESS_PATTERN,
             content="Refactored authentication module",
             importance=0.6,
         )
-        e2 = strategic_memory.store(
+        strategic_memory.store(
             memory_type=MemoryType.FAILURE_PATTERN,
             content="Deployment failed due to network timeout",
             importance=0.5,
@@ -311,12 +309,12 @@ class TestConsolidateSimilarEntries:
         assert count == 0
 
     def test_consolidation_reduces_entry_count(self, strategic_memory):
-        e1 = strategic_memory.store(
+        strategic_memory.store(
             memory_type=MemoryType.SUCCESS_PATTERN,
             content="Refactored auth module using dependency injection pattern",
             importance=0.6,
         )
-        e2 = strategic_memory.store(
+        strategic_memory.store(
             memory_type=MemoryType.SUCCESS_PATTERN,
             content="Refactored auth module with dependency injection",
             importance=0.5,

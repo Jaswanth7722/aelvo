@@ -1,7 +1,7 @@
 from __future__ import annotations
 from enum import Enum
-from typing import Dict, List, Optional, Any, Set, Callable
-from pydantic import BaseModel, Field, field_validator
+from typing import Dict, List, Optional, Any, Set
+from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 
 

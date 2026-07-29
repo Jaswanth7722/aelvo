@@ -8,9 +8,7 @@ detect capability drift over time.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from ..transport.base_transport import BaseTransport, MCPMessage
@@ -18,10 +16,11 @@ from ..registry.models import (
     CapabilityProfile,
     ToolDefinition,
     PromptDefinition,
+    PromptArgument,
     ResourceDefinition,
-    TemplateDefinition,
 )
 from ..events.event_publisher import MCPEventPublisher
+from ..events.mcp_events import MCPCapabilityNegotiated
 
 log = logging.getLogger("aelvo.mcp.client.negotiation")
 

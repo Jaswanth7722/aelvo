@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from ..types import AuthCredentials, ProviderAuthStatus, ProviderKind
 from ..cred_storage import EncryptedCredentialStorage
 from .api_key import APIKeyAuth
 from .oauth import OAuthDeviceFlow, OAuthClientFlow
-from .browser import BrowserAuthFlow, BrowserAuthConfig, SessionAuth
+from .browser import BrowserAuthFlow, SessionAuth
 from .session import SessionManager, SessionToken
 from .local import LocalRuntimeAuth
 from .cloud import AzureAuth, BedrockAuth, VertexAuth
-from .refresh import CredentialRefreshEngine, RefreshConfig
+from .refresh import CredentialRefreshEngine
 
 logger = logging.getLogger(__name__)
 

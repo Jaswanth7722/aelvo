@@ -3,7 +3,6 @@
 Single line: AELVO  provider/model  session:name
 """
 
-from textual.reactive import reactive
 from textual.widgets import Static
 
 

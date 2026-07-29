@@ -1,14 +1,13 @@
 """Tests for AELVO Cognitive Layer — all 10 phases."""
 
 from datetime import datetime, timedelta, timezone
-import pytest
 
 from cognition.types import (
-    Goal, SubGoal, GoalStatus, PlanStep, PlanDependency, PlanStatus,
+    Goal, SubGoal, GoalStatus, PlanStep, PlanStatus,
     Provenance, ProvenanceType, EntryType,
     BlackboardEntry, BlackboardSlot,
     ConsensusEvent, ConsensusResult, ConflictRecord, ConflictSeverity,
-    ResearchHypothesis, ResearchFinding, ResearchEvidence, HypothesisStatus,
+    ResearchHypothesis, ResearchEvidence, HypothesisStatus,
     StrategicMemoryEntry, MemoryType,
     UncertaintyModel, UncertaintyClass, ExecutionHypothesis, BlockedPath,
     CognitiveStateSnapshot,
@@ -21,9 +20,9 @@ from cognition.research import AutonomousResearchRuntime
 from cognition.replan import DynamicReplanningEngine, ReplanTrigger, ReplanAction
 from cognition.coordination import SpecialistCoordinationRuntime, DelegationMode
 from cognition.consensus import MultiAgentConsensusSystem, GovernanceDecision
-from cognition.engine import CognitiveEngine, CognitiveEngineConfig
+from cognition.engine import CognitiveEngine
 
-from runtime_next.models.plan import ExecutionPlan, ExecutionNode, NodeType, Criticality, NodeState
+from runtime_next.models.plan import ExecutionPlan, ExecutionNode, NodeType
 
 
 # =============================================================================
@@ -518,10 +517,10 @@ class TestAutonomousResearchRuntime:
         ar = AutonomousResearchRuntime()
         h1 = ar.propose_hypothesis("python performance")
         ar.add_evidence(h1.id, "fast", "src", relevance=1.0, reliability=1.0, supports=True)
-        f1 = ar.conclude_hypothesis(h1.id)
+        ar.conclude_hypothesis(h1.id)
         h2 = ar.propose_hypothesis("rust safety")
         ar.add_evidence(h2.id, "safe", "src", relevance=1.0, reliability=1.0, supports=True)
-        f2 = ar.conclude_hypothesis(h2.id)
+        ar.conclude_hypothesis(h2.id)
         results = ar.find_findings("python")
         assert len(results) >= 1
 
@@ -860,7 +859,7 @@ class TestCognitiveEngine:
         plan = engine.plan_goal(goal.id)
         assert len(plan.nodes) >= 3
 
-        hyp = engine.research_topic("best practices for auth refactoring",
+        engine.research_topic("best practices for auth refactoring",
                                     tags=["auth", "refactoring"])
         engine.store_memory(
             MemoryType.REUSABLE_STRATEGY,

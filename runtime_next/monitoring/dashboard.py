@@ -10,11 +10,11 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from .metrics import RuntimeMetricsCollector, MetricType
+from .metrics import RuntimeMetricsCollector
 from .health import RuntimeHealthMonitor, HealthStatus
-from .alerting import AlertManager, AlertSeverity
+from .alerting import AlertManager
 
 log = logging.getLogger("aelvo.runtime.monitoring.dashboard")
 

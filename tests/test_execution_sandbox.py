@@ -4,27 +4,21 @@ Tests ExecutionSandbox, SandboxCapability, RollbackApprovalGate, and SecurityInt
 """
 
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 
 from core.execution.tool_registry import (
     ToolExecutionRegistry,
     ToolSpec,
-    ToolResult,
     ToolCategory,
-    RetryPolicy,
 )
 from core.execution.sandbox_session import (
     PersistentSandboxSession,
-    SessionStatus,
 )
 from core.security.execution_sandbox import (
     ExecutionSandbox,
     SandboxCapability,
     SandboxPolicyAction,
-    SandboxAuditRecord,
     RollbackApprovalGate,
-    RollbackApprovalRequest,
     RollbackRiskLevel,
     SecurityIntegration,
 )

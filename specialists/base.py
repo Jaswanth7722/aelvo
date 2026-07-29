@@ -1,7 +1,6 @@
 # base.py - Core Contract Interface for AELVO OMEGA Specialists
 
-import asyncio
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Dict, Tuple, Any
 
 class BaseSpecialist:
     """Standardized abstract base contract representing an AELVO specialist node."""

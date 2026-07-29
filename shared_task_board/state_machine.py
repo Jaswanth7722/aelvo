@@ -8,7 +8,7 @@ is applied to a Task.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set
 
 from shared_task_board.task import TaskStatus
 

@@ -13,9 +13,8 @@ import asyncio
 import hashlib
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Set
 from enum import Enum
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
 
 log = logging.getLogger("aelvo.runtime.scaling.async_pipeline")

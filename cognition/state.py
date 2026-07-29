@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Set, Tuple
+from typing import Dict, List, Optional
 
 from cognition.types import (
     Goal, SubGoal, GoalStatus, BlockedPath, UncertaintyModel, UncertaintyClass,

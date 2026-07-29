@@ -167,7 +167,7 @@ def detect_merge_conflicts(workspace_root: str) -> Dict[str, Any]:
         return state
 
     conflict_files = []
-    conflict_markers = [
+    [
         re.compile(r"^<<<<<<< "),
         re.compile(r"^=======$"),
         re.compile(r"^>>>>>>> ")

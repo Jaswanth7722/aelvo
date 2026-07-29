@@ -16,22 +16,20 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, Callable
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field
 
 from shared_task_board.board import SharedTaskBoard
-from shared_task_board.task import Task, TaskStatus, TaskType, TaskPriority
+from shared_task_board.task import Task, TaskStatus, TaskType
 
 from cognition.blackboard import CognitiveBlackboard
 from cognition.consensus import MultiAgentConsensusSystem
-from cognition.coordination import SpecialistCoordinationRuntime, DelegationMode
+from cognition.coordination import SpecialistCoordinationRuntime
 from cognition.types import (
     EntryType, Provenance, ProvenanceType,
-    ConflictRecord, ConflictSeverity,
-    Goal, StrategicMemoryEntry, MemoryType,
+    ConflictRecord, MemoryType,
 )
 
 log = logging.getLogger("aelvo.shared_task_board.collaboration")
@@ -872,7 +870,7 @@ class CollaborationOrchestrator:
         # Resolve via the consensus system
         resolved = self.consensus.resolve_conflict(conflict)
         if resolved:
-            decision = self.consensus.apply_governance(resolved.id)
+            self.consensus.apply_governance(resolved.id)
 
         self.blackboard.publish(
             slot_name=session.blackboard_slot,

@@ -8,10 +8,8 @@
 from __future__ import annotations
 
 import hashlib
-import time
 import pytest
-from typing import Dict, List, Optional, Set
-from datetime import datetime, timezone
+from typing import Dict, List
 
 # ── Repo Intelligence ─────────────────────────────────────────────────────
 from repo_intelligence.types import (
@@ -21,8 +19,7 @@ from repo_intelligence.types import (
 
 # ── Learning Package ──────────────────────────────────────────────────────
 from learning.types import (
-    EditCategory, EngineeringPattern, PatternQuery, ValidationState,
-    DeltaSource, EditCategorySignature,
+    EditCategory, PatternQuery, DeltaSource,
 )
 from learning.engine import PatternExtractionEngine
 from learning.knowledge_graph import KnowledgeGraph
@@ -40,7 +37,6 @@ from cognition.types import (
 )
 from cognition.coordination import (
     SpecialistCoordinationRuntime,
-    DelegationMode,
 )
 
 # ── Specialists ───────────────────────────────────────────────────────────
@@ -356,7 +352,7 @@ class TestKnowledgeAdapterToSpecialists:
 
         engine = make_engine_with_kg()
         engine.accumulator._min_observations = 2
-        adapter = KnowledgeAdapter(engine)
+        KnowledgeAdapter(engine)
         engine.start_session("e2e_adapter")
 
         for i in range(3):
@@ -878,7 +874,7 @@ class TestFullEndToEndPipeline:
         kg = KnowledgeGraph(db_path=":memory:")
         engine = PatternExtractionEngine(knowledge_graph=kg)
         engine.accumulator._min_observations = 2
-        adapter = KnowledgeAdapter(engine)
+        KnowledgeAdapter(engine)
         blackboard = CognitiveBlackboard()
 
         # 2. Wire pattern created callback → blackboard
@@ -1154,7 +1150,7 @@ class TestEndToEndEdgeCases:
         """PatternExtractionEngine operates without persistence."""
         engine = PatternExtractionEngine()  # No KnowledgeGraph
         engine.accumulator._min_observations = 2
-        adapter = KnowledgeAdapter(engine)
+        KnowledgeAdapter(engine)
 
         v1 = make_snapshot_v1()
         v2 = make_snapshot_v2_with_import()
@@ -1185,7 +1181,7 @@ class TestEndToEndEdgeCases:
     def test_no_active_session_returns_none(self):
         """Operations without an active session are safe."""
         engine = make_engine_with_kg()
-        adapter = KnowledgeAdapter(engine)
+        KnowledgeAdapter(engine)
 
         # get_learning_statistics works even without a session
         stats = engine.get_learning_statistics()

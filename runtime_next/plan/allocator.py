@@ -1,8 +1,8 @@
 from __future__ import annotations
 import logging
-from typing import Dict, List, Set
+from typing import Dict, Set
 
-from ..models.plan import ExecutionPlan, Criticality, NodeState
+from ..models.plan import ExecutionPlan, Criticality
 
 log = logging.getLogger("aelvo.plan.allocator")
 

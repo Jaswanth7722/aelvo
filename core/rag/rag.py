@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import time
-import math
-import re
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Set, Tuple, Callable
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any, Tuple, Callable
 
 from core.rag.types import (
     Document, Chunk, RetrievalResult, RAGContext, IngestResult,
-    ChunkingStrategy, RetrievalStrategy, FusionStrategy, ReRankStrategy,
+    RetrievalStrategy, FusionStrategy, ReRankStrategy,
     RAGConfig, DEFAULT_RAG_CONFIG,
 )
 from core.rag.chunking import chunk_document

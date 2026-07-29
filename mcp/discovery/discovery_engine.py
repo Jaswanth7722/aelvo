@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
-from ..registry.models import MCPServerConfig, MCPServerRecord
 from ..registry.server_registry import ServerRegistry
 from ..events.event_publisher import MCPEventPublisher
 from ..events.event_schemas import DiscoverySource

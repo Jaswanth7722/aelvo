@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 from ..registry.models import PromptDefinition
 
 log = logging.getLogger("aelvo.mcp.capability.prompts")

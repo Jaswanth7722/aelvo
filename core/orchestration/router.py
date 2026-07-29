@@ -2,7 +2,7 @@
 import re
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from config.settings import ACTIVATION_THRESHOLD_DEFAULT
 from specialists import SPECIALIST_REGISTRY, get_specialist

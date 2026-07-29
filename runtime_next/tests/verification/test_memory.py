@@ -1,6 +1,5 @@
 """Tests for Layer 8 — Learned Recovery Memory."""
 
-import pytest
 from runtime_next.verification.types import (
     RecoveryAction, FailureClassification, RecoveryStrategy,
 )

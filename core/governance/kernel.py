@@ -411,7 +411,9 @@ class MemoryEngine:
             digest_src = "Audit: " + "; ".join([f"{r[0][:50]}->{r[1]}" for r in rows])
             digest = agent.send_user_message(f"Summarize these logs into one paragraph of Lessons Learned:\\n\\n{digest_src}")
             
-            import time, hashlib, datetime
+            import time
+            import hashlib
+            import datetime
             ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             m_id = hashlib.sha256(f"digest_{ts}".encode()).hexdigest()
             

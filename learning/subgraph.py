@@ -6,16 +6,14 @@ from __future__ import annotations
 import time
 import logging
 import threading
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Dict, List, Optional
 from collections import Counter, defaultdict
 
 from repo_intelligence.types import (
-    GraphSnapshot, SymbolNode, SymbolEdge, EdgeType, SymbolKind,
-    ConfidenceLevel,
+    GraphSnapshot,
 )
 from learning.types import (
     DependencyGraphDelta, SubgraphSpec, SubgraphNode, SubgraphEdge,
-    EditCategory, EditCategorySignature,
 )
 
 log = logging.getLogger("aelvo.learning.subgraph")
@@ -60,7 +58,7 @@ class SubgraphExtractor:
             # Add nodes from new edges
             for edge in delta.new_edges:
                 self._add_node_from_edge(nodes, edge, is_new=False, after_graph=after_graph)
-                key = self._edge_to_subgraph_edge(edge, edges, nodes)
+                self._edge_to_subgraph_edge(edge, edges, nodes)
 
             # Add nodes from removed edges
             for edge in delta.removed_edges:

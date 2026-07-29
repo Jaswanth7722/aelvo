@@ -16,7 +16,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Callable, Dict
 
-from specialists import SPECIALIST_REGISTRY, get_specialist
+from specialists import SPECIALIST_REGISTRY
 from tools.code_tools import (
     build_symbol_graph,
     run_formatter,

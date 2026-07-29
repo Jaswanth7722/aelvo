@@ -14,7 +14,6 @@ Tests the new collaborative/Phase 8 event models:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import tempfile
 from pathlib import Path

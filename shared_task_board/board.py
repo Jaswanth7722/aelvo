@@ -19,14 +19,12 @@ import logging
 import os
 import sqlite3
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
 
 from shared_task_board.task import Task, TaskStatus, TaskType
 from shared_task_board.state_machine import (
-    InvalidTransitionError,
     TaskStateMachine,
 )
 

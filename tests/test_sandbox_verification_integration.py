@@ -7,16 +7,12 @@ Tests the complete chain:
 4. RecoveryEngine catches VERIFICATION_FAILED events and triggers recovery
 """
 
-import json
 import asyncio
-import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from runtime_next.verification.types import (
     VerificationType,
     FailureClassification,
-    VerificationResult,
     VerificationScope,
     VerificationManifest,
     Severity,
@@ -30,7 +26,6 @@ from runtime_next.verification.sandbox_verifier import (
     classify_sandbox_error,
 )
 from runtime_next.verification.events import (
-    VerificationStartedEvent,
     VerificationCompletedEvent,
     VerificationFailedEvent,
 )

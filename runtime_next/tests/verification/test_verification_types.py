@@ -1,7 +1,6 @@
 """Tests for Layer 1 — Verification Type System."""
 
 import pytest
-from datetime import datetime
 from pydantic import ValidationError
 
 
@@ -24,7 +23,7 @@ class TestVerificationTypes:
         assert FailureClassification.UNKNOWN_FAILURE != FailureClassification.TIMEOUT
 
     def test_verification_result_immutable(self):
-        from runtime_next.verification.types import VerificationResult, VerificationType, Confidence, Severity, Retryability
+        from runtime_next.verification.types import VerificationResult, VerificationType
         result = VerificationResult(
             verification_id="v_test_001",
             node_id="node_001",

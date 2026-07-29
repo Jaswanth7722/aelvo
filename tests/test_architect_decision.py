@@ -13,7 +13,6 @@ Covers:
 
 import time
 
-import pytest
 
 from cognition.architect_decision import (
     ArchitectDecision,

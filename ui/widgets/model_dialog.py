@@ -5,7 +5,7 @@ Browse and select LLM provider + model.
 
 from textual.screen import ModalScreen
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.widgets import Static
 
 
@@ -112,7 +112,7 @@ class ModelDialog(ModalScreen):
         self.query_one("#model-list", Static).update("\n".join(lines))
 
     def action_prev(self) -> None:
-        models = PROVIDERS.get(self.providers[self._provider_idx], [])
+        PROVIDERS.get(self.providers[self._provider_idx], [])
         self._model_idx = max(0, self._model_idx - 1)
         self._render()
 

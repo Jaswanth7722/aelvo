@@ -21,15 +21,11 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from core.execution.tool_registry import (
-    ToolExecutionRegistry,
     ToolSpec,
     ToolCategory,
-    ToolResult,
 )
 from core.execution.sandbox_session import (
     PersistentSandboxSession,
-    SandboxSessionCheckpoint,
-    SessionStatus,
 )
 from core.security.execution_governance import PolicyDecision, RiskLevel
 from core.security.security_orchestrator import (

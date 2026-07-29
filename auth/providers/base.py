@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Optional
 
 from ..types import (
-    AuthCredentials,
     ModelInfo,
     ProviderCapabilities,
     ProviderConfig,
-    ProviderHealth,
     ProviderInfo,
     TokenUsage,
 )

@@ -13,7 +13,7 @@ Displays the full consensus lifecycle as a first-class UI concept:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from rich.text import Text
 from rich.style import Style
@@ -220,7 +220,7 @@ def _render_topic_card(topic: Dict[str, Any], now: float) -> Text:
             t.append("\n")
             t.append(_render_position_row(pos))
     else:
-        t.append(f"\n  [#52627f]awaiting positions...[/]")
+        t.append("\n  [#52627f]awaiting positions...[/]")
 
     # ── Timeout warning ──
     if topic.get("is_timeout", False):

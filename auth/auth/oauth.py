@@ -3,16 +3,15 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 import webbrowser
 import asyncio
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import httpx
 
-from auth.types import AuthConfig, Credential, CredentialType, ProviderConfig
+from auth.types import Credential, CredentialType, ProviderConfig
 from auth.cred_storage import CredentialStore
 
 log = logging.getLogger("aelvo.auth.oauth")

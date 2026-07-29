@@ -9,8 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import shlex
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import AsyncIterator, Dict, List, Optional
 
 from .base_transport import BaseTransport, MCPMessage
 

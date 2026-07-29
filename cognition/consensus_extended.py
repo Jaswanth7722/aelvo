@@ -18,8 +18,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
-from cognition.consensus import MultiAgentConsensusSystem, GovernanceDecision
-from cognition.types import ConsensusEvent, ConsensusResult
+from cognition.consensus import MultiAgentConsensusSystem
 
 log = logging.getLogger("aelvo.cognition.consensus_extended")
 
@@ -447,7 +446,7 @@ class ExtendedConsensusEngine:
         neutral_count = total - for_count - against_count
 
         # Weighted confidence
-        total_weighted_conf = sum(p.confidence for p in positions if p.position.upper() == "FOR")
+        sum(p.confidence for p in positions if p.position.upper() == "FOR")
         total_confidence = sum(p.confidence for p in positions)
         avg_confidence = round(total_confidence / total, 4) if total > 0 else 0.0
 

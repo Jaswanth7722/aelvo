@@ -1,0 +1,24 @@
+target-version = "py313"
+line-length = 120
+
+[lint]
+select = [
+    "F",
+    "E",
+]
+ignore = [
+    "E402",
+    "E501",
+    "E701",
+    "E702",
+    "E741",
+    "F841",
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/test_richlog_scroll.py" = ["E", "F"]
+"specialists/forge.py" = ["F821"]
+"specialists/hermes.py" = ["F821"]
+"repo_intelligence/impact.py" = ["F821"]
+"mcp/integrations/specialists/forge_collab.py" = ["F821"]

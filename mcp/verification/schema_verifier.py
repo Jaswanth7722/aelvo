@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from .verification_result import VerificationResult
 from ..events.event_schemas import VerificationAction
 

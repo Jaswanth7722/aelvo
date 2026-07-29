@@ -10,7 +10,7 @@ bridge. This is the single event routing layer for all visible actions.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List
 
 from ui.core.ui_event import UIEvent, UIEventType
 

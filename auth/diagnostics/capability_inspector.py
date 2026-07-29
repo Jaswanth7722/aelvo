@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
 
 from ..runtime.capability import CapabilityRegistry
 from ..runtime.model_registry import ModelRegistry

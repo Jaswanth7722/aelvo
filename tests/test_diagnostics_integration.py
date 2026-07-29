@@ -9,9 +9,8 @@ Run with:
     python -m pytest tests/test_diagnostics_integration.py -v -k "doctor or auth or capability"  # run subset
 """
 
-import asyncio
 import pytest
-from core.provider_runtime import ProviderRuntime, init_provider_runtime
+from core.provider_runtime import ProviderRuntime
 from auth.diagnostics.doctor import DoctorReport
 from auth.diagnostics.auth_diag import AuthDiagnosticResult
 from auth.diagnostics.capability_inspector import CapabilityReport
@@ -45,10 +44,11 @@ def runtime():
     from auth.monitoring.metrics import MetricsCollector
     from auth.monitoring.degradation import DegradationDetector
     from auth.types import (
-        CapabilityFlag, ModelCapability, ProviderCapabilities,
-        ProviderConfig, ProviderInfo, ProviderKind, ProviderStatus,
+        CapabilityFlag, ProviderCapabilities,
+        ProviderConfig, ProviderInfo, ProviderKind,
     )
-    import tempfile, os
+    import tempfile
+    import os
 
     # Build minimal runtime
     cred_store = CredentialStore(db_path=os.path.join(tempfile.gettempdir(), "test_creds.db"))

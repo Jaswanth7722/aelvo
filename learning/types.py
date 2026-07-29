@@ -5,16 +5,15 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple, Any
-from pydantic import BaseModel, Field, field_validator, computed_field
+from typing import Dict, List, Optional, Set
+from pydantic import BaseModel, Field, computed_field
 from datetime import datetime, timezone
 import hashlib
 
 # ── Re-export repo_intelligence types we depend on ────────────────────────────
 
 from repo_intelligence.types import (
-    EdgeType, SymbolKind, ConfidenceLevel, GraphSnapshot,
-    SymbolNode, SymbolEdge, FileId,
+    EdgeType, SymbolKind, ConfidenceLevel,
 )
 
 

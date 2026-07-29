@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -24,7 +23,6 @@ from core.orchestration.pipeline import (
     PipelinePhase,
     PipelineResult,
     PhaseResult,
-    PIPELINE_HANDOFFS,
 )
 
 log = logging.getLogger("aelvo.task_board_pipeline")

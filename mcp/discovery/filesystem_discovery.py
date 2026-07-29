@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from ..registry.models import MCPServerConfig, TransportType, TrustLevel
 from ..registry.server_registry import ServerRegistry

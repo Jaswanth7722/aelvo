@@ -10,7 +10,6 @@ from ..client.connection_manager import ConnectionManager
 from ..client.reconnect_policy import ReconnectPolicy
 from ..events.event_publisher import MCPEventPublisher
 from ..events.event_schemas import FailureType
-from ..registry.models import TransportType, MCPServerConfig
 from ..execution.execution_request import MCPExecutionRequest
 
 log = logging.getLogger("aelvo.mcp.recovery.reconnect")

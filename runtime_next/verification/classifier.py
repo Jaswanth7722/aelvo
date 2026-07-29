@@ -12,19 +12,14 @@ evidence, and alternative possibilities.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
-import time
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from .types import (
     FailureClassification,
     ClassificationResult,
     Confidence,
-    Severity,
-    Retryability,
     classify_exit_code,
     EXIT_CODE_CLASSIFICATION_MAP,
 )

@@ -6,13 +6,12 @@ detects gaps, and tracks capability drift over time.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
-from ..registry.models import CapabilityProfile, ToolDefinition, MCPServerRecord
+from ..registry.models import CapabilityProfile, ToolDefinition
 
 log = logging.getLogger("aelvo.mcp.capability.graph")
 

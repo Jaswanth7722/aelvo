@@ -23,17 +23,13 @@ change how to build what was already committed to.
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from planning.memory_types import (
-    StrategicPlanEntry,
     HierarchyLevel,
     PlanNodeState,
-    EvolutionTriggerType,
     RevisionRecord,
 )
 from planning.goal_hierarchy import GoalHierarchyEngine

@@ -9,7 +9,6 @@ OpenCode-style chat layout:
 """
 
 import time
-from typing import Optional
 
 from rich.markup import escape
 from textual.containers import VerticalScroll

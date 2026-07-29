@@ -18,7 +18,6 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Awaitable
 from enum import Enum
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 
 log = logging.getLogger("aelvo.runtime.scaling.batch_processor")
 

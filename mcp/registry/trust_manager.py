@@ -6,12 +6,10 @@ Trust changes are audited and may require human acknowledgment for escalations.
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from .models import TrustLevel

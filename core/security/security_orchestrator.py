@@ -15,16 +15,15 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 from .execution_governance import (
     ExecutionGovernance,
     PolicyDecision,
     RiskLevel,
-    TrustLevel,
 )
-from .security_memory import SecurityMemory, MemoryEntryType
+from .security_memory import SecurityMemory
 from .security_analytics import SecurityAnalytics, SecurityAnalyticsReport
 from .approval_manager import ApprovalManager, ApprovalRequest, ApprovalState
 

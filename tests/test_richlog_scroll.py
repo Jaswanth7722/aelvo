@@ -1,7 +1,9 @@
 """
 Validate RichLog refactor for touchpad scrolling.
 """
-import os, sys, importlib.util
+import os
+import sys
+import importlib.util
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 errors, passes = [], 0
 def ok(l): global passes; passes += 1; print(f"  PASS: {l}")

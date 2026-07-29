@@ -94,7 +94,7 @@ class FileScanner:
         return False
 
     def _detect_language_from_extension(self, file_path: Path) -> Optional[LanguageId]:
-        suffix = file_path.suffix.lower()
+        file_path.suffix.lower()
         for ext, lang in self.extension_map.items():
             if file_path.name.endswith(ext):
                 return lang

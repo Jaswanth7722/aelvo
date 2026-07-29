@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
 from ..transport.base_transport import BaseTransport
 from ..transport.transport_factory import TransportFactory
 from ..transport.stdio_transport import MCPConnectionError
-from ..registry.models import MCPServerConfig, MCPServerRecord, TransportType, HealthState
+from ..registry.models import MCPServerConfig, TransportType
 from ..events.event_publisher import MCPEventPublisher
 from ..events.event_schemas import DisconnectReason
 

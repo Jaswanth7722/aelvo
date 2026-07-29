@@ -3,7 +3,6 @@ High-Performance Hybrid RAG Integration and Unit Tests
 Run with: pytest tests/test_rag_omega.py -v
 """
 import time
-import pytest
 from core.rag import MemorySearcher
 from helpers import MockCollection
 

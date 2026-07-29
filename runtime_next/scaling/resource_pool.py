@@ -14,10 +14,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-import threading
-from typing import Any, Callable, Dict, List, Optional, Set, Union, Awaitable
+from typing import Any, Callable, Dict, List, Optional, Set
 from enum import Enum
-from datetime import datetime, timezone
 
 log = logging.getLogger("aelvo.runtime.scaling.resource_pool")
 
@@ -303,7 +301,7 @@ class ResourcePool:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get pool statistics."""
-        now = time.time()
+        time.time()
         return {
             "name": self._name,
             "state": self._state.value,

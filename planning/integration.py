@@ -33,18 +33,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from typing import Any, Dict, List, Optional
 
 from planning.goal_hierarchy import GoalHierarchyEngine
 from planning.multi_session import MultiSessionPlanningEngine
-from planning.plan_evolution import PlanEvolutionEngine, EvolutionTrigger
+from planning.plan_evolution import PlanEvolutionEngine
 from planning.debt_forecasting import TechnicalDebtForecaster
 from planning.self_critique import SelfCritiqueEngine, CritiqueRunResult
 from planning.critique_evolution_pipeline import (
     SelfCritiqueEvolutionPipeline,
     PipelineResult,
-    PipelineStatus,
 )
 from planning.memory_types import HierarchyLevel, PlanNodeState
 

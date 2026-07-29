@@ -9,15 +9,14 @@ import json
 import logging
 import sqlite3
 import threading
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 from collections import defaultdict
 from datetime import datetime, timezone
 
 from learning.types import (
     EngineeringPattern, EditCategory, PatternQuery, PatternQueryResult,
     ValidationState, ContradictionRecord, ConfidenceUpdate,
-    SubgraphSpec, SubgraphNode, SubgraphEdge,
-    EditCategorySignature,
+    SubgraphSpec, EditCategorySignature,
 )
 
 log = logging.getLogger("aelvo.learning.knowledge_graph")

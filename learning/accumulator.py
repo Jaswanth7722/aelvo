@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import time
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 from collections import defaultdict
 from datetime import datetime, timezone
 import hashlib
@@ -15,6 +15,7 @@ from learning.types import (
     EngineeringPattern, PatternObservation, DependencyGraphDelta,
     EditCategorySignature, SubgraphSpec, EditCategory,
     ValidationState, PatternQuery, PatternQueryResult,
+    ConfidenceUpdate,
 )
 from learning.confidence import ConfidenceSystem
 from learning.subgraph import SubgraphExtractor, SubgraphSimilarity

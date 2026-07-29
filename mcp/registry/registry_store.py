@@ -11,7 +11,7 @@ import logging
 import sqlite3
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import List, Optional
 from .models import (
     MCPServerRecord,
     TrustLevel,
@@ -20,6 +20,7 @@ from .models import (
     CapabilityProfile,
     ToolDefinition,
     PromptDefinition,
+    PromptArgument,
     ResourceDefinition,
     TemplateDefinition,
 )

@@ -13,7 +13,7 @@ Covers:
 """
 
 import pytest
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from specialists.oracle import OracleSpecialist
 from cognition.blackboard import CognitiveBlackboard

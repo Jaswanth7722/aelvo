@@ -16,11 +16,11 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from .execution_governance import ExecutionGovernance, PolicyDecision, RiskLevel
-from .security_memory import SecurityMemory, SecurityMemoryEntry, MemoryEntryType
+from .security_memory import SecurityMemory, MemoryEntryType
 
 log = logging.getLogger("aelvo.security.analytics")
 

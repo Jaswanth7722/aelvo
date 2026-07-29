@@ -1,6 +1,5 @@
 """Tests for Layer 5 — Recovery Node Injection."""
 
-import pytest
 from unittest.mock import MagicMock
 from runtime_next.verification.types import (
     RecoveryAction, RecoveryStrategy, FailureClassification,

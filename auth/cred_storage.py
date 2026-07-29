@@ -17,18 +17,15 @@ Architecture:
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 import logging
 import os
 import sqlite3
 import threading
 import time
-import uuid as _uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple
 
 from auth.types import Credential, CredentialType
 

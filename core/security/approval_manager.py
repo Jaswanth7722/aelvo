@@ -9,14 +9,12 @@ Integrates with the UI for user-facing approval prompts.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Awaitable
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from .execution_governance import PolicyDecision, RiskLevel
 

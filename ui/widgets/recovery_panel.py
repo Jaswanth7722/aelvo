@@ -10,7 +10,7 @@ Users see resilience in real time.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from rich.text import Text
 from rich.style import Style

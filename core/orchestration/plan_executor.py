@@ -1,14 +1,11 @@
 """plan_executor.py — Architect plan integration for AELVO OMEGA."""
-import hashlib
 import logging
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from runtime_next.models.node import NodeDefinition
 from runtime_next.engine.engine import ExecutionGraph
 from runtime_next.verification.types import (
-    VerificationType, VerificationManifest, VerificationScope,
-    VerificationResult, Confidence, Severity, Retryability,
+    VerificationType,
 )
 from runtime_next.plan.architect import ArchitectOrchestrator
 from runtime_next.plan.calibration import PlanCalibrationSystem
@@ -250,7 +247,7 @@ class PlanExecutor:
                 planned_phases=len(plan.execution_strategy.phases),
                 completed_phases=len([
                     p for p in plan.execution_strategy.phases
-                    if p.id not in [n.split("_")[1] for nid, _ in failed_nodes]
+                    if p.id not in [nid.split("_")[1] for nid, _ in failed_nodes]
                 ]),
                 planned_specialists=planned_specialists,
                 actual_specialists=actual_specialists,

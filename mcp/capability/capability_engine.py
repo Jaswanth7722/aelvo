@@ -6,17 +6,13 @@ and specialist-facing capability discovery interfaces.
 
 from __future__ import annotations
 
-import hashlib
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..registry.models import (
     MCPServerRecord,
     CapabilityProfile,
     ToolDefinition,
-    PromptDefinition,
-    ResourceDefinition,
 )
 from ..registry.server_registry import ServerRegistry
 from .capability_profile import CapabilityProfileBuilder

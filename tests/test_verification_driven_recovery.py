@@ -16,8 +16,7 @@ import os
 import sys
 import time
 import unittest
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, AsyncMock, patch
+from typing import Any, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -37,7 +36,6 @@ from runtime_next.verification.types import (
     RetryDecision,
     GovernanceDecision,
     VerificationResult,
-    VerificationScope,
     Retryability,
     Severity,
 )

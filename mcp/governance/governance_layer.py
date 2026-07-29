@@ -12,13 +12,13 @@ Integrates with SENTINEL to enforce:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
-from ..registry.models import TrustLevel, MCPServerRecord
+from ..registry.models import TrustLevel
 from ..registry.server_registry import ServerRegistry
 from ..execution.execution_request import MCPExecutionRequest
-from .permission_model import PermissionModel, MCPPermission
+from .permission_model import PermissionModel
 from .allowlist_manager import AllowlistManager
 from .restriction_engine import RestrictionEngine
 from .audit_logger import MCPAuditLogger
