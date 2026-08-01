@@ -696,7 +696,7 @@ class Orchestrator:
                         self.cognitive_engine.handle_failure(
                             self.cognitive_plan, phase.value, err,
                         )
-                    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # 6. Store execution trace in cognitive memory on success
         if pipeline_result.success:
@@ -1173,10 +1173,12 @@ class Orchestrator:
 
                         retain = tool_args.get("retain_memory")
                         if retain:
-                            searcher = MemorySearcher(self.memory_engine.memory_collection)
-                            if not searcher.resolve_conflict(retain, meta_type="fact"):
+                            with self.memory_engine.collection_guard() as coll:
+                                searcher = MemorySearcher(coll)
+                                deduplicated = searcher.resolve_conflict(retain, meta_type="fact")
+                            if not deduplicated:
                                 ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                m_id = hashlib.sha256(f"voluntary_{ts}_{retain[:30]}".encode()).hexdigest()
+                                m_id = hashlib.sha256(f"voluntary_{ts}_{str(retain or "")[:30]}".encode()).hexdigest()
                                 
                                 # SQLite sync
                                 try:
@@ -1190,18 +1192,19 @@ class Orchestrator:
                                 # ChromaDB sync (defer to avoid blocking read-path writes)
                                 async def add_chroma_async():
                                     try:
-                                        self.memory_engine.memory_collection.add(
-                                            ids=[m_id],
-                                            documents=[retain],
-                                            metadatas=[{
-                                                "type": "voluntary",
-                                                "timestamp": ts,
-                                                "timestamp_unix": time.time(),
-                                                "importance": 0.6,
-                                                "usage_count": 0,
-                                                "source": "respond"
-                                            }]
-                                        )
+                                        with self.memory_engine.collection_guard() as coll:
+                                            coll.add(
+                                                ids=[m_id],
+                                                documents=[retain],
+                                                metadatas=[{
+                                                    "type": "voluntary",
+                                                    "timestamp": ts,
+                                                    "timestamp_unix": time.time(),
+                                                    "importance": 0.6,
+                                                    "usage_count": 0,
+                                                    "source": "respond"
+                                                }]
+                                            )
                                     except Exception as chroma_err:
                                         log.error("ChromaDB voluntary memory store failed: %s", chroma_err)
 
@@ -1209,7 +1212,7 @@ class Orchestrator:
 
                                 if tui_session:
                                     from runtime_next.models.events import EventType
-                                    await tui_session.emit_memory(EventType.MEMORY_STORED, "voluntary", retain[:40], 1, 0.6)
+                                    await tui_session.emit_memory(EventType.MEMORY_STORED, "voluntary", str(retain or "")[:40], 1, 0.6)
 
                         if session_tracker:
                             session_tracker.record_answer(msg)

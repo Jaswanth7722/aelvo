@@ -822,8 +822,8 @@ class TaskBoardPipeline:
                     loop = asyncio.get_running_loop()
                     if loop.is_running():
                         asyncio.ensure_future(self.runtime_bus.publish(start_event))
-                except RuntimeError:
-                    pass
+                except RuntimeError as _ex:
+                    log.warning("Silenced exception: %s", _ex)
                 except Exception as e:
                     log.debug("Failed to emit CONSENSUS_STARTED: %s", e)
 
@@ -879,8 +879,8 @@ class TaskBoardPipeline:
                     loop = asyncio.get_running_loop()
                     if loop.is_running():
                         asyncio.ensure_future(self.runtime_bus.publish(consensus_bus_event))
-                except RuntimeError:
-                    pass
+                except RuntimeError as _ex:
+                    log.warning("Silenced exception: %s", _ex)
                 except Exception as e:
                     log.debug("Failed to emit ConsensusEvent: %s", e)
 
@@ -919,8 +919,8 @@ class TaskBoardPipeline:
                         loop = asyncio.get_running_loop()
                         if loop.is_running():
                             asyncio.ensure_future(self.runtime_bus.publish(arch_bus_event))
-                    except RuntimeError:
-                        pass
+                    except RuntimeError as _ex:
+                        log.warning("Silenced exception: %s", _ex)
                     except Exception as e:
                         log.debug("Failed to emit ArchitectDecisionEvent: %s", e)
 
@@ -1097,8 +1097,8 @@ class TaskBoardPipeline:
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
                     asyncio.ensure_future(self.runtime_bus.publish(start_event))
-            except RuntimeError:
-                pass
+            except RuntimeError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             except Exception as e:
                 log.debug("Failed to emit ExecutionStartedEvent: %s", e)
 
@@ -1135,8 +1135,8 @@ class TaskBoardPipeline:
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
                     asyncio.ensure_future(self.runtime_bus.publish(complete_event))
-            except RuntimeError:
-                pass
+            except RuntimeError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             except Exception as e:
                 log.debug("Failed to emit ExecutionCompletedEvent: %s", e)
 
@@ -1226,8 +1226,8 @@ class TaskBoardPipeline:
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
                     asyncio.ensure_future(self.runtime_bus.publish(report_event))
-            except RuntimeError:
-                pass
+            except RuntimeError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             except Exception as e:
                 log.debug("Failed to emit ReportGeneratedEvent: %s", e)
 
@@ -1273,8 +1273,8 @@ class TaskBoardPipeline:
                     key=lambda e: getattr(e, "timestamp", ""),
                 )
                 return latest.content
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
         # Fallback: task board summary
         try:

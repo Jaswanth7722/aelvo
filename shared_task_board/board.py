@@ -402,9 +402,9 @@ class SharedTaskBoard:
         """Initialize SQLite tables."""
         try:
             os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
-        except (OSError, ValueError):
+        except (OSError, ValueError) as _ex:
             # db_path might be a filename without a directory
-            pass
+            log.warning("Silenced exception: %s", _ex)
         with sqlite3.connect(self.config.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS task_board_tasks (

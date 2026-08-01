@@ -160,6 +160,7 @@ class AgentMetricsTracker:
         self._oracle_approved: int = 0
         self._forge_approved: int = 0
         self._forge_revision: int = 0
+        self._forge_successes: int = 0
         self._sentinel_approved: int = 0
         self._architect_approvals: int = 0
         self._architect_overrides: int = 0
@@ -215,11 +216,13 @@ class AgentMetricsTracker:
                 self._forge_approved += 1
             if revision:
                 self._forge_revision += 1
-            if success:
-                self._forge.success_rate = (
-                    (self._forge.success_rate * (self._forge.implementation_count - 1) + 1)
-                    / self._forge.implementation_count
-                )
+            # success_rate must reflect mixed outcomes: track successes
+            # and recompute on every call so failures are counted too.
+            self._forge_successes += 1 if success else 0
+            self._forge.success_rate = (
+                self._forge_successes / self._forge.implementation_count
+                if self._forge.implementation_count > 0 else 0.0
+            )
             self._recompute_forge_rates()
 
     def _recompute_forge_rates(self) -> None:
@@ -366,6 +369,7 @@ class AgentMetricsTracker:
             self._oracle_approved = 0
             self._forge_approved = 0
             self._forge_revision = 0
+            self._forge_successes = 0
             self._sentinel_approved = 0
             self._architect_approvals = 0
             self._architect_overrides = 0

@@ -316,7 +316,7 @@ class MultiSessionPlanningEngine:
             log.error("Boundary atomic write failed: %s", exc)
             try:
                 os.unlink(tmp_path)
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             return False
 
     def _write_boundary_to_chroma(self, record: SessionBoundaryRecord) -> bool:

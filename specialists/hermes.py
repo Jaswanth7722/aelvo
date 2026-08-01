@@ -52,8 +52,8 @@ class HermesSpecialist(BaseSpecialist):
                 loop.create_task(self.event_bus.publish(
                     create_specialist_event(EventType.SPECIALIST_ACTION, "HERMES", action)
                 ))
-            except RuntimeError:
-                pass
+            except RuntimeError as _ex:
+                log.warning("Silenced exception: %s", _ex)
     
 
 
@@ -108,7 +108,7 @@ class HermesSpecialist(BaseSpecialist):
         any(any(c in m.lower() for c in corrections) for m in user_msgs[-3:])
         
         # 5. Emoji and casual
-        casual_indicators = {"lol", "yeah", "bro", "yep", "ðŸ˜Š", "ðŸ‘", "thanks", "hey", "hi"}
+        casual_indicators = {"lol", "yeah", "bro", "yep", "\U0001F60A", "\U0001F44D", "thanks", "hey", "hi"}
         casual_count = sum(1 for m in user_msgs if any(c in m.lower() for c in casual_indicators))
         casual_style = "casual" if casual_count > 0 else "neutral"
         
@@ -157,7 +157,7 @@ class HermesSpecialist(BaseSpecialist):
             zipped = list(zip(results.get("documents") or [], results.get("metadatas") or []))
             zipped.sort(key=lambda x: float(x[1].get("timestamp_unix", 0.0)), reverse=True)
             preferences = [x[0] for x in zipped]
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             
         return {
             "user_preferences": preferences,
@@ -220,7 +220,7 @@ class HermesSpecialist(BaseSpecialist):
                     doc = res["documents"][0]
                     meta = res["metadatas"][0]
                     proactive_injection = f"NOTE: Surface the system decision '{doc[:120]}' from {meta.get('timestamp', 'past session')} if it is relevant to this task."
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 
         # Section 5 - Output format
         output_format = (
@@ -328,7 +328,7 @@ class HermesSpecialist(BaseSpecialist):
             log.error("SQLite sync failed in HERMES, rolling back Chroma: %s", exc)
             try:
                 memory_engine.memory_collection.delete(ids=[entry_id])
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             return False
             
         return True

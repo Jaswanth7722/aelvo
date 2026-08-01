@@ -124,8 +124,8 @@ class ContextBuilder:
                                 seen.add(sig)
                     else:
                         cross_memory[k] = v
-            except NotImplementedError:
-                pass
+            except NotImplementedError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             except Exception as e:
                 log.warning("Memory context failed for %s: %s", name, e)
 

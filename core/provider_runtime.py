@@ -52,6 +52,7 @@ from auth.types import (
 )
 
 logger = logging.getLogger("aelvo.provider_runtime")
+log = logger
 
 # Default paths
 DEFAULT_RUNTIME_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".aelvo_runtime")
@@ -677,7 +678,7 @@ async def init_provider_runtime(
                 cred = credential_store.get_for_provider(provider_key)
                 if cred:
                     client = _try_create_sdk_client(provider_key, config, cred.value)
-            except Exception as _ex: print("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         registry.register(
             info=info,
@@ -780,8 +781,8 @@ def _try_create_sdk_client(
             import google.generativeai as genai
             genai.configure(api_key=api_key)
             return genai
-    except ImportError:
-        pass
+    except ImportError as _ex:
+        log.warning("Silenced exception: %s", _ex)
     return None
 
 

@@ -429,7 +429,7 @@ class PipelineContext:
                             "doc": doc,
                             "score": round(1.0 - float(dist), 3),
                         })
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return decisions
 
     def _get_code_patterns(self) -> List[Dict[str, Any]]:
@@ -448,7 +448,7 @@ class PipelineContext:
                             "doc": doc,
                             "score": round(1.0 - float(dist), 3),
                         })
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return patterns
 
     @property
@@ -714,7 +714,7 @@ class RuntimePipeline:
                 ctx.constraints = (
                     self.memory_engine.parse_anchor() or {}
                 )
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
             # Load state
             try:
@@ -722,7 +722,7 @@ class RuntimePipeline:
                     "SELECT key, value FROM state WHERE key NOT LIKE 'runtime:%'"
                 ).fetchall()
                 ctx.state = {r[0]: r[1] for r in rows}
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # Get workspace tree
         if hasattr(self.orchestrator, "get_workspace_tree"):
@@ -1320,6 +1320,26 @@ class RuntimePipeline:
     # UI Notifications
     # ==================================================================
 
+    @staticmethod
+    def _fire_and_forget(coro):
+        """Schedule a fire-and-forget task, logging any exception it raises.
+
+        Prevents "Task exception was never retrieved" warnings and surfaces
+        background pipeline failures instead of silently swallowing them.
+        """
+        task = asyncio.get_running_loop().create_task(coro)
+
+        def _on_done(t: asyncio.Task) -> None:
+            try:
+                t.result()
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:
+                log.warning("Background pipeline task failed: %s", exc)
+
+        task.add_done_callback(_on_done)
+        return task
+
     def _notify_pipeline_start(self, ctx: PipelineContext) -> None:
         """Notify UI that the pipeline is starting."""
         phases_str = " â†’ ".join(p.value for p in self._active_phases)
@@ -1333,19 +1353,18 @@ class RuntimePipeline:
             try:
                 from ui.events.event_factory import create_specialist_event
                 from ui.events import EventType as UIEventType
-                loop = asyncio.get_running_loop()
                 for phase in self._active_phases:
                     contract = PIPELINE_HANDOFFS.get(phase)
                     if contract:
-                        loop.create_task(event_bus.publish(
+                        self._fire_and_forget(event_bus.publish(
                             create_specialist_event(
                                 UIEventType.SPECIALIST_ACTIVATED,
                                 contract.specialist_name,
                                 f"Pipeline phase: {phase.value}",
                             )
                         ))
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
     def _notify_pipeline_complete(
         self, result: PipelineResult
@@ -1362,13 +1381,12 @@ class RuntimePipeline:
             try:
                 from ui.events.event_factory import create_specialist_event
                 from ui.events import EventType as UIEventType
-                loop = asyncio.get_running_loop()
                 for phase in result.phases_executed:
                     contract = PIPELINE_HANDOFFS.get(phase)
                     if contract:
                         phase_result = result.phase_results.get(phase)
                         success = phase_result.success if phase_result else True
-                        loop.create_task(self.event_bus.publish(
+                        self._fire_and_forget(self.event_bus.publish(
                             create_specialist_event(
                                 UIEventType.SPECIALIST_ACTION if success else UIEventType.SPECIALIST_DEACTIVATED,
                                 contract.specialist_name,
@@ -1376,8 +1394,8 @@ class RuntimePipeline:
                                 {"success": success},
                             )
                         ))
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
     # ==================================================================
     # CONSOLIDATED PROMPT (Single LLM Call Per Turn)
@@ -1434,7 +1452,7 @@ class RuntimePipeline:
                             "score": round(1.0 - float(dist), 3),
                             "metadata": meta,
                         })
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # â”€â”€ Build context for each active phase â”€â”€
         for phase in self._active_phases:

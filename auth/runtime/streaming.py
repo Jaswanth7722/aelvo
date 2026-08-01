@@ -13,6 +13,7 @@ from typing import Any, AsyncIterator, Callable, Optional
 from ..types import TokenUsage
 
 logger = logging.getLogger(__name__)
+log = logger
 
 
 class StreamEventType(Enum):
@@ -218,8 +219,8 @@ class StreamManager:
             task.cancel()
             try:
                 await task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         emitter = self._emitters.get(stream_id)
         if emitter:

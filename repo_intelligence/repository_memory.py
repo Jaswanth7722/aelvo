@@ -1,6 +1,7 @@
 # repository_memory.py - Repository Memory System for Repository Intelligence
 # Layer 13: Maintains long-term repository awareness and learning
 
+import contextlib
 import time
 import logging
 import sqlite3
@@ -18,6 +19,23 @@ from repo_intelligence.types_extended import (
 )
 
 log = logging.getLogger("aelvo.repo_intelligence.repository_memory")
+
+
+@contextlib.contextmanager
+def _connect(db_path: str):
+    """Open a SQLite connection that is guaranteed to be closed on exit.
+
+    ``with sqlite3.connect(path) as conn:`` only commits/rolls back the
+    transaction — it does NOT close the connection, so on Windows the
+    database file stays locked until garbage collection. This helper
+    releases the handle deterministically.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 class RepositoryMemorySystem:
@@ -118,7 +136,7 @@ class HistoricalModificationTracker:
     
     def _initialize_schema(self):
         """Initialize the database schema for modification tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS modifications (
@@ -147,7 +165,7 @@ class HistoricalModificationTracker:
         """Record a modification and its context"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO modifications 
@@ -174,7 +192,7 @@ class HistoricalModificationTracker:
         """Identify frequently modified areas (hotspots)"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             
             # Build query with optional time filter
@@ -236,7 +254,7 @@ class HistoricalModificationTracker:
     
     def _count_breakages_for_component(self, component: str) -> int:
         """Count breakages associated with a component"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT COUNT(*) FROM breakages WHERE component_id = ?
@@ -247,7 +265,7 @@ class HistoricalModificationTracker:
         """Analyze patterns in historical modifications"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT modification_type, specialist, success, modified_files, modified_symbols
@@ -321,7 +339,7 @@ class FragileComponentRegistry:
     
     def _initialize_schema(self):
         """Initialize the database schema for fragile component tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS breakages (
@@ -348,7 +366,7 @@ class FragileComponentRegistry:
         """Record a component breakage event"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO breakages 
@@ -373,7 +391,7 @@ class FragileComponentRegistry:
         """Returns components ranked by fragility"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT component_id, breakage_type, timestamp, severity
@@ -433,7 +451,7 @@ class FragileComponentRegistry:
         """Analyzes patterns in component breakages"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT breakage_type, component_id, context
@@ -502,7 +520,7 @@ class ArchitecturalDecisionRecorder:
     
     def _initialize_schema(self):
         """Initialize the database schema for architectural decision tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS architectural_decisions (
@@ -535,7 +553,7 @@ class ArchitecturalDecisionRecorder:
         """Record an architectural decision with context"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO architectural_decisions 
@@ -562,7 +580,7 @@ class ArchitecturalDecisionRecorder:
         """Retrieves architectural decisions relevant to a context"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             
             # Build query based on context
@@ -659,7 +677,7 @@ class KnownRiskRegistry:
     
     def _initialize_schema(self):
         """Initialize the database schema for risk tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS known_risks (
@@ -693,7 +711,7 @@ class KnownRiskRegistry:
         """Register a known risk"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO known_risks 
@@ -722,7 +740,7 @@ class KnownRiskRegistry:
         """Update the status of a known risk"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 UPDATE known_risks 
@@ -738,7 +756,7 @@ class KnownRiskRegistry:
         """Retrieves active risks, optionally filtered by component"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             
             # Build query

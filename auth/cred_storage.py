@@ -73,8 +73,8 @@ def _machine_id() -> str:
                     with open(path) as f:
                         mid = f.read().strip()
                         break
-    except Exception:
-        pass
+    except Exception as _ex:
+        log.warning("Silenced exception: %s", _ex)
 
     if mid is None:
         # Try reading a previously persisted machine ID
@@ -83,8 +83,8 @@ def _machine_id() -> str:
             try:
                 with open(persisted) as f:
                     mid = f.read().strip()
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
     if mid is None:
         raise RuntimeError(
@@ -130,7 +130,7 @@ def _decrypt(ciphertext: str, master_secret: str, salt: bytes) -> Optional[str]:
         log.error("Credential decryption failed: Invalid token (wrong key or corrupted data)")
         return None
     except Exception as e:
-        log.error(f"Credential decryption failed: {e}")
+        log.error("Credential decryption failed: %s", e)
         return None
 
 
@@ -332,10 +332,10 @@ class CredentialStore:
                     )
                     self._audit(conn, credential.id, "store", f"Provider: {credential.provider}")
                 self._touch()
-                log.info(f"Credential stored for provider '{credential.provider}' (id: {credential.id[:12]}...)")
+                log.info("Credential stored for provider '%s' (id: %s...)", credential.provider, credential.id[:12])
                 return True
             except Exception as e:
-                log.error(f"Failed to store credential: {e}")
+                log.error("Failed to store credential: %s", e)
                 return False
 
     def retrieve(self, credential_id: str) -> Optional[Credential]:
@@ -353,7 +353,7 @@ class CredentialStore:
                     ).fetchone()
 
                 if not row:
-                    log.warning(f"Credential not found: {credential_id[:12]}...")
+                    log.warning("Credential not found: %s...", credential_id[:12])
                     return None
 
                 (cid, provider, ctype, encrypted, salt, label,
@@ -362,7 +362,7 @@ class CredentialStore:
 
                 decrypted = _decrypt(encrypted, self._master_secret, salt)
                 if decrypted is None:
-                    log.error(f"Failed to decrypt credential {cid[:12]}...")
+                    log.error("Failed to decrypt credential %s...", cid[:12])
                     return None
 
                 # Update usage stats
@@ -388,7 +388,7 @@ class CredentialStore:
                     metadata=json.loads(metadata_json) if metadata_json else {},
                 )
             except Exception as e:
-                log.error(f"Failed to retrieve credential: {e}")
+                log.error("Failed to retrieve credential: %s", e)
                 return None
 
     def get_for_provider(self, provider: str, credential_type: Optional[CredentialType] = None) -> Optional[Credential]:
@@ -412,7 +412,7 @@ class CredentialStore:
 
                 return self.retrieve(row[0])
             except Exception as e:
-                log.error(f"Failed to get credential for provider '{provider}': {e}")
+                log.error("Failed to get credential for provider '%s': %s", provider, e)
                 return None
 
     def delete(self, credential_id: str) -> bool:
@@ -424,10 +424,10 @@ class CredentialStore:
                     conn.execute("DELETE FROM credentials WHERE id = ?", (credential_id,))
                     self._audit(conn, credential_id, "delete")
                 self._touch()
-                log.info(f"Credential deleted: {credential_id[:12]}...")
+                log.info("Credential deleted: %s...", credential_id[:12])
                 return True
             except Exception as e:
-                log.error(f"Failed to delete credential: {e}")
+                log.error("Failed to delete credential: %s", e)
                 return False
 
     def delete_for_provider(self, provider: str) -> int:
@@ -443,10 +443,10 @@ class CredentialStore:
                         conn.execute("DELETE FROM credentials WHERE id = ?", (row[0],))
                         self._audit(conn, row[0], "delete", f"Provider: {provider}")
                 self._touch()
-                log.info(f"Deleted {len(rows)} credential(s) for provider '{provider}'")
+                log.info("Deleted %d credential(s) for provider '%s'", len(rows), provider)
                 return len(rows)
             except Exception as e:
-                log.error(f"Failed to delete credentials for provider '{provider}': {e}")
+                log.error("Failed to delete credentials for provider '%s': %s", provider, e)
                 return 0
 
     def list_credentials(self, provider: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -486,7 +486,7 @@ class CredentialStore:
                 self._touch()
                 return result
             except Exception as e:
-                log.error(f"Failed to list credentials: {e}")
+                log.error("Failed to list credentials: %s", e)
                 return []
 
     def validate_credential(self, credential_id: str) -> Tuple[bool, str]:
@@ -547,7 +547,7 @@ class CredentialStore:
                     for r in rows
                 ]
             except Exception as e:
-                log.error(f"Failed to get audit log: {e}")
+                log.error("Failed to get audit log: %s", e)
                 return []
 
     def clear_audit_log(self) -> bool:
@@ -560,7 +560,7 @@ class CredentialStore:
                 log.info("Credential audit log cleared")
                 return True
             except Exception as e:
-                log.error(f"Failed to clear audit log: {e}")
+                log.error("Failed to clear audit log: %s", e)
                 return False
 
     def rotate_key(self, new_passphrase: str = "") -> bool:
@@ -581,7 +581,7 @@ class CredentialStore:
                         cid, provider, ctype, encrypted, old_salt = row
                         decrypted = _decrypt(encrypted, self._master_secret, old_salt)
                         if decrypted is None:
-                            log.error(f"Key rotation failed for credential {cid}: decryption error")
+                            log.error("Key rotation failed for credential %s: decryption error", cid)
                             return False
 
                         new_salt = _generate_salt()
@@ -598,7 +598,7 @@ class CredentialStore:
                 self._touch()
                 return True
             except Exception as e:
-                log.error(f"Key rotation failed: {e}")
+                log.error("Key rotation failed: %s", e)
                 return False
 
 

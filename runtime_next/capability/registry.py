@@ -42,8 +42,8 @@ class CapabilityRegistry:
             self._monitor_task.cancel()
             try:
                 await self._monitor_task
-            except (asyncio.CancelledError, RuntimeError):
-                pass
+            except (asyncio.CancelledError, RuntimeError) as _ex:
+                log.warning("Silenced exception: %s", _ex)
         log.info("Capability monitoring stopped")
 
     async def _monitor_loop(self):
@@ -59,8 +59,8 @@ class CapabilityRegistry:
             while self._is_running:
                 await asyncio.sleep(30)
                 await self.refresh()
-        except asyncio.CancelledError:
-            pass
+        except asyncio.CancelledError as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     async def refresh(self) -> CapabilitySnapshot:
         Path(os.getcwd()).resolve()
@@ -105,8 +105,8 @@ class CapabilityRegistry:
         try:
             from specialists import SPECIALIST_REGISTRY
             self._specialist_cache = list(SPECIALIST_REGISTRY.keys())
-        except ImportError:
-            pass
+        except ImportError as _ex:
+            log.warning("Silenced exception: %s", _ex)
         return self._specialist_cache
 
     def _check_files(self) -> Tuple[Set[str], Set[str]]:
@@ -206,7 +206,7 @@ class CapabilityRegistry:
         except ImportError:
             try:
                 disk = shutil.disk_usage(self.workspace_root).free / (1024 * 1024 * 1024)
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return mem, disk
 
     def _check_permissions(self) -> Dict[str, Any]:
@@ -215,10 +215,13 @@ class CapabilityRegistry:
             "can_read_workspace": os.access(self.workspace_root, os.R_OK),
         }
         try:
-            test_file = Path(tempfile.gettempdir()) / f"aelvo_perm_test_{os.getpid()}.tmp"
-            test_file.write_text("test")
-            test_file.unlink()
-            perms["can_write_temp"] = True
+            fd, tmp_path = tempfile.mkstemp(prefix="aelvo_perm_test_", suffix=".tmp")
+            try:
+                os.write(fd, b"test")
+                perms["can_write_temp"] = True
+            finally:
+                os.close(fd)
+                os.unlink(tmp_path)
         except Exception:
             perms["can_write_temp"] = False
         return perms

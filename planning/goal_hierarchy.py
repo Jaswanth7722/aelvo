@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
+from functools import wraps
 from typing import Any, Dict, List, Optional, Tuple
 
 from planning.memory_types import (
@@ -41,6 +43,21 @@ from config.settings import (
 
 log = logging.getLogger("aelvo.planning.hierarchy")
 
+
+def _synchronized(method):
+    """Serialize access to shared hierarchy state guarded by self._lock.
+
+    Methods are synchronous and may be called from multiple worker
+    threads, so a reentrant threading.RLock is used (asyncio.Lock
+    cannot be used with `with` on sync methods). Reentrancy is
+    required because public methods call other decorated methods.
+    """
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
 
 class GoalHierarchyEngine:
     """Full CRUD engine for the six-level goal hierarchy.
@@ -64,11 +81,14 @@ class GoalHierarchyEngine:
         self._nodes: Dict[str, StrategicPlanEntry] = {}
         self._children_index: Dict[str, List[str]] = {}  # parent_id → [child_node_ids]
         self._loaded = False
+        # Serialize all hierarchy mutations/reads (report HIGH #24)
+        self._lock = threading.RLock()
 
     # ------------------------------------------------------------------
     # Initialization
     # ------------------------------------------------------------------
 
+    @_synchronized
     def load_hierarchy(self) -> int:
         """Load all strategic plan nodes from ChromaDB into the in-memory index.
 
@@ -113,6 +133,7 @@ class GoalHierarchyEngine:
     # Create
     # ------------------------------------------------------------------
 
+    @_synchronized
     def create_node(
         self,
         level: HierarchyLevel,
@@ -210,7 +231,7 @@ class GoalHierarchyEngine:
             log.error("SQLite dual-sync failed for '%s', rolling back: %s", title, exc)
             try:
                 self.collection.delete(ids=[entry_id])
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             return None
 
         # 6. Update in-memory index
@@ -231,6 +252,7 @@ class GoalHierarchyEngine:
     # Read
     # ------------------------------------------------------------------
 
+    @_synchronized
     def get_node(self, node_id: str) -> Optional[StrategicPlanEntry]:
         """Retrieve a node by its planning node_id."""
         node = self._nodes.get(node_id)
@@ -239,6 +261,7 @@ class GoalHierarchyEngine:
             node.importance = min(1.0, node.importance + 0.01)
         return node
 
+    @_synchronized
     def get_mission(self) -> Optional[StrategicPlanEntry]:
         """Get the single Mission node for this project."""
         for node in self._nodes.values():
@@ -246,6 +269,7 @@ class GoalHierarchyEngine:
                 return node
         return None
 
+    @_synchronized
     def get_active_objectives(self) -> List[StrategicPlanEntry]:
         """Return all Strategic Objective nodes in ACTIVE state."""
         return [
@@ -254,6 +278,7 @@ class GoalHierarchyEngine:
             and n.state == PlanNodeState.ACTIVE
         ]
 
+    @_synchronized
     def get_active_milestones(self) -> List[StrategicPlanEntry]:
         """Return all Milestone nodes currently in ACTIVE state."""
         return [
@@ -262,11 +287,13 @@ class GoalHierarchyEngine:
             and n.state == PlanNodeState.ACTIVE
         ]
 
+    @_synchronized
     def get_children(self, node_id: str) -> List[StrategicPlanEntry]:
         """Return all direct children of a node."""
         child_ids = self._children_index.get(node_id, [])
         return [self._nodes[cid] for cid in child_ids if cid in self._nodes]
 
+    @_synchronized
     def get_ancestors(self, node_id: str) -> List[StrategicPlanEntry]:
         """Return the full ancestor chain from this node up to Mission."""
         ancestors = []
@@ -285,6 +312,7 @@ class GoalHierarchyEngine:
                 break
         return ancestors
 
+    @_synchronized
     def get_objective_for_task(self, task_node_id: str) -> Optional[StrategicPlanEntry]:
         """Trace a task node up through the hierarchy to its Strategic Objective."""
         ancestors = self.get_ancestors(task_node_id)
@@ -293,10 +321,12 @@ class GoalHierarchyEngine:
                 return ancestor
         return None
 
+    @_synchronized
     def find_nodes_by_level(self, level: HierarchyLevel) -> List[StrategicPlanEntry]:
         """Return all nodes at a given hierarchy level."""
         return [n for n in self._nodes.values() if n.level == level]
 
+    @_synchronized
     def find_floating_tasks(self) -> List[StrategicPlanEntry]:
         """Find task nodes not traceable to any Strategic Objective.
 
@@ -311,6 +341,7 @@ class GoalHierarchyEngine:
                     floating.append(node)
         return floating
 
+    @_synchronized
     def detect_circular_dependencies(self) -> List[Tuple[str, str]]:
         """Detect circular references in blocking_dependencies.
 
@@ -324,6 +355,7 @@ class GoalHierarchyEngine:
                     cycles.append((node_id, dep_id))
         return cycles
 
+    @_synchronized
     def build_strategic_context_summary(self) -> Dict[str, Any]:
         """Build the strategic context dict injected into the orchestrator's shared context.
 
@@ -421,6 +453,7 @@ class GoalHierarchyEngine:
     # Update
     # ------------------------------------------------------------------
 
+    @_synchronized
     def update_node_state(
         self,
         node_id: str,
@@ -452,6 +485,7 @@ class GoalHierarchyEngine:
         log.info("Node '%s' state: %s → %s", node.title, old_state.value, new_state.value)
         return True
 
+    @_synchronized
     def update_confidence(
         self,
         node_id: str,
@@ -482,6 +516,7 @@ class GoalHierarchyEngine:
         )
         return True
 
+    @_synchronized
     def attach_risk_assessment(
         self,
         node_id: str,
@@ -496,6 +531,7 @@ class GoalHierarchyEngine:
         self._persist_node_update(node)
         return True
 
+    @_synchronized
     def attach_verification_strategy(
         self,
         node_id: str,
@@ -514,6 +550,7 @@ class GoalHierarchyEngine:
     # Delete
     # ------------------------------------------------------------------
 
+    @_synchronized
     def cancel_node(
         self,
         node_id: str,
@@ -586,14 +623,14 @@ class GoalHierarchyEngine:
                     meta["usage_count"] = int(meta.get("usage_count", 0)) + 1
                     meta["importance"] = min(1.0, float(meta.get("importance", 0.5)) + 0.05)
                     self.collection.update(ids=[existing_id], metadatas=[meta])
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 return True
 
             if similarity >= CONFLICT_SIMILARITY_OVERRIDE:
                 # Stale — prune before fresh insert
                 try:
                     self.collection.delete(ids=[existing_id])
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 return False
 
         except Exception as e:
@@ -685,7 +722,7 @@ class GoalHierarchyEngine:
                         trigger_summary=r.get("changes_made", ""),
                         previous_state_summary="",
                     ))
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
             node = StrategicPlanEntry(
                 id=entry_id,

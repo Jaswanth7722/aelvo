@@ -227,6 +227,10 @@ class MCPExecutionEngine:
             server_id=request.server_id,
             tool_name=request.tool_name,
             response=response,
+            context={
+                "start_time": start_time,
+                "timeout_ms": request.timeout_ms,
+            },
         )
         all_verified = all(v.passed for v in verification_results)
 

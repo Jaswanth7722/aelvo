@@ -101,7 +101,7 @@ ORACLE PROTOCOL:
             if res.get("ids") and res["ids"][0]:
                 for doc, dist in zip(res["documents"][0], res["distances"][0]):
                     findings.append({"doc": doc, "score": round(1.0 - float(dist), 3)})
-        except Exception as _ex: print("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return {"research_findings": findings}
 
     def post_process(self, result: str, memory_engine, conversation_history: List[Dict[str, str]]) -> str:
@@ -180,7 +180,7 @@ ORACLE PROTOCOL:
         except Exception:
             try:
                 memory_engine.memory_collection.delete(ids=[m_id])
-            except Exception as _ex: print("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         return f"[ORACLE AUDIT] {', '.join(audits) if audits else 'no new research stored'}"
 
@@ -267,16 +267,16 @@ ORACLE PROTOCOL:
             try:
                 q = QuestionEntry.from_entry_content(entry.content)
                 self._questions.append(q)
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         def _on_finding(entry: Any) -> None:
             from cognition.blackboard_schemas import FindingEntry
             try:
                 f = FindingEntry.from_entry_content(entry.content)
                 self._findings.append(f)
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         blackboard.subscribe("questions", _on_question)
         blackboard.subscribe("research_findings", _on_finding)

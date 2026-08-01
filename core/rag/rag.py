@@ -433,7 +433,7 @@ class MemorySearcher:
                     meta["usage_count"] = int(meta.get("usage_count", 0)) + 1
                     meta["importance"] = min(1.0, float(meta.get("importance", 0.5)) + 0.05)
                     self.collection.update(ids=[existing_id], metadatas=[meta])
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 return True
             if similarity > 0.85 and meta_type in ("fact", "voluntary", "semantic"):
                 self.collection.delete(ids=[existing_id])
@@ -542,7 +542,7 @@ class MemorySearcher:
                                 meta_copy = dict(meta)
                                 meta_copy["project"] = f"FEDERATED:{col.name}"
                                 federated_hits.append((round(sim * 0.7, 3), mid, doc, meta_copy))
-                    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             if federated_hits:
                 federated_hits.sort(key=lambda x: x[0], reverse=True)
                 final_hits = federated_hits[:3]

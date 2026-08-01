@@ -120,7 +120,7 @@ def _walk_project_skeleton(workspace: str, max_dirs: int = 25, max_files_per_dir
             visited += 1
             if visited >= max_dirs:
                 break
-    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
     return skeleton
 
@@ -280,7 +280,7 @@ class ArchitectSpecialist(BaseSpecialist):
                         "requirements.txt", "tsconfig.json", "cargo.toml", "go.mod",
                     ):
                         configs.append(os.path.relpath(os.path.join(root, f), workspace))
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         configs_str = ", ".join(configs[:8]) if configs else "None"
 
         # 4. Live decomposition
@@ -475,7 +475,7 @@ DIAGRAM GENERATION (when explicitly requested):
             if res.get("ids") and res["ids"][0]:
                 for doc, dist in zip(res["documents"][0], res["distances"][0]):
                     decisions.append({"doc": doc, "score": round(1.0 - dist, 3)})
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # Query for prior plans
         prior_plans: List[Dict[str, Any]] = []
@@ -488,7 +488,7 @@ DIAGRAM GENERATION (when explicitly requested):
             if res.get("ids") and res["ids"][0]:
                 for doc, dist in zip(res["documents"][0], res["distances"][0]):
                     prior_plans.append({"doc": doc[:200], "score": round(1.0 - dist, 3)})
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         return {
             "system_decisions": decisions,
@@ -530,7 +530,7 @@ DIAGRAM GENERATION (when explicitly requested):
                     ids=[m_id], documents=[f"[ARCHITECT PLAN] {plan_section}"], metadatas=[meta]
                 )
                 audits.append("Persisted architect plan to memory.")
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # 2. Persist Mermaid artifacts as architecture_map vectors
         mermaid_blocks = re.findall(r"```mermaid\n([\s\S]+?)\n```", text)
@@ -569,7 +569,7 @@ DIAGRAM GENERATION (when explicitly requested):
             except Exception:
                 try:
                     memory_engine.memory_collection.delete(ids=[m_id])
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # 3. Persist ADR-style decisions as system_decision vectors
         adr_matches = re.findall(
@@ -611,7 +611,7 @@ DIAGRAM GENERATION (when explicitly requested):
             except Exception:
                 try:
                     memory_engine.memory_collection.delete(ids=[m_id])
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # 4. If diagrams referenced but none provided, log soft note
         if not mermaid_blocks and any(w in low for w in ["flowchart", "mindmap", "architecture diagram"]):

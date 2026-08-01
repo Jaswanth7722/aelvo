@@ -24,7 +24,24 @@ class CapabilityRefresh:
 
     async def execute(self, request: MCPExecutionRequest, failure_type: FailureType, attempt: int) -> bool:
         profile = self._capability_engine.get_profile(request.server_id)
-        if profile:
-            log.info("CapabilityRefresh: refreshing capabilities for %s", request.server_id)
-            return True
-        return False
+        if profile is None:
+            log.warning("CapabilityRefresh: no profile available for %s — cannot refresh", request.server_id)
+            return False
+        refreshed = await self._capability_engine.refresh_capabilities(request.server_id, profile)
+        log.info(
+            "CapabilityRefresh: refreshed capabilities for %s (drift=%s)",
+            request.server_id, refreshed,
+        )
+        if self._event_publisher:
+            try:
+                from ..events.mcp_events import MCPCapabilityDriftDetected
+                await self._event_publisher.publish(MCPCapabilityDriftDetected(
+                    event_id=f"cap_refresh_{request.server_id}",
+                    server_id=request.server_id,
+                    previous_checksum="unknown",
+                    current_checksum="refreshed",
+                    changes=["capabilities re-negotiated after failure"],
+                ))
+            except Exception as e:
+                log.warning("CapabilityRefresh: failed to publish refresh event: %s", e)
+        return True

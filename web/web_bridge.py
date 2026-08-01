@@ -316,8 +316,8 @@ def _extract_data(event: BaseEvent) -> Dict[str, Any]:
             # Test serialisability
             json.dumps(val)
             data[attr_name] = val
-        except (TypeError, ValueError):
-            pass
+        except (TypeError, ValueError) as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     return data
 

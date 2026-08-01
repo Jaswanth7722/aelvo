@@ -52,7 +52,7 @@ class PythonASTParser(ast.NodeVisitor):
                     try:
                         decorators.append(ast.unparse(decorator.func))
                         self.unresolved_references.append(ast.unparse(decorator.func))
-                    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return decorators
 
     def _get_type_annotation_str(self, node: Optional[ast.AST]) -> Optional[str]:
@@ -163,7 +163,7 @@ class PythonASTParser(ast.NodeVisitor):
                     name = ast.unparse(base)
                     base_classes.append(name)
                     self.unresolved_references.append(name)
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         for keyword in getattr(node, 'keywords', []):
             if keyword.arg == 'metaclass':
                 if isinstance(keyword.value, ast.Name):
@@ -312,7 +312,7 @@ class PythonASTParser(ast.NodeVisitor):
                 inner = node.func.value
                 if isinstance(inner, ast.Name):
                     self.unresolved_references.append(inner.id)
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
@@ -562,7 +562,7 @@ class ASTParser:
                 visitor.visit(tree)
                 parsed_file.symbols = visitor.symbols
                 parsed_file.unresolved_references = visitor.unresolved_references
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             parsed_file.parse_success = False
             parsed_file.parse_error = f"Syntax error at line {e.lineno}: {str(e)}"
             return parsed_file

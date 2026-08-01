@@ -11,6 +11,10 @@ from config.settings import (
     CONFLICT_SIMILARITY_OVERRIDE,
 )
 from memory import MEMORY_TYPE_USER_PREFERENCE
+import logging
+
+log = logging.getLogger(__name__)
+
 
 
 # Heuristic vocabulary for signal extraction.
@@ -217,7 +221,7 @@ class UserModelManager:
                         self.collection.update(ids=[existing_id], metadatas=[meta])
                     elif similarity >= CONFLICT_SIMILARITY_OVERRIDE:
                         self.collection.delete(ids=[existing_id])
-                except Exception as _ex: print("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
             if duplicate:
                 return
@@ -245,7 +249,7 @@ class UserModelManager:
             except Exception:
                 try:
                     self.collection.delete(ids=[m_id])
-                except Exception as _ex: print("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 return
 
             # SQLite dual-sync
@@ -259,7 +263,7 @@ class UserModelManager:
                 # Rollback ChromaDB if SQLite write fails to restore sync
                 try:
                     self.collection.delete(ids=[m_id])
-                except Exception as _ex: print("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
     # ------------------------------------------------------------------
     # PROMPT INJECTION

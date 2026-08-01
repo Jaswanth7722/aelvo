@@ -22,6 +22,10 @@ import asyncio
 import pytest
 
 from config.settings import BASE_DIR
+import logging
+
+log = logging.getLogger(__name__)
+
 
 
 # ==============================================================================
@@ -134,8 +138,8 @@ def shared_orchestrator():
     try:
         engine.db.close()
         os.unlink(db_path)
-    except Exception:
-        pass
+    except Exception as _ex:
+        log.warning("Silenced exception: %s", _ex)
 
 
 @pytest.fixture

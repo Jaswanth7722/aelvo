@@ -190,7 +190,7 @@ class HeraldSpecialist(BaseSpecialist):
                 limit=5
             )
             user_preferences = res.get("documents", []) or []
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         context = {
             "user_preferences": user_preferences,
@@ -223,7 +223,7 @@ class HeraldSpecialist(BaseSpecialist):
                 for key, val in constraints.items():
                     if isinstance(val, dict) and val.get("locked"):
                         locked_rules.append(f"HARD RULE: {key} = {val.get('value')}")
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         if not locked_rules:
             constraints = context.get("constraints", {}) or {}
             for key, val in constraints.items():
@@ -408,13 +408,13 @@ class HeraldSpecialist(BaseSpecialist):
                 data = ApprovalEntry.from_entry_content(entry.content)
                 self._summary_reviews.append({"type": "approval", "data": data})
                 return
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
             try:
                 data = RejectionEntry.from_entry_content(entry.content)
                 self._summary_reviews.append({"type": "rejection", "data": data})
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         blackboard.subscribe("collaboration_summaries", _on_summary_review)
 
@@ -554,13 +554,13 @@ class HeraldSpecialist(BaseSpecialist):
                 ApprovalEntry.from_entry_content(e.content)
                 approvals += 1
                 continue
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
             try:
                 RejectionEntry.from_entry_content(e.content)
                 rejections += 1
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         # Security escalations
         esc_entries = blackboard.read(
@@ -587,8 +587,8 @@ class HeraldSpecialist(BaseSpecialist):
                     success_count += 1
                 else:
                     failure_count += 1
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         # Architect decisions
         arch_entries = blackboard.read(
@@ -810,14 +810,14 @@ class HeraldSpecialist(BaseSpecialist):
                 data = ApprovalEntry.from_entry_content(entry.content)
                 results.append({"type": "approval", "data": data})
                 continue
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
             try:
                 data = RejectionEntry.from_entry_content(entry.content)
                 results.append({"type": "rejection", "data": data})
                 continue
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
             log.debug("Failed to parse summary review entry: %s", entry.id[:8])
 
         return results
@@ -1072,12 +1072,13 @@ class HeraldSpecialist(BaseSpecialist):
             if hasattr(ev, 'lifecycle_status') and ev.lifecycle_status.value == "challenged":
                 stats["challenged"] += 1
 
-        # Compute averages
-        for agent, stats in agent_stats.items():
-            stats["avg_confidence"] = round(
-                stats["confidence_sum"] / stats["total"], 4
-            ) if stats["total"] > 0 else 0.0
-            del stats["confidence_sum"]
+        # Compute averages (loop var renamed to avoid shadowing the outer
+        # `stats` binding accumulated in the loop above)
+        for agent, summary in agent_stats.items():
+            summary["avg_confidence"] = round(
+                summary["confidence_sum"] / summary["total"], 4
+            ) if summary["total"] > 0 else 0.0
+            del summary["confidence_sum"]
 
         return {
             "agents": agent_stats,

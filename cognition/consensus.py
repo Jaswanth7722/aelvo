@@ -172,7 +172,7 @@ class MultiAgentConsensusSystem:
                                     "veto": True,
                                     "reason": "Security concern detected in consensus vote",
                                 }
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         if self._governance:
             try:
                 state = None
@@ -180,7 +180,7 @@ class MultiAgentConsensusSystem:
                     state = self._governance.session_state
                 if state and state.get("failures", 0) >= 3:
                     return {"veto": True, "reason": "Session failure threshold exceeded"}
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return {"veto": False, "reason": ""}
 
     def _generate_id(self, prefix: str, content: str) -> str:

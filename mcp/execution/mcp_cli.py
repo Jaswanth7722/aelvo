@@ -307,8 +307,8 @@ class MCPCommandLineInterface:
                         tail = int(parts[1])
                     else:
                         tail = int(args[args.index(arg) + 1])
-                except Exception:
-                    pass
+                except Exception as _ex:
+                    log.warning("Silenced exception: %s", _ex)
 
         # Stub events for tailing
         print(f"\n[MCP] Tailing recent events (cap={tail}):")

@@ -7,6 +7,8 @@ import json
 import hashlib
 import logging
 import concurrent.futures
+import threading
+import contextlib
 import re
 import os
 try:
@@ -147,8 +149,24 @@ class MemoryEngine:
         
         self.session_failures = 0
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="aelvo_tool")
+        # Serialize access to the shared Chroma collection. Tool calls execute on
+        # ThreadPoolExecutor worker threads (kernel._execute_tool) while the event
+        # loop path (orchestrator) touches the same collection, so a plain
+        # asyncio.Lock would NOT protect against cross-thread races.
+        self._collection_lock = threading.RLock()
         self._init_db(project_name)
         self.reconcile_databases()
+
+    @contextlib.contextmanager
+    def collection_guard(self):
+        """Yield the Chroma memory collection with the engine lock held.
+
+        All readers/writers (executor worker threads, event-loop orchestrator,
+        main.py tool wrappers) must go through this guard so Chroma's collection
+        is never mutated concurrently.
+        """
+        with self._collection_lock:
+            yield self.memory_collection
 
     def _init_db(self, project_name):
         with self.db:
@@ -202,7 +220,8 @@ class MemoryEngine:
                 sqlite_entries.append(r[0])
             
             # 2. Get all entries from ChromaDB memory_collection
-            chroma_data = self.memory_collection.get()
+            with self.collection_guard() as coll:
+                chroma_data = coll.get()
             chroma_docs = chroma_data.get("documents", []) if chroma_data else []
             
             sqlite_set = set(sqlite_entries)
@@ -216,18 +235,19 @@ class MemoryEngine:
                 ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 m_id = hashlib.sha256(f"reconciled_{ts}_{content[:30]}".encode()).hexdigest()
                 try:
-                    self.memory_collection.add(
-                        ids=[m_id],
-                        documents=[content],
-                        metadatas=[{
-                            "type": "voluntary",
-                            "timestamp": ts,
-                            "timestamp_unix": time.time(),
-                            "importance": 0.6,
-                            "usage_count": 0,
-                            "source": "reconciliation"
-                        }]
-                    )
+                    with self.collection_guard() as coll:
+                        coll.add(
+                            ids=[m_id],
+                            documents=[content],
+                            metadatas=[{
+                                "type": "voluntary",
+                                "timestamp": ts,
+                                "timestamp_unix": time.time(),
+                                "importance": 0.6,
+                                "usage_count": 0,
+                                "source": "reconciliation"
+                            }]
+                        )
                     logging.debug(f"Reconciliation: Added memory to Chroma: {content[:40]}")
                 except Exception as ce:
                     logging.error(f"Reconciliation error adding to Chroma: {ce}")
@@ -393,14 +413,15 @@ class MemoryEngine:
     def decay_memory(self):
         """Phase 7: Reduces importance of unused memories to ensure fresh project focus."""
         try:
-            results = self.memory_collection.get(include=['metadatas', 'ids'])
-            if not results['ids']: return
-            u_ids, u_metas = [], []
-            for meta, mid in zip(results['metadatas'], results['ids']):
-                imp = float(meta.get('importance', 0.5)) * 0.98
-                meta['importance'] = max(0.1, round(imp, 3))
-                u_ids.append(mid); u_metas.append(meta)
-            if u_ids: self.memory_collection.update(ids=u_ids, metadatas=u_metas)
+            with self.collection_guard() as coll:
+                results = coll.get(include=['metadatas', 'ids'])
+                if not results['ids']: return
+                u_ids, u_metas = [], []
+                for meta, mid in zip(results['metadatas'], results['ids']):
+                    imp = float(meta.get('importance', 0.5)) * 0.98
+                    meta['importance'] = max(0.1, round(imp, 3))
+                    u_ids.append(mid); u_metas.append(meta)
+                if u_ids: coll.update(ids=u_ids, metadatas=u_metas)
         except Exception as e: logging.error(f"Decay Error: {e}")
 
     def _summarize_history(self, agent):
@@ -418,10 +439,11 @@ class MemoryEngine:
             m_id = hashlib.sha256(f"digest_{ts}".encode()).hexdigest()
             
             self.db.execute("INSERT INTO retained_memory (content) VALUES (?)", (f"MISSION LOG: {digest}",))
-            self.memory_collection.add(
-                ids=[m_id], documents=[digest],
-                metadatas=[{"type": "summary", "timestamp": ts, "timestamp_unix": time.time(), "importance": 0.7, "usage_count": 0}]
-            )
+            with self.collection_guard() as coll:
+                coll.add(
+                    ids=[m_id], documents=[digest],
+                    metadatas=[{"type": "summary", "timestamp": ts, "timestamp_unix": time.time(), "importance": 0.7, "usage_count": 0}]
+                )
             self.db.execute("DELETE FROM episodes WHERE episode_id IN (SELECT episode_id FROM episodes ORDER BY timestamp ASC LIMIT 40)")
             self.db.commit()
             logging.info("✓ Signal Extraction complete.")

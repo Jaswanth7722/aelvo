@@ -183,8 +183,8 @@ class TaskRouter:
             try:
                 block = text.split("```json", 1)[1].split("```", 1)[0].strip()
                 candidates.append(("block", block))
-            except (IndexError, ValueError):
-                pass
+            except (IndexError, ValueError) as _ex:
+                log.warning("Silenced exception: %s", _ex)
         candidates.append(("direct", text))
 
         decoder = json.JSONDecoder(strict=False)

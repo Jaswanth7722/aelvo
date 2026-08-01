@@ -10,6 +10,10 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
 import main
+import logging
+
+log = logging.getLogger(__name__)
+
 
 
 @pytest.fixture(autouse=True)
@@ -77,8 +81,8 @@ def test_cli_config_flag():
         mock_detect.return_value = ("openai", MagicMock())
         try:
             main.main()
-        except SystemExit:
-            pass
+        except SystemExit as _ex:
+            log.warning("Silenced exception: %s", _ex)
         # Should call main_async which then invokes detect_provider
         assert mock_async.called
 

@@ -12,6 +12,7 @@ Integrates with SENTINEL to enforce:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
@@ -72,6 +73,8 @@ class MCPGovernanceLayer:
         self._allowlist = allowlist or AllowlistManager()
         self._restrictions = restrictions or RestrictionEngine()
         self._audit_logger = audit_logger or MCPAuditLogger()
+        self._rate_buckets: Dict[str, list] = {}
+
 
     async def check(self, request: MCPExecutionRequest) -> GovernanceResult:
         """Run all governance checks for a request.
@@ -84,6 +87,16 @@ class MCPGovernanceLayer:
         5. Rate limit
         6. Side-effect gate
         """
+        # Validate server_id up front (report HIGH #21): an empty id would
+        # otherwise pass the allowlist check and reach the trust check.
+        if not request.server_id:
+            result = GovernanceResult(
+                allowed=False,
+                reason="Server id is empty",
+            )
+            await self._audit_logger.log("DENIED", request, result)
+            return result
+
         record = self._registry.get(request.server_id)
 
         # 1. Server allowlist check
@@ -143,6 +156,21 @@ class MCPGovernanceLayer:
         # 6. Side-effect gate
         side_effect_ok = await self._check_side_effects(request)
 
+        if not rate_ok or not side_effect_ok:
+            reasons = []
+            if not rate_ok:
+                reasons.append("rate limit exceeded")
+            if not side_effect_ok:
+                reasons.append("side-effect not permitted")
+            result = GovernanceResult(
+                allowed=False,
+                reason="; ".join(reasons),
+                rate_limit_ok=rate_ok,
+                side_effect_ok=side_effect_ok,
+            )
+            await self._audit_logger.log("DENIED", request, result)
+            return result
+
         # All checks passed
         requires_approval = permission.requires_approval or restriction_result.get("requires_approval", False)
         result = GovernanceResult(
@@ -150,8 +178,8 @@ class MCPGovernanceLayer:
             trust_level_ok=True,
             permission_ok=True,
             allowlist_ok=True,
-            rate_limit_ok=rate_ok,
-            side_effect_ok=side_effect_ok,
+            rate_limit_ok=True,
+            side_effect_ok=True,
             requires_approval=requires_approval,
             details={
                 "permission": permission.details,
@@ -174,11 +202,58 @@ class MCPGovernanceLayer:
             return False
 
     def _check_rate_limit(self, server_id: str, tool_name: str, specialist_id: str) -> bool:
-        """Check rate limits for a server/tool/specialist combination."""
-        # Simplified — returns True (rate limiting is a future enhancement)
+        """Check rate limits for a server/tool/specialist combination.
+
+        Simple sliding-window limiter: allows at most MAX_REQUESTS per
+        WINDOW_SECONDS per (server, tool). Failures are loud — the request
+        is denied so the caller can surface the throttling to the user.
+        """
+        max_requests = 60
+        window_seconds = 60.0
+
+        now = time.monotonic()
+        key = f"{server_id}:{tool_name}:{specialist_id}"
+        bucket = self._rate_buckets.get(key, [])
+        # Drop entries outside the window
+        bucket = [t for t in bucket if now - t < window_seconds]
+        if len(bucket) >= max_requests:
+            self._rate_buckets[key] = bucket
+            log.warning(
+                "Governance: rate limit exceeded for %s (>=%d req/%gs)",
+                key, max_requests, window_seconds,
+            )
+            return False
+        bucket.append(now)
+        self._rate_buckets[key] = bucket
+
+        # Prevent unbounded growth of the bucket map: prune stale keys periodically.
+        if len(self._rate_buckets) > 10_000:
+            for stale_key, stale_bucket in list(self._rate_buckets.items()):
+                if not any(now - t < window_seconds for t in stale_bucket):
+                    del self._rate_buckets[stale_key]
+
         return True
 
     async def _check_side_effects(self, request: MCPExecutionRequest) -> bool:
-        """Check if side effects are allowed for this request."""
-        # Simplified — returns True (side-effect gating is a future enhancement)
-        return True
+        """Check if side effects are allowed for this request.
+
+        Denies mutation-style tools unless the requesting specialist is
+        explicitly authorized to perform side effects (TERMINUS/FORGE for
+        write operations). Read-only tools are always allowed.
+        """
+        side_effect_tools = {
+            "write_file", "edit_file", "delete", "create", "update",
+            "send", "execute", "run", "kill", "stop", "restart",
+        }
+        tool_lower = request.tool_name.lower()
+        if tool_lower not in side_effect_tools:
+            return True
+
+        specialist = (request.specialist_id or "").upper()
+        if specialist in ("TERMINUS", "FORGE"):
+            return True
+        log.warning(
+            "Governance: side-effect tool '%s' denied for specialist '%s'",
+            request.tool_name, request.specialist_id,
+        )
+        return False

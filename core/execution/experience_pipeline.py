@@ -392,8 +392,8 @@ class ExperienceLearningPipeline:
                     succeeded=result.is_success,
                     confidence_at_time=self._compute_tool_confidence(result.tool_name),
                 )
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         return record
 

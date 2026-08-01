@@ -34,6 +34,10 @@ from mcp.integrations.execution_graph.node_factory import MCPNodeFactory
 from mcp.integrations.specialists import (
     HermesMCPInterface
 )
+import logging
+
+log = logging.getLogger(__name__)
+
 
 # ============================================================================
 # MOCKS
@@ -91,8 +95,8 @@ def temp_db():
     os.close(fd)
     try:
         os.remove(path)
-    except OSError:
-        pass
+    except OSError as _ex:
+        log.warning("Silenced exception: %s", _ex)
 
 @pytest.fixture
 def mcp_platform(temp_db):
@@ -364,3 +368,185 @@ async def test_cli_help(mcp_platform):
     cli = MCPCommandLineInterface(mcp_platform)
     res = await cli.execute("#mcp help")
     assert res["status"] == "SUCCESS"
+
+# ============================================================================
+# PATH EXECUTABLE DISCOVERY - SECURITY REGRESSION TESTS
+# ============================================================================
+# Regression coverage for the HIGH-severity fix: `mcp-*` / `*.mcp` executables
+# on PATH must NOT be auto-registered by default (an attacker who can write to
+# a PATH directory would otherwise get arbitrary code execution through MCP).
+# When opt-in discovery is enabled, candidates must be registered as
+# QUARANTINED (inspection only, no execution) until the user promotes them.
+
+
+def _make_path_executable(tmp_path, name):
+    """Create a fake mcp-* executable inside a temp PATH dir."""
+    exe = tmp_path / name
+    exe.write_text("#!/bin/sh\necho fake-mcp\n", encoding="utf-8")
+    exe.chmod(0o755)
+
+
+@pytest.mark.asyncio
+async def test_path_executables_not_registered_by_default(mcp_platform, tmp_path, monkeypatch):
+    """Regression: PATH mcp-* executables are NOT auto-registered by default."""
+    from mcp.discovery.filesystem_discovery import FilesystemDiscovery
+
+    registry = mcp_platform["registry"]
+    _make_path_executable(tmp_path, "mcp-fake-server")
+    _make_path_executable(tmp_path, "other-tool.mcp")
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    discovery = FilesystemDiscovery(registry, scan_paths=[], discover_path_executables=False)
+    discovered = await discovery.discover()
+
+    # No fs_* server may be discovered or registered without explicit opt-in.
+    assert not any(d.startswith("fs_") for d in discovered)
+    assert all(not r.id.startswith("fs_") for r in registry.list_servers())
+    assert registry.get("fs_mcp-fake-server") is None
+    assert registry.get("fs_other-tool.mcp") is None
+
+
+@pytest.mark.asyncio
+async def test_path_executables_quarantined_when_opted_in(mcp_platform, tmp_path, monkeypatch):
+    """Regression: opt-in PATH discovery registers candidates as QUARANTINED."""
+    from mcp.discovery.filesystem_discovery import FilesystemDiscovery
+
+    registry = mcp_platform["registry"]
+    _make_path_executable(tmp_path, "mcp-fake-server")
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    discovery = FilesystemDiscovery(registry, scan_paths=[], discover_path_executables=True)
+    discovered = await discovery.discover()
+
+    assert "fs_mcp-fake-server" in discovered
+    record = registry.get("fs_mcp-fake-server")
+    assert record is not None
+    # Registered for inspection only - QUARANTINED blocks execution until the
+    # user explicitly promotes the trust level.
+    assert record.trust_level == TrustLevel.QUARANTINED
+    assert record.enabled is True
+    assert "unvetted" in record.tags
+
+
+def test_discovery_engine_path_executable_flag_wiring(mcp_platform):
+    """Regression: DiscoveryEngine defaults PATH discovery off and forwards opt-in."""
+    from mcp.discovery.discovery_engine import DiscoveryEngine
+    from mcp.events.event_schemas import DiscoverySource
+
+    default_engine = DiscoveryEngine(mcp_platform["registry"])
+    assert default_engine.get_source(DiscoverySource.FILESYSTEM).discover_path_executables is False
+
+    optin_engine = DiscoveryEngine(mcp_platform["registry"], discover_path_executables=True)
+    assert optin_engine.get_source(DiscoverySource.FILESYSTEM).discover_path_executables is True
+
+
+
+@pytest.mark.asyncio
+async def test_quarantined_server_promotion_enables_execution(mcp_platform, tmp_path, monkeypatch):
+    """Regression: a QUARANTINED PATH-discovered server is blocked from execution
+    until the user promotes it (update_trust); afterwards it executes normally.
+    """
+    from mcp.discovery.filesystem_discovery import FilesystemDiscovery
+    from mcp.transport.transport_factory import TransportFactory
+
+    registry = mcp_platform["registry"]
+    governance = mcp_platform["governance"]
+    execution = mcp_platform["execution_engine"]
+
+    # Discover a PATH executable with opt-in -> registered QUARANTINED.
+    _make_path_executable(tmp_path, "mcp-promotable-server")
+    monkeypatch.setenv("PATH", str(tmp_path))
+    discovery = FilesystemDiscovery(registry, scan_paths=[], discover_path_executables=True)
+    discovered = await discovery.discover()
+    server_id = "fs_mcp-promotable-server"
+    assert server_id in discovered
+    assert registry.get(server_id).trust_level == TrustLevel.QUARANTINED
+
+    # Governance must block execution while the server is QUARANTINED.
+    governance._allowlist.clear()
+    request = MCPExecutionRequest(
+        request_id="req-promote-1",
+        specialist_id="FORGE",
+        server_id=server_id,
+        tool_name="read_file",
+        trust_requirement=TrustLevel.SANDBOXED,
+    )
+    blocked = await governance.check(request)
+    assert blocked.allowed is False
+    assert blocked.trust_level_ok is False
+
+    # The user promotes the server (explicit user action).
+    assert registry.update_trust(server_id, TrustLevel.VERIFIED) is True
+    assert registry.get(server_id).trust_level == TrustLevel.VERIFIED
+
+    # Governance now allows the same request.
+    allowed = await governance.check(request)
+    assert allowed.allowed is True
+    assert allowed.trust_level_ok is True
+
+    # And it executes normally through the governed pipeline.
+    old_create = TransportFactory.create
+    TransportFactory.create = lambda cfg: MockTransport()
+    try:
+        result = await execution.execute(request)
+        assert result.success is True
+        assert result.governance_passed is True
+        assert result.trust_level_at_execution == "verified"
+    finally:
+        TransportFactory.create = old_create
+
+
+
+@pytest.mark.asyncio
+async def test_quarantined_path_server_blocked_from_execution(mcp_platform, tmp_path, monkeypatch):
+    """Regression: a QUARANTINED PATH-discovered server is blocked end-to-end
+    by the governance/trust layer - execution must not reach the transport.
+    """
+    from mcp.discovery.filesystem_discovery import FilesystemDiscovery
+    from mcp.transport.transport_factory import TransportFactory
+
+    registry = mcp_platform["registry"]
+    governance = mcp_platform["governance"]
+    execution = mcp_platform["execution_engine"]
+
+    # Discover a PATH executable with opt-in -> registered QUARANTINED.
+    _make_path_executable(tmp_path, "mcp-blocked-server")
+    monkeypatch.setenv("PATH", str(tmp_path))
+    discovery = FilesystemDiscovery(registry, scan_paths=[], discover_path_executables=True)
+    discovered = await discovery.discover()
+    server_id = "fs_mcp-blocked-server"
+    assert server_id in discovered
+    record = registry.get(server_id)
+    assert record is not None
+    assert record.trust_level == TrustLevel.QUARANTINED
+
+    # Open the allowlist so the trust level is the only gate under test.
+    governance._allowlist.clear()
+
+    request = MCPExecutionRequest(
+        request_id="req-quarantine-1",
+        specialist_id="FORGE",
+        server_id=server_id,
+        tool_name="read_file",
+        trust_requirement=TrustLevel.SANDBOXED,
+    )
+
+    # Even with a working transport available, execution must be refused:
+    # QUARANTINED is inspection-only, below the SANDBOXED requirement.
+    old_create = TransportFactory.create
+    TransportFactory.create = lambda cfg: MockTransport()
+    try:
+        result = await execution.execute(request)
+    finally:
+        TransportFactory.create = old_create
+
+    assert result.success is False
+    assert result.governance_passed is False
+    assert "Governance blocked" in result.error
+    assert "trust level" in result.error
+
+    # Direct governance check agrees: the trust gate itself denies.
+    blocked = await governance.check(request)
+    assert blocked.allowed is False
+    assert blocked.trust_level_ok is False
+

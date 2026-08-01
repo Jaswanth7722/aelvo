@@ -267,7 +267,7 @@ class AelvoKernel:
                     log.warning(f"SQLite online backup failed: {backup_err}. Attempting physical restore.")
                     try:
                         self.conn.close()
-                    except Exception as _ex: print("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                     shutil.copy2(src_db_path, self.db_path)
                     self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
                     self.conn.execute("PRAGMA journal_mode=WAL;")

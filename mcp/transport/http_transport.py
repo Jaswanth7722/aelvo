@@ -73,8 +73,8 @@ class HttpTransport(BaseTransport):
             self._sse_task.cancel()
             try:
                 await self._sse_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             self._sse_task = None
 
         if self._session:
@@ -143,9 +143,9 @@ class HttpTransport(BaseTransport):
                                 data = json.loads(text[6:])
                                 message = MCPMessage(**data)
                                 await self._read_buffer.put(message)
-                            except json.JSONDecodeError:
-                                pass
-        except asyncio.CancelledError:
-            pass
+                            except json.JSONDecodeError as _ex:
+                                log.warning("Silenced exception: %s", _ex)
+        except asyncio.CancelledError as _ex:
+            log.warning("Silenced exception: %s", _ex)
         except Exception as e:
             log.error("HttpTransport: SSE read error: %s", e)

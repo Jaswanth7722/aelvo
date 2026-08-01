@@ -34,8 +34,8 @@ class EventBus:
         if self._process_task:
             try:
                 await asyncio.wait_for(self._process_task, timeout=5.0)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                pass
+            except (asyncio.TimeoutError, asyncio.CancelledError) as _ex:
+                log.warning("Silenced exception: %s", _ex)
         log.info("EventBus stopped")
 
     def subscribe(self, event_type: EventType, callback: Callable[[BaseEvent], Awaitable[None]]):

@@ -520,5 +520,5 @@ class SpecialistEffectivenessTracker:
         """Close the database connection."""
         try:
             self._conn.close()
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)

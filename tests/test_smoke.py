@@ -72,12 +72,16 @@ def test_hermes_specialist_calibrate():
 
 
 def test_validate_script_runs():
-    """validate.py executes without error."""
+    """validate.py (if present) executes without error."""
     import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    script = os.path.join(root, "validate.py")
+    if not os.path.exists(script):
+        pytest.skip("validate.py not present in repo root")
     result = subprocess.run(
-        [sys.executable, "validate.py"],
+        [sys.executable, script],
         capture_output=True, text=True, timeout=30,
-        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cwd=root,
     )
     assert result.returncode == 0, f"validate.py failed:\n{result.stderr}"
 

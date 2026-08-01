@@ -95,7 +95,7 @@ SENTINEL EXECUTION RULES:
             if res.get("ids") and res["ids"][0]:
                 for doc, dist in zip(res["documents"][0], res["distances"][0]):
                     rules.append({"doc": doc, "score": round(1.0 - float(dist), 3)})
-        except Exception as _ex: print("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return {"security_rules": rules}
 
     def post_process(self, result: str, memory_engine, conversation_history: List[Dict[str, str]]) -> str:
@@ -169,7 +169,7 @@ SENTINEL EXECUTION RULES:
                 except Exception:
                     try:
                         memory_engine.memory_collection.delete(ids=[m_id])
-                    except Exception as _ex: print("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
 
         return f"[SENTINEL AUDIT] {', '.join(audits) if audits else 'no new security rules'}"
@@ -277,16 +277,16 @@ SENTINEL EXECUTION RULES:
             try:
                 impl = ImplementationEntry.from_entry_content(entry.content)
                 self._implementations.append(impl)
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         def _on_escalation(entry: Any) -> None:
             from cognition.blackboard_schemas import EscalationEntry
             try:
                 e = EscalationEntry.from_entry_content(entry.content)
                 self._escalations.append(e)
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         blackboard.subscribe("implementations", _on_implementation)
         blackboard.subscribe("security_escalations", _on_escalation)

@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 
 logger = logging.getLogger(__name__)
+log = logger
 
 
 @dataclass
@@ -184,8 +185,8 @@ class RuntimeSessionManager:
             self._cleanup_task.cancel()
             try:
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
     def summary(self) -> dict[str, Any]:
         active = self.get_active_sessions()

@@ -4,6 +4,10 @@ import subprocess
 import re
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
+import logging
+
+log = logging.getLogger(__name__)
+
 
 def _run_git_cmd(args: List[str], cwd: str) -> Tuple[int, str, str]:
     """Runs a Git shell command safely in the specified working directory."""
@@ -194,7 +198,7 @@ def detect_merge_conflicts(workspace_root: str) -> Dict[str, Any]:
                         "file": rel_path,
                         "markers": markers_found
                     })
-        except Exception as _ex: print("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
     return {
         "status": "success" if not conflict_files else "error",
@@ -205,6 +209,12 @@ def detect_merge_conflicts(workspace_root: str) -> Dict[str, Any]:
 
 def generate_pr_description(base_branch: str, head_branch: str, workspace_root: str) -> Dict[str, Any]:
     """Compares head_branch to base_branch and formats a standard pull request template in Markdown."""
+    # Validate branch names to prevent git option/argument injection
+    if not re.fullmatch(r"[A-Za-z0-9_/.-]+", base_branch or ""):
+        return {"status": "error", "logs": f"Invalid base branch name: '{base_branch}'.", "executed": {}}
+    if not re.fullmatch(r"[A-Za-z0-9_/.-]+", head_branch or ""):
+        return {"status": "error", "logs": f"Invalid head branch name: '{head_branch}'.", "executed": {}}
+
     # Find list of commits between branches
     code, commits_raw, _ = _run_git_cmd(["log", f"{base_branch}..{head_branch}", "--oneline"], workspace_root)
     if code != 0:

@@ -14,6 +14,7 @@ import httpx
 from ..types import AuthCredentials
 
 logger = logging.getLogger(__name__)
+log = logger
 
 
 @dataclass
@@ -187,8 +188,8 @@ class SessionAuth:
                 session_token = data.get("token") or data.get(
                     "session_token"
                 ) or data.get("session")
-            except (json.JSONDecodeError, KeyError):
-                pass
+            except (json.JSONDecodeError, KeyError) as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         return AuthCredentials(
             provider_id=self.config.provider_id,

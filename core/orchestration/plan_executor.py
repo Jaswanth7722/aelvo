@@ -97,8 +97,8 @@ class PlanExecutor:
             if self.memory_engine:
                 try:
                     constraints = self.memory_engine.parse_anchor() or {}
-                except Exception:
-                    pass
+                except Exception as _ex:
+                    log.warning("Silenced exception: %s", _ex)
 
             affected_files = []
             if self.cognitive_engine:
@@ -110,8 +110,8 @@ class PlanExecutor:
                             for slot in slots:
                                 if hasattr(slot, 'content') and isinstance(slot.content, dict):
                                     affected_files.extend(slot.content.get('files', []))
-                except Exception:
-                    pass
+                except Exception as _ex:
+                    log.warning("Silenced exception: %s", _ex)
 
             tree = get_workspace_tree() if get_workspace_tree else ""
 
@@ -332,7 +332,7 @@ class PlanExecutor:
                 )
                 log.info("Verification calibration recorded for %s: %d type failures",
                          plan.id[:12], len(type_failures))
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
         except Exception as e:
             log.warning("Verification calibration failed: %s", e)

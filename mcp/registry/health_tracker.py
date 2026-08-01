@@ -54,6 +54,8 @@ class HealthTracker:
             error_rate = self._compute_error_rate(server_id)
             if error_rate > self._degrade_threshold:
                 new_state = HealthState.DEGRADED
+            else:
+                new_state = current
 
         snapshot = HealthSnapshot(
             server_id=server_id,

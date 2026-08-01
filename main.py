@@ -127,7 +127,7 @@ def get_system_prompt(user_query=""):
             rows = db.execute("SELECT key, value FROM state ORDER BY key").fetchall()
         if rows:
             state_info = "\n".join([f"  {k}: {v}" for k, v in rows if not k.startswith("runtime:")])
-    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
     try:
         if os.path.exists(ANCHOR_PATH):
@@ -139,7 +139,7 @@ def get_system_prompt(user_query=""):
                         data = yaml.safe_load(parts[1])
                         if data and data.get("constraints"):
                             anchor_info = "\n".join([f"  {k}: {v.get('value')}" for k, v in data["constraints"].items()])
-    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
     # --- SECRETARY: Active Semantic Injection (DYNAMIC RAG ONLY) ---
 
@@ -263,8 +263,8 @@ class LLMCache:
                     # Cache entries are valid for 2 hours
                     if time.time() - row[1] < 7200:
                         return row[0]
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
         return None
 
     def set(self, key: str, response: str):
@@ -276,8 +276,8 @@ class LLMCache:
                     (key, response, time.time())
                 )
                 conn.commit()
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
 
 # ============================================================================
@@ -375,7 +375,10 @@ class AelvoAgent:
                 messages=all_msgs,
                 temperature=0.1
             )
-            response_text = response.choices[0].message.content
+            if response.choices:
+                response_text = response.choices[0].message.content or ""
+            else:
+                log.error("OpenAI response contained no choices")
 
         elif self.sdk_type == "anthropic":
             # Anthtopic handles system separately
@@ -386,7 +389,10 @@ class AelvoAgent:
                 system=system_prompt,
                 temperature=0.1
             )
-            response_text = response.content[0].text
+            if response.content:
+                response_text = response.content[0].text or ""
+            else:
+                log.error("Anthropic response contained no content blocks")
 
         elif self.sdk_type == "google":
             # provider_msgs already in Google format ({role, parts}) from MessageAdapter
@@ -512,14 +518,14 @@ def parse_llm_output(text: str):
             parsed = json.loads(block, strict=False)
             norm = normalize_calls(parsed)
             if norm: return ("tool_calls", norm)
-    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
     # Try direct parse
     try:
         parsed = json.loads(text, strict=False)
         norm = normalize_calls(parsed)
         if norm: return ("tool_calls", norm)
-    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
     # Aggressive Search via JSONDecoder
     decoder = json.JSONDecoder(strict=False)
@@ -531,7 +537,9 @@ def parse_llm_output(text: str):
                 parsed, index = decoder.raw_decode(candidate)
                 norm = normalize_calls(parsed)
                 if norm: return ("tool_calls", norm)
-            except Exception: continue
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
+                continue
 
     return ("unknown", text)
 
@@ -577,10 +585,11 @@ def build_tool_registry(fs: AelvoFileSystem, kernel: AelvoKernel, memory_engine:
     def _wrap_respond(message="", retain_memory=None, **_ignored):
         if retain_memory:
             # PHASE 8: Conflict Resolution (Deduplication)
-            searcher = MemorySearcher(memory_engine.memory_collection)
-            if searcher.resolve_conflict(retain_memory, meta_type="fact"):
-                # Concept already exists; skip redundant insert to prevent bloat
-                return {"status": "success", "logs": f"Deduplicated: {message}", "executed": {"message": message, "memory_retained": False}}
+            with memory_engine.collection_guard() as coll:
+                searcher = MemorySearcher(coll)
+                if searcher.resolve_conflict(retain_memory, meta_type="fact"):
+                    # Concept already exists; skip redundant insert to prevent bloat
+                    return {"status": "success", "logs": f"Deduplicated: {message}", "executed": {"message": message, "memory_retained": False}}
 
             try:
                 # PHASE 4 & 7: Atomic Dual-Sync + Adaptive Metadata
@@ -588,25 +597,26 @@ def build_tool_registry(fs: AelvoFileSystem, kernel: AelvoKernel, memory_engine:
                 import time
                 import hashlib
                 ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                m_id = hashlib.sha256(f"voluntary_{ts}_{retain_memory[:30]}".encode()).hexdigest()
+                m_id = hashlib.sha256(f"voluntary_{ts}_{(retain_memory or "")[:30]}".encode()).hexdigest()
                 
                 # 1. SQL System of Record
                 with sqlite3.connect(DB_PATH) as db:
                     db.execute("INSERT INTO retained_memory (content) VALUES (?)", (retain_memory,))
                 
                 # 2. Vector Search Engine with Lifecycle Metadata
-                memory_engine.memory_collection.add(
-                    ids=[m_id],
-                    documents=[retain_memory],
-                    metadatas=[{
-                        "type": "voluntary",
-                        "timestamp": ts,
-                        "timestamp_unix": time.time(),
-                        "importance": 0.6,    # Standard starting importance
-                        "usage_count": 0,
-                        "source": "respond"
-                    }]
-                )
+                with memory_engine.collection_guard() as coll:
+                    coll.add(
+                        ids=[m_id],
+                        documents=[retain_memory],
+                        metadatas=[{
+                            "type": "voluntary",
+                            "timestamp": ts,
+                            "timestamp_unix": time.time(),
+                            "importance": 0.6,    # Standard starting importance
+                            "usage_count": 0,
+                            "source": "respond"
+                        }]
+                    )
                 log.info(f"âœ“ Voluntary memory atomized: {m_id}")
             except Exception as e:
                 log.error(f"FATAL: Memory Desync on Respond: {e}")
@@ -614,21 +624,22 @@ def build_tool_registry(fs: AelvoFileSystem, kernel: AelvoKernel, memory_engine:
         # PHASE 7: Feedback Loop (Reinforce used memories - run asynchronously to mitigate read-path writes)
         used_ids = getattr(memory_engine, "last_retrieved_ids", [])
         if used_ids:
-            def _async_reinforce_memories(ids_to_update, coll):
+            def _async_reinforce_memories(ids_to_update):
                 for mid in ids_to_update:
                     try:
-                        data = coll.get(ids=[mid], include=["metadatas"])
-                        if not data or not data.get("metadatas"): continue
-                        meta = data["metadatas"][0]
-                        # Reward: Increase importance and usage count
-                        meta["usage_count"] = int(meta.get("usage_count", 0)) + 1
-                        meta["importance"] = min(1.0, float(meta.get("importance", 0.5)) + 0.05)
-                        coll.update(ids=[mid], metadatas=[meta])
-                    except Exception:
-                        pass
+                        with memory_engine.collection_guard() as coll:
+                            data = coll.get(ids=[mid], include=["metadatas"])
+                            if not data or not data.get("metadatas"): continue
+                            meta = data["metadatas"][0]
+                            # Reward: Increase importance and usage count
+                            meta["usage_count"] = int(meta.get("usage_count", 0)) + 1
+                            meta["importance"] = min(1.0, float(meta.get("importance", 0.5)) + 0.05)
+                            coll.update(ids=[mid], metadatas=[meta])
+                    except Exception as _ex:
+                        log.warning("Silenced exception: %s", _ex)
             
             try:
-                memory_engine._executor.submit(_async_reinforce_memories, list(used_ids), memory_engine.memory_collection)
+                memory_engine._executor.submit(_async_reinforce_memories, list(used_ids))
             except Exception as e:
                 log.debug("Failed to submit async memory reinforcement: %s", e)
             # Reset feedback for next turn
@@ -691,9 +702,10 @@ def build_tool_registry(fs: AelvoFileSystem, kernel: AelvoKernel, memory_engine:
     def _wrap_save_constraint(tag, rule, **_ignored):
         # PHASE 8: Conflict Resolution (Deduplication)
         content = f"{tag}: {rule}"
-        searcher = MemorySearcher(memory_engine.memory_collection)
-        if searcher.resolve_conflict(content, meta_type="fact"):
-            return {"status": "success", "logs": f"Deduplicated constraint: {tag}", "executed": {"tag": tag}}
+        with memory_engine.collection_guard() as coll:
+            searcher = MemorySearcher(coll)
+            if searcher.resolve_conflict(content, meta_type="fact"):
+                return {"status": "success", "logs": f"Deduplicated constraint: {tag}", "executed": {"tag": tag}}
 
         try:
             # PHASE 4 & 7: Atomic Dual-Sync + Adaptive Metadata
@@ -708,18 +720,19 @@ def build_tool_registry(fs: AelvoFileSystem, kernel: AelvoKernel, memory_engine:
                 db.execute("INSERT INTO semantic_memory (tag, constraint_rule) VALUES (?, ?)", (tag, rule))
             
             # 2. Vector Search Engine with Lifecycle Metadata
-            memory_engine.memory_collection.add(
-                ids=[m_id],
-                documents=[content],
-                metadatas=[{
-                    "type": "semantic",
-                    "tag": tag,
-                    "timestamp": ts,
-                    "timestamp_unix": time.time(),
-                    "importance": 0.8,    # Constraints start with higher importance
-                    "usage_count": 0
-                }]
-            )
+            with memory_engine.collection_guard() as coll:
+                coll.add(
+                    ids=[m_id],
+                    documents=[content],
+                    metadatas=[{
+                        "type": "semantic",
+                        "tag": tag,
+                        "timestamp": ts,
+                        "timestamp_unix": time.time(),
+                        "importance": 0.8,    # Constraints start with higher importance
+                        "usage_count": 0
+                    }]
+                )
             log.info(f"âœ“ Semantic memory atomized: {m_id}")
             result = {"status": "success"}
         except Exception as e:
@@ -1162,7 +1175,7 @@ async def main_async():
                 if lhp:
                     try:
                         await lhp.shutdown()
-                    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 break
 
             # Start session tracking for this interaction
@@ -1542,8 +1555,8 @@ async def main_async():
                     spinner_task.cancel()
                     try:
                         await spinner_task
-                    except asyncio.CancelledError:
-                        pass
+                    except asyncio.CancelledError as _ex:
+                        log.warning("Silenced exception: %s", _ex)
                     sys.stdout.write("\r" + " " * 40 + "\r")
                     sys.stdout.flush()
             
@@ -1570,14 +1583,14 @@ async def main_async():
             if lhp:
                 try:
                     lhp.on_turn_complete()
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         except KeyboardInterrupt:
             log.info("AELVO terminated by user (Ctrl+C).")
             if lhp:
                 try:
                     await lhp.shutdown(interrupted_details={"interrupted": True})
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             break
         except Exception:
             log.error("Unhandled REPL error:")
@@ -1612,8 +1625,8 @@ def main():
 
     try:
         asyncio.run(main_async())
-    except KeyboardInterrupt:
-        pass
+    except KeyboardInterrupt as _ex:
+        log.warning("Silenced exception: %s", _ex)
 
 if __name__ == "__main__":
     main()

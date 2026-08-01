@@ -28,6 +28,10 @@ from repo_intelligence.query import QueryEngine
 from repo_intelligence.context import ContextInjectionBuilder
 from repo_intelligence.engine import RepoIntelligenceEngine
 import ast
+import logging
+
+log = logging.getLogger(__name__)
+
 
 
 # =============================================================================
@@ -486,8 +490,8 @@ def get_size() -> int:
         PythonASTParser("test.py", fid)
         try:
             ast.parse(content)
-        except SyntaxError:
-            pass
+        except SyntaxError as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     def test_docstring_extraction(self):
         content = '''"""Module docstring."""

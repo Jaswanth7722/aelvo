@@ -169,8 +169,8 @@ class RuntimeMetricsCollector:
                     metric_name=metric_name,
                     value=value,
                 )
-            except Exception:
-                pass  # Don't let alerting interfere with metrics collection
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
     # ── Recovery Metrics ────────────────────────────────────────────────
 

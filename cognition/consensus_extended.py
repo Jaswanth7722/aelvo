@@ -34,8 +34,8 @@ _HAS_CHROMADB = False
 try:
     import chromadb
     _HAS_CHROMADB = True
-except ImportError:
-    pass
+except ImportError as _ex:
+    log.warning("Silenced exception: %s", _ex)
 
 
 # ============================================================================
@@ -555,8 +555,8 @@ class ExtendedConsensusEngine:
                         self._outcomes[consensus_id] = outcome
                         self._active_requests.pop(consensus_id, None)
                         log.warning("Consensus %s timed out — %s did not respond", consensus_id[:8], timeout)
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         if loop.is_running():
             task = asyncio.create_task(_timer())
@@ -822,8 +822,8 @@ class ExtendedConsensusEngine:
             return  # No running loop — skip in sync context
         try:
             asyncio.ensure_future(self._publish_event_async(event_name, data))
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     async def _publish_event_async(self, event_name: str, data: Dict[str, Any]) -> None:
         """Publish a consensus event to the UI EventBus.

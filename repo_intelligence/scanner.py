@@ -119,8 +119,8 @@ class FileScanner:
                         lang = self.SHEBANG_MAP.get(part)
                         if lang:
                             return lang
-        except (IOError, UnicodeDecodeError):
-            pass
+        except (IOError, UnicodeDecodeError) as _ex:
+            log.warning("Silenced exception: %s", _ex)
         return None
 
     def detect_language(self, file_path: Path) -> LanguageId:

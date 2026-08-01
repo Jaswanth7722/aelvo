@@ -131,7 +131,7 @@ class TerminusSpecialist(BaseSpecialist):
                     f"Stash: {gd.get('stash_count', 0)}\n"
                     f"Recent: " + " | ".join(gd.get("recent_commits", [])[:3])
                 )
-        except Exception as _ex: print("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         constraints = context.get("constraints", {}) or {}
         constraints_str = "\n".join(
@@ -176,7 +176,7 @@ TERMINUS RULES:
             if res.get("ids") and res["ids"][0]:
                 for doc, dist in zip(res["documents"][0], res["distances"][0]):
                     patterns.append({"doc": doc, "score": round(1.0 - float(dist), 3)})
-        except Exception as _ex: print("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         return {"devops_patterns": patterns}
 
     # ------------------------------------------------------------------
@@ -295,7 +295,7 @@ TERMINUS RULES:
             except Exception:
                 try:
                     memory_engine.memory_collection.delete(ids=[m_id])
-                except Exception as _ex: print("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         # Capture failures + their fixes (failure â†’ success on similar command).
         for i, ev in enumerate(bash_events):
@@ -338,7 +338,7 @@ TERMINUS RULES:
                     except Exception:
                         try:
                             memory_engine.memory_collection.delete(ids=[m_id])
-                        except Exception as _ex: print("Silenced exception: %s", _ex)
+                        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                     break
 
         return f"[TERMINUS AUDIT] {', '.join(audits) if audits else 'no new devops patterns'}"
@@ -408,8 +408,8 @@ TERMINUS RULES:
             try:
                 r = ExecutionResultEntry.from_entry_content(entry.content)
                 self._execution_results.append(r)
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         blackboard.subscribe("execution_results", _on_execution_result)
 

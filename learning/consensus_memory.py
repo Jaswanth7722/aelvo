@@ -132,8 +132,8 @@ class ConsensusMemory:
                 log.error("SQLite dual-sync failed (consensus_record), rolling back ChromaDB: %s", exc)
                 try:
                     self.collection.delete(ids=[entry_id])
-                except Exception:
-                    pass
+                except Exception as _ex:
+                    log.warning("Silenced exception: %s", _ex)
                 return False
 
             # Step 7: Feed into CollaborationAccumulator if wired
@@ -268,8 +268,8 @@ class ConsensusMemory:
                         meta["usage_count"] = int(meta.get("usage_count", 0)) + 1
                         meta["importance"] = min(1.0, float(meta.get("importance", 0.5)) + 0.05)
                         self.collection.update(ids=[existing_id], metadatas=[meta])
-                    except Exception:
-                        pass
+                    except Exception as _ex:
+                        log.warning("Silenced exception: %s", _ex)
                     log.debug("resolve_conflict: duplicate consensus_record (sim=%.3f) — skipped", similarity)
                     return True
 
@@ -277,8 +277,8 @@ class ConsensusMemory:
                     # Stale: prune before fresh insert
                     try:
                         self.collection.delete(ids=[existing_id])
-                    except Exception:
-                        pass
+                    except Exception as _ex:
+                        log.warning("Silenced exception: %s", _ex)
                     log.debug("resolve_conflict: pruned stale consensus_record (sim=%.3f)", similarity)
                     return False
 

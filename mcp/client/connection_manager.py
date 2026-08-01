@@ -96,8 +96,8 @@ class ConnectionManager:
                 task.cancel()
                 try:
                     await task
-                except asyncio.CancelledError:
-                    pass
+                except asyncio.CancelledError as _ex:
+                    log.warning("Silenced exception: %s", _ex)
 
             # Disconnect transport
             transport = self._transports.get(server_id)

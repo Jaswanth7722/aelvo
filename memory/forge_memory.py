@@ -281,7 +281,7 @@ class ForgeMemory:
                 log.error("SQLite dual-sync failed (%s), rolling back ChromaDB: %s", entry_type, exc)
                 try:
                     self.collection.delete(ids=[entry_id])
-                except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 return False
 
             log.info("✓ ForgeMemory saved %s (project=%s)", entry_type, self.project)
@@ -314,7 +314,7 @@ class ForgeMemory:
                         meta["usage_count"] = int(meta.get("usage_count", 0)) + 1
                         meta["importance"] = min(1.0, float(meta.get("importance", 0.5)) + 0.05)
                         self.collection.update(ids=[existing_id], metadatas=[meta])
-                    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                     log.debug("resolve_conflict: duplicate %s (sim=%.3f) — skipped", entry_type, similarity)
                     return True  # Skip
 
@@ -322,7 +322,7 @@ class ForgeMemory:
                     # Stale: prune before fresh insert
                     try:
                         self.collection.delete(ids=[existing_id])
-                    except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                     log.debug("resolve_conflict: pruned stale %s (sim=%.3f)", entry_type, similarity)
                     return False  # Proceed with fresh insert
 

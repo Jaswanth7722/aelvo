@@ -6,8 +6,11 @@ import json
 import logging
 import sqlite3
 import os
+import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Callable
+
+from cognition._locking import synchronized
 from pydantic import BaseModel, Field, field_validator
 
 from cognition.types import (
@@ -87,6 +90,7 @@ class CognitiveBlackboard:
             db_path: Optional path to SQLite database for persistence.
             event_bus: Optional runtime EventBus for emitting events.
         """
+        self._lock = threading.RLock()
         self._slots: Dict[str, BlackboardSlot] = {}
         self._max_slots = max_slots
         self._conflicts: List[ConflictRecord] = []
@@ -118,6 +122,7 @@ class CognitiveBlackboard:
         """
         self._router = router
 
+    @synchronized
     def create_slot(self, name: str, max_entries: int = 100) -> BlackboardSlot:
         if name in self._slots:
             return self._slots[name]
@@ -129,12 +134,14 @@ class CognitiveBlackboard:
     def get_slot(self, name: str) -> Optional[BlackboardSlot]:
         return self._slots.get(name)
 
+    @synchronized
     def get_or_create_slot(self, name: str, max_entries: int = 100) -> BlackboardSlot:
         existing = self.get_slot(name)
         if existing is not None:
             return existing
         return self.create_slot(name, max_entries=max_entries)
 
+    @synchronized
     def publish(
         self,
         slot_name: str,
@@ -215,14 +222,15 @@ class CognitiveBlackboard:
                     loop = asyncio.get_running_loop()
                     if loop.is_running():
                         asyncio.ensure_future(self._event_bus.publish(pub_event))
-                except RuntimeError:
-                    pass  # No running event loop — skip publish
+                except RuntimeError as _ex:
+                    log.warning("Silenced exception: %s", _ex)
             except Exception as e:
                 log.debug("Failed to emit BlackboardPublicationEvent: %s", e)
 
         log.debug("Published entry %s to slot '%s'", entry_id, slot_name)
         return entry
 
+    @synchronized
     def read(self, slot_name: str, entry_type: Optional[EntryType] = None) -> List[BlackboardEntry]:
         slot = self.get_slot(slot_name)
         if slot is None:
@@ -232,6 +240,7 @@ class CognitiveBlackboard:
             entries = [e for e in entries if e.entry_type == entry_type]
         return entries
 
+    @synchronized
     def read_latest(self, slot_name: str, entry_type: Optional[EntryType] = None) -> Optional[BlackboardEntry]:
         entries = self.read(slot_name, entry_type)
         if not entries:
@@ -239,6 +248,7 @@ class CognitiveBlackboard:
         entries.sort(key=lambda e: e.timestamp, reverse=True)
         return entries[0]
 
+    @synchronized
     def supersede(self, entry_id: str, replacement_id: str) -> bool:
         for slot in self._slots.values():
             for entry in slot.entries:
@@ -247,6 +257,7 @@ class CognitiveBlackboard:
                     return True
         return False
 
+    @synchronized
     def query(self, query_text: str, max_results: int = 10) -> List[BlackboardEntry]:
         query_lower = query_text.lower()
         scored: List[tuple] = []
@@ -266,15 +277,18 @@ class CognitiveBlackboard:
         scored.sort(key=lambda x: x[0], reverse=True)
         return [e for _, e in scored[:max_results]]
 
+    @synchronized
     def get_all_active_entries(self) -> List[BlackboardEntry]:
         result = []
         for slot in self._slots.values():
             result.extend(slot.active_entries())
         return result
 
+    @synchronized
     def get_pending_conflicts(self) -> List[ConflictRecord]:
         return [c for c in self._conflicts if not c.resolved]
 
+    @synchronized
     def resolve_conflict(self, conflict_id: str, resolution: str) -> bool:
         for conflict in self._conflicts:
             if conflict.id == conflict_id and not conflict.resolved:
@@ -285,11 +299,13 @@ class CognitiveBlackboard:
                 return True
         return False
 
+    @synchronized
     def subscribe(self, slot_name: str, callback: Callable[[BlackboardEntry], None]) -> None:
         if slot_name not in self._subscriptions:
             self._subscriptions[slot_name] = []
         self._subscriptions[slot_name].append(callback)
 
+    @synchronized
     def slot_names(self) -> List[str]:
         return list(self._slots.keys())
 
@@ -297,6 +313,7 @@ class CognitiveBlackboard:
     # Challenge System
     # ======================================================================
 
+    @synchronized
     def challenge(
         self,
         slot_type: str,
@@ -359,19 +376,21 @@ class CognitiveBlackboard:
                     loop = asyncio.get_running_loop()
                     if loop.is_running():
                         asyncio.ensure_future(self._event_bus.publish(challenge_event))
-                except RuntimeError:
-                    pass
+                except RuntimeError as _ex:
+                    log.warning("Silenced exception: %s", _ex)
             except Exception as e:
                 log.debug("Failed to emit ChallengeRaisedEvent: %s", e)
 
         return challenge_entry
 
+    @synchronized
     def get_challenges(self, entry_id: Optional[str] = None) -> List[ChallengeEntry]:
         """Get all challenges, optionally filtered by entry."""
         if entry_id:
             return [c for c in self._challenges.values() if c.entry_id == entry_id]
         return list(self._challenges.values())
 
+    @synchronized
     def resolve_challenge(self, challenge_id: str, resolution: str, resolver: str) -> bool:
         """Resolve a challenge with a final decision."""
         challenge = self._challenges.get(challenge_id)
@@ -386,6 +405,7 @@ class CognitiveBlackboard:
     # Voting System
     # ======================================================================
 
+    @synchronized
     def vote(
         self,
         slot_type: str,
@@ -421,6 +441,7 @@ class CognitiveBlackboard:
         )
         return vote_entry
 
+    @synchronized
     def tally_votes(self, entry_id: str) -> Dict[str, Any]:
         """Tally votes for an entry and return the outcome."""
         votes = self._votes.get(entry_id, [])
@@ -454,6 +475,7 @@ class CognitiveBlackboard:
             "avg_confidence": avg_confidence,
         }
 
+    @synchronized
     def get_votes(self, entry_id: str) -> List[VoteEntry]:
         """Get all votes for an entry."""
         return self._votes.get(entry_id, [])
@@ -623,6 +645,7 @@ class CognitiveBlackboard:
     # Consumption Tracking
     # ======================================================================
 
+    @synchronized
     def consume(self, entry_id: str, consumer: str) -> Optional[BlackboardEntry]:
         """Record that a specialist consumed a blackboard entry.
 
@@ -665,8 +688,8 @@ class CognitiveBlackboard:
                             loop = asyncio.get_running_loop()
                             if loop.is_running():
                                 asyncio.ensure_future(self._event_bus.publish(consumed_event))
-                        except RuntimeError:
-                            pass
+                        except RuntimeError as _ex:
+                            log.warning("Silenced exception: %s", _ex)
                         except Exception as e:
                             log.debug("Failed to emit FindingConsumedEvent: %s", e)
 
@@ -674,6 +697,7 @@ class CognitiveBlackboard:
         log.warning("Consumption failed: entry %s not found", entry_id[:8])
         return None
 
+    @synchronized
     def get_consumption_trail(self, entry_id: str) -> List[Dict[str, Any]]:
         """Get the full consumption history for a blackboard entry.
 
@@ -688,6 +712,7 @@ class CognitiveBlackboard:
         """
         return self._consumptions.get(entry_id, [])
 
+    @synchronized
     def get_all_consumptions(self) -> Dict[str, List[Dict[str, Any]]]:
         """Get all consumption records across all entries.
 
@@ -696,6 +721,7 @@ class CognitiveBlackboard:
         """
         return dict(self._consumptions)
 
+    @synchronized
     def snapshot(self) -> Dict[str, Any]:
         consumption_count = sum(len(v) for v in self._consumptions.values())
         return {
@@ -714,6 +740,7 @@ class CognitiveBlackboard:
         raw = f"{slot_name}_{content}_{datetime.now(timezone.utc).isoformat()}"
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
+    @synchronized
     def evidence(self) -> List[Any]:
         """Export all active knowledge from the blackboard.
 
@@ -836,6 +863,7 @@ class CognitiveBlackboard:
 
     ARCHIVE_SENTINEL = "__archived__"
 
+    @synchronized
     def archive(self, entry_id: str, reason: str = "", archived_by: str = "") -> bool:
         """Archive an entry, removing it from active view.
 
@@ -862,6 +890,7 @@ class CognitiveBlackboard:
                     return True
         return False
 
+    @synchronized
     def get_archived_entries(self, slot_name: Optional[str] = None) -> List[BlackboardEntry]:
         """Get all archived entries, optionally filtered by slot."""
         result = []

@@ -216,8 +216,10 @@ class PatternAccumulator:
             count = 0
             skipped = 0
             for p in patterns:
-                if p.id not in self._patterns:
-                    self._patterns[p.id] = p
+                if p.id in self._patterns:
+                    skipped += 1
+                    continue
+                self._patterns[p.id] = p
                 # Rebuild reverse index from loaded pattern's signature hash
                 sig_hash = p.category_signature.signature_hash
                 existing_id = self._sig_hash_to_pattern_id.get(sig_hash)
@@ -229,8 +231,6 @@ class PatternAccumulator:
                     )
                     self._sig_hash_to_pattern_id[sig_hash] = p.id
                 count += 1
-            else:
-                skipped += 1
             if skipped:
                 log.debug(f"Skipped {skipped} duplicate patterns during load")
             log.info(f"Loaded {count} patterns from persistence")

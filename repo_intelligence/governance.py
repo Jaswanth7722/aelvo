@@ -1,6 +1,7 @@
 # governance.py - Repository Governance System for Repository Intelligence
 # Layer 14: Enforces governance policies and protects critical infrastructure
 
+import contextlib
 import time
 import logging
 import sqlite3
@@ -18,6 +19,23 @@ from repo_intelligence.types_extended import (
 )
 
 log = logging.getLogger("aelvo.repo_intelligence.governance")
+
+
+@contextlib.contextmanager
+def _connect(db_path: str):
+    """Open a SQLite connection that is guaranteed to be closed on exit.
+
+    ``with sqlite3.connect(path) as conn:`` only commits/rolls back the
+    transaction — it does NOT close the connection, so on Windows the
+    database file stays locked until garbage collection. This helper
+    releases the handle deterministically.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 class GovernanceSystem:
@@ -114,7 +132,7 @@ class ProtectedModuleRegistry:
     
     def _initialize_schema(self):
         """Initialize the database schema for protected module tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS protected_modules (
@@ -136,7 +154,7 @@ class ProtectedModuleRegistry:
         """Register a protected module with governance policies"""
         start = time.time()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO protected_modules 
@@ -161,7 +179,7 @@ class ProtectedModuleRegistry:
         start = time.time()
         
         # Check if file or its parent module is protected
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             
             # Try exact match first
@@ -222,7 +240,7 @@ class ProtectedModuleRegistry:
     
     def get_protection_level(self, file_id: str) -> ProtectionLevel:
         """Returns the protection level for a file"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT protection_level FROM protected_modules WHERE module_id = ?
@@ -260,7 +278,7 @@ class CriticalInfrastructureIdentifier:
     
     def _initialize_schema(self):
         """Initialize the database schema for critical infrastructure tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS critical_components (
@@ -323,7 +341,7 @@ class CriticalInfrastructureIdentifier:
     
     def _store_critical_component(self, component: CriticalComponent):
         """Store a critical component in the database"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO critical_components 
@@ -424,7 +442,7 @@ class SecuritySensitiveTracker:
     
     def _initialize_schema(self):
         """Initialize the database schema for security-sensitive tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS security_sensitive_components (
@@ -475,7 +493,7 @@ class SecuritySensitiveTracker:
     
     def _store_security_component(self, component: SecuritySensitiveComponent):
         """Store a security-sensitive component in the database"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO security_sensitive_components 
@@ -590,7 +608,7 @@ class GovernancePolicyEngine:
     
     def _initialize_schema(self):
         """Initialize the database schema for governance policy tracking"""
-        with sqlite3.connect(self.db_path) as conn:
+        with _connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS governance_policies (

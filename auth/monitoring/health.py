@@ -12,6 +12,7 @@ from typing import Any, Awaitable, Callable, Optional
 from ..types import ProviderStatus
 
 logger = logging.getLogger(__name__)
+log = logger
 
 
 class AlertLevel(Enum):
@@ -104,8 +105,8 @@ class HealthMonitor:
             task.cancel()
             try:
                 await task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
         self._check_tasks.clear()
 
     async def _check_loop(

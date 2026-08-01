@@ -7,6 +7,10 @@ from config.settings import BASE_DIR
 from ui.style import (
     print_styled, draw_header, draw_separator, C_PRIMARY, C_ACCENT, C_SUCCESS, C_WARNING, C_DANGER, C_MUTED, C_WHITE, SYM_OK, SYM_INFO, SYM_WARN, SYM_FAIL, SYM_BULLET
 )
+import logging
+
+log = logging.getLogger(__name__)
+
 
 # Paths resolved via BASE_DIR
 GLOBAL_DB_PATH = os.path.join(BASE_DIR, "global_memory.db")
@@ -313,8 +317,8 @@ def detect_provider(model_registry: dict) -> tuple:
                 cred = store.get_for_provider(explicit)
                 if cred:
                     key = cred.value
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
         if not key:
             print_styled(f"{SYM_WARN} LLM_PROVIDER is '{explicit}' but {cfg.env_key} variable is missing.", C_WARNING)
             return interactive_provider_setup(model_registry)
@@ -338,8 +342,8 @@ def detect_provider(model_registry: dict) -> tuple:
             if cred and cred.value:
                 model = model_override or cfg.default_model
                 return name, cfg, cred.value, model
-    except Exception:
-        pass
+    except Exception as _ex:
+        log.warning("Silenced exception: %s", _ex)
 
     # Nothing found -> Interactive Wizard
     print_styled(f"\n{SYM_INFO} No active LLM provider keys detected in environmental vars, .env or credential store.", C_PRIMARY)

@@ -100,8 +100,8 @@ class UINotifier:
                 loop.create_task(self.orchestrator.event_bus.publish(
                     create_specialist_event(UIEventType.SPECIALIST_ACTION, "TERMINUS", f"Running tool {tool_name}")
                 ))
-        except RuntimeError:
-            pass
+        except RuntimeError as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     def notify_tool_completed(self, tool_name: str, cmd: str, status: str, exit_code: Optional[int] = None):
         try:
@@ -110,5 +110,5 @@ class UINotifier:
                 loop.create_task(self.orchestrator.event_bus.publish(
                     create_specialist_event(UIEventType.SPECIALIST_ACTION, "TERMINUS", f"Completed tool {tool_name} with status {status}")
                 ))
-        except RuntimeError:
-            pass
+        except RuntimeError as _ex:
+            log.warning("Silenced exception: %s", _ex)

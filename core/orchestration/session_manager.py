@@ -87,6 +87,6 @@ class SessionManager:
                     try:
                         self.memory_engine.memory_collection.delete(ids=[m_id])
                     except Exception as _ex:
-                        log.debug("Silenced exception on delete rollback: %s", _ex)
+                        log.warning("Silenced exception on delete rollback: %s", _ex)
 
         return summary_text

@@ -1,6 +1,10 @@
 # base.py - Core Contract Interface for AELVO OMEGA Specialists
 
 from typing import List, Dict, Tuple, Any
+import logging
+
+log = logging.getLogger(__name__)
+
 
 class BaseSpecialist:
     """Standardized abstract base contract representing an AELVO specialist node."""
@@ -42,7 +46,7 @@ class BaseSpecialist:
                 results = memory_engine.search(task, limit=1, types=self.memory_types)
                 if results and results[0].get("score", 0) > 0.7:
                     score += 0.3
-            except Exception as _ex: print("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                 
         return min(1.0, score)
 

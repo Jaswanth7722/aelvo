@@ -21,8 +21,8 @@ from ui.core.ui_dispatcher import UIEventDispatcher
 _AgentMetricsTracker = None
 try:
     from learning.agent_metrics import AgentMetricsTracker as _AgentMetricsTracker
-except ImportError:
-    pass
+except ImportError as _ex:
+    log.warning("Silenced exception: %s", _ex)
 
 # Lazy helper to create an AgentMetricsTracker if available
 _AGENT_METRICS_TRACKER_INSTANCE = None
@@ -43,8 +43,6 @@ class UIBridge:
         self.overview = SystemOverviewAggregator()
         # Phase 2: Per-agent status tracking
         self.agent_tracker = AgentStatusTracker()
-        # Phase 3: Track which tasks have already generated assignment events
-        self._assigned_task_ids: set = set()
         # Phase 5: Live work queue tracking
         self.work_queue = WorkQueueTracker()
         # Phase 7: Consensus visibility tracking

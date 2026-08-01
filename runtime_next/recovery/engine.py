@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import hashlib
-import threading
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 
@@ -60,8 +59,12 @@ class RecoveryEngine:
         self.injector = RecoveryNodeInjector()
         self.recovery_memory = LearnedRecoveryMemory()
         self.governance = RecoveryGovernance()
+        # Plain boolean toggle: reads/writes are atomic under the GIL, so no
+        # lock is required. A threading.Lock here would risk blocking the
+        # event loop when acquired from async recovery paths (and an
+        # asyncio.Lock cannot be used from the synchronous use_legacy_recovery
+        # toggle API).
         self._use_new_subsystem = True
-        self._toggle_lock = threading.Lock()
 
         # Phase 11: Consensus, Specialist, and Task-level recovery
         self.consensus_recovery = ConsensusRecoveryEngine()
@@ -129,8 +132,7 @@ class RecoveryEngine:
 
     def use_legacy_recovery(self, enabled: bool = True):
         """Toggle between legacy and new verification subsystem."""
-        with self._toggle_lock:
-            self._use_new_subsystem = not enabled
+        self._use_new_subsystem = not enabled
 
     @property
     def use_new_subsystem(self):
@@ -196,8 +198,7 @@ class RecoveryEngine:
 
         log.warning(f"Handling failure for {node_id}: {reason[:100]}")
 
-        with self._toggle_lock:
-            use_new = self._use_new_subsystem
+        use_new = self._use_new_subsystem
 
         if use_new:
             await self._handle_with_new_subsystem(node, node_id, reason)
@@ -522,8 +523,8 @@ class RecoveryEngine:
                 original=original,
                 replacement=replacement,
             )
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     def _classify_failure_legacy(self, reason: str) -> str:
         r = reason.lower()

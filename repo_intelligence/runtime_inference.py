@@ -9,8 +9,9 @@ from collections import defaultdict
 from repo_intelligence.types import (
     EdgeType, ConfidenceLevel
 )
+from repo_intelligence.types import PerformanceMetrics
 from repo_intelligence.types_extended import (
-    RuntimeDependency, ExecutionPath, DataFlowPath, PerformanceMetrics
+    RuntimeDependency, ExecutionPath, DataFlowPath
 )
 
 log = logging.getLogger("aelvo.repo_intelligence.runtime_inference")

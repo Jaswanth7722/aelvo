@@ -4,6 +4,10 @@ import re
 import multiprocessing
 import queue  # Fix 2: Required for safe queue fetching
 from urllib.parse import urlparse
+import logging
+
+log = logging.getLogger(__name__)
+
 
 # The Industrial Speed Stack
 try:
@@ -42,6 +46,14 @@ def normalize_url(url: str) -> str:
     if parsed.query:
         normalized += f"?{parsed.query}"
     return normalized
+
+
+_ALLOWED_URL_SCHEMES = {"http", "https"}
+
+
+def _url_scheme_allowed(url: str) -> bool:
+    """SSRF guard: only http/https schemes may be fetched."""
+    return urlparse(url).scheme.lower() in _ALLOWED_URL_SCHEMES
 
 class AelvoSpider(scrapy.Spider if scrapy else object):
     """
@@ -152,6 +164,9 @@ def execute_light_scrape(url: str, kernel=None) -> dict:
     import requests as _requests
     clean_url = normalize_url(url)
 
+    if not _url_scheme_allowed(clean_url):
+        return {"status": "error", "logs": f"Blocked URL scheme: '{url}' (only http/https allowed).", "executed": {"url": clean_url}}
+
     if kernel and hasattr(kernel, 'authorize_scrape') and not kernel.authorize_scrape(clean_url):
         return {
             "status": "rejected",
@@ -176,7 +191,7 @@ def execute_light_scrape(url: str, kernel=None) -> dict:
                     "executed": {"url": clean_url},
                     "data": {"type": "json", "content": parsed}
                 }
-            except Exception as _ex: print("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         cleaned = html_to_text(resp.text)
         if len(cleaned) > 25000:
@@ -199,7 +214,7 @@ def execute_light_scrape(url: str, kernel=None) -> dict:
                             "INSERT INTO audit_trail (cmd_type, args, status, msg) VALUES (?, ?, ?, ?)",
                             ("light_scrape", json.dumps({"url": clean_url}), "SUCCESS", "Light scrape completed")
                         )
-            except Exception as _ex: print("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
             
         return result
     except Exception as e:
@@ -213,7 +228,9 @@ def execute_light_scrape(url: str, kernel=None) -> dict:
 def execute_heavy_crawl(url: str, kernel) -> dict:
     """The AELVO Executor Gateway for Deep Scrapes."""
     clean_url = normalize_url(url)
-    
+    if not _url_scheme_allowed(clean_url):
+        return {"status": "error", "logs": f"Blocked URL scheme: '{url}' (only http/https allowed).", "executed": {"url": clean_url}}
+
     if not kernel.authorize_scrape(clean_url):
         return {
             "status": "rejected",

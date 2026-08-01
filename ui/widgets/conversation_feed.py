@@ -24,6 +24,10 @@ from ui.models.collaboration_event import (
     SPECIALIST_COLORS,
 )
 from ui.core.ui_event import UIEvent, UIEventType
+import logging
+
+log = logging.getLogger(__name__)
+
 
 MAX_VISIBLE_EVENTS = 20
 
@@ -214,8 +218,8 @@ class ConversationFeed(VerticalScroll):
                 indicator.styles.display = "none"
                 indicator.update("")
                 self._pending_count = 0
-        except AttributeError:
-            pass
+        except AttributeError as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     # ── Content Rendering ───────────────────────────────────────
 

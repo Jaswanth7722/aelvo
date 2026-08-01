@@ -427,8 +427,8 @@ class IntelligentRouter:
                 )
                 if act_score > type_score:
                     return max(0.0, min(1.0, act_score))
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         # Phase 3: trigger_patterns — can boost above baseline but below TaskType
         if hasattr(specialist, "trigger_patterns"):

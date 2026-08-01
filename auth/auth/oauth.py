@@ -71,7 +71,7 @@ class OAuthDeviceFlow:
             # Try to open browser automatically
             try:
                 webbrowser.open(result["verification_uri"])
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
             return result
 

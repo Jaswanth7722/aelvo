@@ -102,7 +102,7 @@ class ForgeSpecialist(BaseSpecialist):
                         break
                 if has_source:
                     break
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         filesystem_signal = 0.3 if has_source else 0.0
 
         # 3. Memory signal (0.0 - 0.2)
@@ -114,7 +114,7 @@ class ForgeSpecialist(BaseSpecialist):
                 hits = fm.query_patterns(task, 1)
                 if hits and any(h.get("score", 0.0) >= FORGE_NOISE_FLOOR for h in hits):
                     has_memory = True
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         memory_signal = 0.2 if has_memory else 0.0
 
         return min(1.0, max(0.0, keyword_signal + filesystem_signal + memory_signal))
@@ -151,7 +151,7 @@ class ForgeSpecialist(BaseSpecialist):
                 for key, val in constraints.items():
                     if isinstance(val, dict) and val.get("locked"):
                         locked_rules.append(f"HARD RULE: {key} = {val.get('value')}")
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         if not locked_rules:
             constraints = context.get("constraints", {}) or {}
             for key, val in constraints.items():
@@ -230,7 +230,7 @@ class ForgeSpecialist(BaseSpecialist):
 
                 if blocks:
                     prior_section = "\n\n".join(blocks)
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         if not prior_section:
             prior_section = "No prior knowledge for this project â€” extract and save patterns as you work."
@@ -332,8 +332,8 @@ class ForgeSpecialist(BaseSpecialist):
             try:
                 f = FindingEntry.from_entry_content(entry.content)
                 self._findings.append(f)
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         def _on_review(entry: Any) -> None:
             from cognition.blackboard_schemas import ApprovalEntry, RejectionEntry
@@ -341,13 +341,13 @@ class ForgeSpecialist(BaseSpecialist):
                 data = ApprovalEntry.from_entry_content(entry.content)
                 self._revisions.append({"type": "approval", "data": data})
                 return
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
             try:
                 data = RejectionEntry.from_entry_content(entry.content)
                 self._revisions.append({"type": "rejection", "data": data})
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         blackboard.subscribe("research_findings", _on_finding)
         blackboard.subscribe("reviews", _on_review)
@@ -573,15 +573,15 @@ class ForgeSpecialist(BaseSpecialist):
                 data = RejectionEntry.from_entry_content(entry.content)
                 results.append({"type": "rejection", "data": data})
                 continue
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
             # Try parsing as ApprovalEntry
             try:
                 data = ApprovalEntry.from_entry_content(entry.content)
                 results.append({"type": "approval", "data": data})
                 continue
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
             log.debug("Failed to parse review entry: %s", entry.id[:8])
 
         return results
@@ -740,7 +740,9 @@ class ForgeSpecialist(BaseSpecialist):
                         failed_verifications.clear()
 
         # 4. Conventions (3 or more fires)
-        fs = context.get("fs") if isinstance(context, dict) else None
+        # NOTE: post_process() has no `context` parameter, so look up the
+        # filesystem/kernel off memory_engine if present (safe no-op otherwise).
+        fs = getattr(memory_engine, "fs", None)
         kernel = getattr(fs, "kernel", None) if fs else None
         for rule, count in linter_rules.items():
             if count >= 3:
@@ -755,7 +757,7 @@ class ForgeSpecialist(BaseSpecialist):
                     if kernel:
                         try:
                             kernel.parse_and_execute(f"#lock LINTER_{rule} locked")
-                        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
         return f"FORGE extracted {num_patterns} patterns, {num_recoveries} error recoveries, {num_conventions} conventions this turn."
 
@@ -767,7 +769,7 @@ class ForgeSpecialist(BaseSpecialist):
             try:
                 block = text.split("```json", 1)[1].split("```", 1)[0].strip()
                 candidates.append(block)
-            except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+            except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         candidates.append(text)
         for candidate in candidates:
             try:
@@ -804,7 +806,7 @@ class ForgeSpecialist(BaseSpecialist):
                                 results.extend(parsed)
                             elif isinstance(parsed, dict):
                                 results.append(parsed)
-                        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
                     if not results:
                         try:
                             clean_json = user_content
@@ -816,7 +818,7 @@ class ForgeSpecialist(BaseSpecialist):
                                 results = parsed
                             elif isinstance(parsed, dict):
                                 results = [parsed]
-                        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+                        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
 
                     for c_idx, call in enumerate(turn_calls):
                         call_copy = dict(call)

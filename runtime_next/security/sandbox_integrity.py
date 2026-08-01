@@ -307,8 +307,8 @@ class SandboxIntegrityVerifier:
             try:
                 if os.path.exists(self._audit_log_path):
                     file_size = os.path.getsize(self._audit_log_path)
-            except Exception:
-                pass
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         passed = len(violations) == 0 and file_integrity_ok
         if violations:
@@ -605,6 +605,6 @@ class SandboxIntegrityVerifier:
                     if line:
                         try:
                             records.append(json.loads(line))
-                        except json.JSONDecodeError:
-                            pass
+                        except json.JSONDecodeError as _ex:
+                            log.warning("Silenced exception: %s", _ex)
         return records

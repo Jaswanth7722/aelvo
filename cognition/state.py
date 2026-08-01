@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
+from cognition._locking import synchronized
 
 from cognition.types import (
     Goal, SubGoal, GoalStatus, BlockedPath, UncertaintyModel, UncertaintyClass,
@@ -22,6 +25,7 @@ class CognitiveStateEngine:
     """
 
     def __init__(self):
+        self._lock = threading.RLock()
         self._goals: Dict[str, Goal] = {}
         self._sub_goals: Dict[str, SubGoal] = {}
         self._blocked_paths: Dict[str, BlockedPath] = {}
@@ -29,15 +33,18 @@ class CognitiveStateEngine:
         self._hypotheses: Dict[str, ExecutionHypothesis] = {}
         self._goal_order: List[str] = []
 
+    @synchronized
     def register_goal(self, goal: Goal) -> None:
         self._goals[goal.id] = goal
         if goal.id not in self._goal_order:
             self._goal_order.append(goal.id)
         log.info("Registered goal %s: %s", goal.id, goal.description[:60])
 
+    @synchronized
     def get_goal(self, goal_id: str) -> Optional[Goal]:
         return self._goals.get(goal_id)
 
+    @synchronized
     def update_goal_status(self, goal_id: str, status: GoalStatus) -> bool:
         goal = self._goals.get(goal_id)
         if goal is None:
@@ -46,18 +53,23 @@ class CognitiveStateEngine:
         goal.updated_at = datetime.now(timezone.utc)
         return True
 
+    @synchronized
     def get_active_goals(self) -> List[Goal]:
         return [g for g in self._goals.values() if g.status == GoalStatus.IN_PROGRESS]
 
+    @synchronized
     def get_pending_goals(self) -> List[Goal]:
         return [g for g in self._goals.values() if g.status == GoalStatus.PENDING]
 
+    @synchronized
     def get_blocked_goals(self) -> List[Goal]:
         return [g for g in self._goals.values() if g.status == GoalStatus.BLOCKED]
 
+    @synchronized
     def get_completed_goal_ids(self) -> List[str]:
         return [g.id for g in self._goals.values() if g.status == GoalStatus.COMPLETED]
 
+    @synchronized
     def register_sub_goal(self, sub_goal: SubGoal) -> None:
         self._sub_goals[sub_goal.id] = sub_goal
         parent = self._goals.get(sub_goal.parent_goal_id)
@@ -65,9 +77,11 @@ class CognitiveStateEngine:
             if sub_goal.id not in parent.sub_goal_ids:
                 parent.sub_goal_ids.append(sub_goal.id)
 
+    @synchronized
     def get_sub_goals(self, parent_goal_id: str) -> List[SubGoal]:
         return [sg for sg in self._sub_goals.values() if sg.parent_goal_id == parent_goal_id]
 
+    @synchronized
     def update_sub_goal_status(self, sub_goal_id: str, status: GoalStatus) -> bool:
         sg = self._sub_goals.get(sub_goal_id)
         if sg is None:
@@ -75,10 +89,12 @@ class CognitiveStateEngine:
         sg.status = status
         return True
 
+    @synchronized
     def add_blocked_path(self, blocked: BlockedPath) -> None:
         self._blocked_paths[blocked.id] = blocked
         log.info("Blocked path: %s â€” %s", blocked.step_id, blocked.reason[:60])
 
+    @synchronized
     def resolve_blocked_path(self, path_id: str) -> bool:
         bp = self._blocked_paths.get(path_id)
         if bp is None:
@@ -87,24 +103,30 @@ class CognitiveStateEngine:
         bp.resolved_at = datetime.now(timezone.utc)
         return True
 
+    @synchronized
     def get_active_blocked_paths(self) -> List[BlockedPath]:
         return [bp for bp in self._blocked_paths.values() if not bp.resolved]
 
+    @synchronized
     def register_uncertainty(self, area: str, uc: UncertaintyClass) -> None:
         self._uncertainty.register_uncertainty(area, uc)
 
+    @synchronized
     def resolve_uncertainty(self, area: str, uc: UncertaintyClass) -> None:
         self._uncertainty.resolve_uncertainty(area, uc)
 
+    @synchronized
     def get_uncertainty_summary(self) -> Dict[str, List[str]]:
         result = {}
         for area, classes in self._uncertainty.uncertain_areas.items():
             result[area] = [c.value for c in classes]
         return result
 
+    @synchronized
     def add_hypothesis(self, hypothesis: ExecutionHypothesis) -> None:
         self._hypotheses[hypothesis.id] = hypothesis
 
+    @synchronized
     def update_hypothesis_status(self, hyp_id: str, status: HypothesisStatus) -> bool:
         h = self._hypotheses.get(hyp_id)
         if h is None:
@@ -112,9 +134,11 @@ class CognitiveStateEngine:
         h.status = status
         return True
 
+    @synchronized
     def get_active_hypotheses(self) -> List[ExecutionHypothesis]:
         return [h for h in self._hypotheses.values() if h.status in (HypothesisStatus.PROPOSED, HypothesisStatus.INVESTIGATING)]
 
+    @synchronized
     def snapshot(self) -> CognitiveStateSnapshot:
         return CognitiveStateSnapshot(
             id=self._generate_snapshot_id(),

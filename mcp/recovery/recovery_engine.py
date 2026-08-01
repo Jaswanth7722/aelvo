@@ -20,7 +20,6 @@ from ..capability.capability_engine import CapabilityEngine
 from ..execution.execution_request import MCPExecutionRequest
 from .reconnect_strategy import ReconnectStrategy
 from .retry_strategy import RetryStrategy
-from .failover_strategy import FailoverStrategy
 from .capability_refresh import CapabilityRefresh
 from .server_isolation import ServerIsolation
 from .trust_downgrade import TrustDowngrade
@@ -32,12 +31,17 @@ class MCPRecoveryEngine:
     """Handles MCP failure recovery across all failure modes.
 
     Recovery strategies by failure type:
-    - Connection lost: ReconnectStrategy → FailoverStrategy
-    - Transient error: RetryStrategy → FailoverStrategy
+    - Connection lost: ReconnectStrategy → ServerIsolation
+    - Transient error: RetryStrategy → ServerIsolation
     - Timeout: RetryStrategy (reduced timeout) → ServerIsolation
     - Schema violation: CapabilityRefresh → retry → ServerIsolation
     - Trust violation: TrustDowngrade → ServerIsolation
     - Repeated failure: ServerIsolation → manual recovery required
+
+    Note: FailoverStrategy exists for API compatibility but is NOT wired into
+    the active fallback map — the runtime does not re-dispatch requests after
+    recovery, so an automatic failover would never actually run on the
+    alternate server. Honest outcome for an unavailable server is isolation.
     """
 
     def __init__(
@@ -61,14 +65,14 @@ class MCPRecoveryEngine:
             FailureType.TRANSIENT_ERROR: RetryStrategy(event_publisher),
             FailureType.TIMEOUT: RetryStrategy(event_publisher, reduced_timeout=True),
             FailureType.SCHEMA_VIOLATION: CapabilityRefresh(capability_engine, event_publisher),
-            FailureType.TRUST_VIOLATION: TrustDowngrade(trust_manager, event_publisher),
+            FailureType.TRUST_VIOLATION: TrustDowngrade(trust_manager, event_publisher, registry),
             FailureType.CAPABILITY_MISMATCH: CapabilityRefresh(capability_engine, event_publisher),
             FailureType.RECOVERY_FAILED: ServerIsolation(registry, health_tracker, event_publisher),
         }
 
         self._fallbacks = {
-            FailureType.CONNECTION_LOST: FailoverStrategy(registry, capability_engine, event_publisher),
-            FailureType.TRANSIENT_ERROR: FailoverStrategy(registry, capability_engine, event_publisher),
+            FailureType.CONNECTION_LOST: ServerIsolation(registry, health_tracker, event_publisher),
+            FailureType.TRANSIENT_ERROR: ServerIsolation(registry, health_tracker, event_publisher),
             FailureType.TIMEOUT: ServerIsolation(registry, health_tracker, event_publisher),
         }
 

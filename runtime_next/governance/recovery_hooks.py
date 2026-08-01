@@ -92,8 +92,8 @@ class RecoveryGovernanceHooks:
                 result=effect,
                 duration_ms=outcome.duration_ms,
             )
-        except Exception:
-            pass  # Don't let metrics recording interfere with governance
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     # ── Consensus Recovery Hooks ─────────────────────────────────────────
 

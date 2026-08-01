@@ -31,13 +31,18 @@ class DiscoveryEngine:
         registry: ServerRegistry,
         event_publisher: Optional[MCPEventPublisher] = None,
         scan_paths: Optional[List[str]] = None,
+        discover_path_executables: bool = False,
     ):
         self._registry = registry
         self._event_publisher = event_publisher
         self._sources = [
             ManualRegistration(registry),
             ConfigDiscovery(registry),
-            FilesystemDiscovery(registry, scan_paths=scan_paths),
+            FilesystemDiscovery(
+                registry,
+                scan_paths=scan_paths,
+                discover_path_executables=discover_path_executables,
+            ),
             RuntimeDiscovery(registry),
         ]
 

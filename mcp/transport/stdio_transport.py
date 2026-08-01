@@ -77,16 +77,16 @@ class StdioTransport(BaseTransport):
             self._reader_task.cancel()
             try:
                 await self._reader_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             self._reader_task = None
 
         if self._stderr_task:
             self._stderr_task.cancel()
             try:
                 await self._stderr_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             self._stderr_task = None
 
         if self._process and self._process.stdin:
@@ -159,8 +159,8 @@ class StdioTransport(BaseTransport):
                     await self._read_buffer.put(message)
                 except json.JSONDecodeError as e:
                     log.warning("StdioTransport: invalid JSON from stdout: %s", e)
-        except asyncio.CancelledError:
-            pass
+        except asyncio.CancelledError as _ex:
+            log.warning("Silenced exception: %s", _ex)
         except Exception as e:
             log.error("StdioTransport: stdout read error: %s", e)
 
@@ -175,8 +175,8 @@ class StdioTransport(BaseTransport):
                 if line:
                     self._stderr_lines.append(line)
                     log.debug("StdioTransport [stderr]: %s", line)
-        except asyncio.CancelledError:
-            pass
+        except asyncio.CancelledError as _ex:
+            log.warning("Silenced exception: %s", _ex)
         except Exception as e:
             log.debug("StdioTransport: stderr read error: %s", e)
 

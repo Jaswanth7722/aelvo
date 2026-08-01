@@ -23,9 +23,20 @@ class FilesystemDiscovery:
     - Project roots for mcp.json / mcp.yaml manifests
     """
 
-    def __init__(self, registry: ServerRegistry, scan_paths: Optional[List[str]] = None):
+    def __init__(
+        self,
+        registry: ServerRegistry,
+        scan_paths: Optional[List[str]] = None,
+        discover_path_executables: bool = False,
+    ):
         self._registry = registry
         self._scan_paths = scan_paths or []
+        # PATH-executable auto-registration is opt-in: auto-registering any
+        # `mcp-*`/`*.mcp` executable found on PATH would let an attacker who
+        # can write to a PATH directory execute arbitrary code through MCP.
+        # Require explicit user opt-in and register candidates as QUARANTINED
+        # (inspection only) until the user promotes them.
+        self.discover_path_executables = discover_path_executables
         self.source_type = DiscoverySource.FILESYSTEM
 
     async def discover(self) -> List[str]:
@@ -33,19 +44,24 @@ class FilesystemDiscovery:
         discovered: List[str] = []
         seen_ids: set = set()
 
-        # 1. Scan PATH for mcp-* executables
-        for path_entry in os.environ.get("PATH", "").split(os.pathsep):
-            if not path_entry:
-                continue
-            try:
-                for filename in os.listdir(path_entry):
-                    if filename.startswith("mcp-") or filename.endswith(".mcp"):
-                        server_id = self._register_path_executable(path_entry, filename)
-                        if server_id and server_id not in seen_ids:
-                            seen_ids.add(server_id)
-                            discovered.append(server_id)
-            except (PermissionError, FileNotFoundError):
-                continue
+        # 1. Scan PATH for mcp-* executables (opt-in; requires user confirmation)
+        if self.discover_path_executables:
+            log.info(
+                "PATH executable discovery is enabled; candidates are "
+                "registered as QUARANTINED pending user approval"
+            )
+            for path_entry in os.environ.get("PATH", "").split(os.pathsep):
+                if not path_entry:
+                    continue
+                try:
+                    for filename in os.listdir(path_entry):
+                        if filename.startswith("mcp-") or filename.endswith(".mcp"):
+                            server_id = self._register_path_executable(path_entry, filename)
+                            if server_id and server_id not in seen_ids:
+                                seen_ids.add(server_id)
+                                discovered.append(server_id)
+                except (PermissionError, FileNotFoundError):
+                    continue
 
         # 2. Scan ~/.aelvo/servers/ directory
         home_servers = os.path.expanduser("~/.aelvo/servers")
@@ -83,14 +99,21 @@ class FilesystemDiscovery:
         config = MCPServerConfig(
             id=server_id,
             name=filename.replace(".mcp", "").replace("mcp-", "").title(),
-            description=f"Auto-discovered MCP server: {filename}",
+            description=f"Auto-discovered MCP server (unvetted PATH executable): {filename}",
             transport_type=TransportType.STDIO,
             connection_config={"command": executable_path},
-            trust_level=TrustLevel.SANDBOXED,
+            # Unvetted executables from PATH are registered as QUARANTINED
+            # (inspection only, no execution) until the user explicitly
+            # promotes their trust level.
+            trust_level=TrustLevel.QUARANTINED,
             auto_connect=False,
-            tags=["autodiscovered", "filesystem"],
+            tags=["autodiscovered", "filesystem", "unvetted"],
         )
         self._registry.register(config)
+        log.warning(
+            "Registered unvetted PATH executable as QUARANTINED "
+            "(no execution until user approval): %s", executable_path,
+        )
         return server_id
 
     def _register_from_manifest(self, manifest_path: str) -> Optional[str]:

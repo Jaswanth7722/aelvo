@@ -128,8 +128,8 @@ class ResourcePool:
             self._cleanup_task.cancel()
             try:
                 await self._cleanup_task
-            except (asyncio.CancelledError, RuntimeError):
-                pass
+            except (asyncio.CancelledError, RuntimeError) as _ex:
+                log.warning("Silenced exception: %s", _ex)
             self._cleanup_task = None
 
         async with self._lock:
@@ -401,8 +401,8 @@ class ResourcePool:
                             self._state = PoolState.DEGRADED
                         else:
                             self._state = PoolState.OPEN
-        except asyncio.CancelledError:
-            pass
+        except asyncio.CancelledError as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
 
 class ConnectionPool(ResourcePool):

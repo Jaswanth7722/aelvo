@@ -251,8 +251,8 @@ class AelvoTUI(App):
             right = f"{text} "
             padding = max(0, self.size.width - len(left) - len(right))
             status.update(left + " " * padding + right)
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
@@ -337,21 +337,21 @@ class AelvoTUI(App):
                 marker = ">" if s == self._current_session else " "
                 lines.append(f" {marker} {s}")
             session_list.update("\n".join(lines) if lines else " (no sessions)")
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     async def shutdown(self) -> None:
         if self._queue_worker_task and not self._queue_worker_task.done():
             self._queue_worker_task.cancel()
             try:
                 await self._queue_worker_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
         if self._bridge_task and not self._bridge_task.done():
             self._bridge_task.cancel()
             try:
                 await self._bridge_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
         await self.bridge.stop()
         await super().shutdown()

@@ -396,8 +396,8 @@ class PersistentSandboxSession:
                 try:
                     os.remove(path)
                     deleted_count += 1
-                except Exception:
-                    pass
+                except Exception as _ex:
+                    log.warning("Silenced exception: %s", _ex)
 
         # Restore session state from checkpoint
         self.state.files_created = set(snapshot.get("files_created", []))

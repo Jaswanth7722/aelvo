@@ -71,8 +71,8 @@ class WebSocketTransport(BaseTransport):
             self._reader_task.cancel()
             try:
                 await self._reader_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
             self._reader_task = None
 
         if self._ws:
@@ -124,7 +124,7 @@ class WebSocketTransport(BaseTransport):
                     await self._read_buffer.put(message)
                 except (json.JSONDecodeError, Exception) as e:
                     log.warning("WebSocketTransport: invalid message: %s", e)
-        except asyncio.CancelledError:
-            pass
+        except asyncio.CancelledError as _ex:
+            log.warning("Silenced exception: %s", _ex)
         except Exception as e:
             log.error("WebSocketTransport: read error: %s", e)

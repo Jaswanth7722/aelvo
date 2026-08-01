@@ -31,6 +31,10 @@ from runtime_next.models.events import (
     ConsensusEvent,
     BlackboardPublicationEvent,
 )
+import logging
+
+log = logging.getLogger(__name__)
+
 
 
 # ===========================================================================
@@ -726,8 +730,8 @@ class TestEventBusReplayNewTypes:
         yield log_path
         try:
             Path(log_path).unlink(missing_ok=True)
-        except Exception:
-            pass
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
 
     @pytest.mark.asyncio
     async def test_replay_architect_decision(self, log_path):

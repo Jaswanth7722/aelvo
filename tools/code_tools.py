@@ -174,7 +174,7 @@ def run_linter(path: str, language: str, workspace: str) -> Dict[str, Any]:
                         "message": msg.get("message"),
                         "severity": "error" if msg.get("severity") == 2 else "warning",
                     })
-        except Exception as _ex: log.debug("Silenced exception: %s", _ex)
+        except Exception as _ex: log.warning("Silenced exception: %s", _ex)
         status = "success" if not violations else "error"
         return {
             "status": status,
@@ -329,6 +329,12 @@ def run_tests(
     if language == "python":
         cmd = [PYTEST_BINARY, str(abs_path), "-v", "--tb=short", "--no-header"]
         if test_filter:
+            if not re.fullmatch(r"[A-Za-z0-9_ .,:/-]+", test_filter):
+                return {
+                    "status": "error",
+                    "logs": "Invalid test_filter: only alphanumerics, spaces, and _ . , : / - are allowed.",
+                    "executed": {"path": path, "tool": "pytest", "language": language},
+                }
             cmd += ["-k", test_filter]
         result = _run(cmd, cwd=workspace, timeout=TEST_RUNNER_TIMEOUT_SECONDS)
 
@@ -421,7 +427,13 @@ def build_symbol_graph(workspace: str) -> Dict[str, Any]:
     except Exception as e:
         return {"status": "error", "logs": f"Walk failed: {e}", "executed": {"workspace": workspace}}
 
+    total_py_files = len(py_files)
     py_files = py_files[:1000]  # Cap at 1000 files to avoid timeout
+    if len(py_files) < total_py_files:
+        log.warning(
+            "Code analysis truncated to %d of %d python files (analysis cap)",
+            len(py_files), total_py_files,
+        )
 
     for fpath in py_files:
         rel = str(fpath.relative_to(workspace_path))

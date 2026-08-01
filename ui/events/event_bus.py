@@ -12,6 +12,9 @@ from enum import Enum
 from collections import deque
 import logging
 
+log = logging.getLogger(__name__)
+
+
 
 class EventType(Enum):
     """Event types for the AELVO system."""
@@ -157,8 +160,8 @@ class EventBus:
             try:
                 self._subscribers[event_type].remove(handler)
                 self._logger.debug(f"Unsubscribed from {event_type.value}")
-            except ValueError:
-                pass
+            except ValueError as _ex:
+                log.warning("Silenced exception: %s", _ex)
     
     async def publish(self, event: Event) -> None:
         """
@@ -202,8 +205,8 @@ class EventBus:
             self._processor_task.cancel()
             try:
                 await self._processor_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as _ex:
+                log.warning("Silenced exception: %s", _ex)
         
         self._logger.info("Event bus stopped")
     

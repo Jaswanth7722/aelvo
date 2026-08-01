@@ -10,6 +10,7 @@ from ..runtime.registry import ProviderRegistry
 from ..runtime.health import ProviderHealthRuntime
 from ..runtime.usage import UsageTracker
 from ..runtime.capability import CapabilityRegistry
+from ..types import ProviderStatus
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class ProviderDoctor:
 
         # Check auth status
         auth_health = self._health.get_health(provider_id)
-        auth_ok = auth_health is not None and auth_health.status.value > 0
+        auth_ok = auth_health is not None and auth_health.status != ProviderStatus.UNKNOWN
         if not auth_ok:
             issues.append(f"Provider {provider_id} has not been health-checked")
             recommendations.append("Run a health check on this provider")
@@ -103,7 +104,7 @@ class ProviderDoctor:
 
         # Get models
         entry = self._registry.get(provider_id)
-        models = [m.model_id for m in entry.info.supported_models] if entry and hasattr(entry.info, "supported_models") else []
+        models = [m.id for m in entry.info.models] if entry and entry.info.models else []
 
         # Usage metrics
         usage = self._usage.summary()

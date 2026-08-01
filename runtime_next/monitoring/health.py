@@ -199,8 +199,8 @@ class RuntimeHealthMonitor:
                     },
                 )
                 self._metrics_collector.record("health.check")  # Aggregate
-            except Exception:
-                pass  # Don't let metrics interfere with health checks
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
 
         return result
 

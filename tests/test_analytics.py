@@ -10,18 +10,18 @@ from datetime import datetime, timezone, timedelta
 from learning.types import (
     TrendPoint,
     TrendDirection, EditCategory,
+    DependencyGraphDelta, GraphDeltaEdge,
+    EditCategorySignature, SubgraphSpec,
 )
 from learning.analytics import AnalyticsEngine
 from learning.engine import PatternExtractionEngine
 from learning.knowledge_graph import KnowledgeGraph
+from learning.accumulator import PatternAccumulator
 from repo_intelligence.types import (
     FileId, SymbolNode, ConfidenceLevel, ParsedFile, LanguageId, SymbolEdge,
 )
 from repo_intelligence.graph import (
-    GraphSnapshot, DependencyGraphDelta, GraphDeltaEdge,
-)
-from learning.engine import (
-    PatternAccumulator, EditCategorySignature, SubgraphSpec,
+    GraphSnapshot,
 )
 
 
