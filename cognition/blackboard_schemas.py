@@ -246,9 +246,14 @@ def deserialize_entry_content(content: str, schema_type: str) -> BaseModel:
         An instance of the corresponding schema class.
 
     Raises:
-        KeyError: If ``schema_type`` is not in the registry.
+        ValueError: If ``schema_type`` is not in the registry.
     """
-    cls = ENTRY_SCHEMA_REGISTRY[schema_type]
+    cls = ENTRY_SCHEMA_REGISTRY.get(schema_type)
+    if cls is None:
+        raise ValueError(
+            f"Unknown schema type: {schema_type!r}. "
+            f"Known types: {sorted(ENTRY_SCHEMA_REGISTRY)}"
+        )
     return cls(**json.loads(content))
 
 

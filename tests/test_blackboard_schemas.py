@@ -360,7 +360,7 @@ class TestSchemaRegistry:
         assert result.approved_by == "ARCHITECT"
 
     def test_deserialize_unknown_type(self):
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match="Unknown schema type"):
             deserialize_entry_content("{}", "unknown_type")
 
     def test_serialize_round_trip_all_types(self):

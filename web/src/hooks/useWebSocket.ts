@@ -59,8 +59,9 @@ export function useWebSocket(): UseWebSocketReturn {
               ? next.slice(next.length - config.maxEvents)
               : next;
           });
-        } catch {
-          // Ignore malformed messages
+        } catch (error) {
+          // Surface malformed messages so connection issues are visible
+          console.warn("Ignoring malformed WebSocket message:", error);
         }
       };
 

@@ -121,7 +121,6 @@ class OAuthDeviceFlow:
                         label=f"{provider_config.name} OAuth Token",
                         expires_at=time.time() + expires_in,
                         metadata={
-                            "refresh_token": refresh_token,
                             "scopes": auth.oauth_scopes,
                             "provider": provider_config.name,
                         },

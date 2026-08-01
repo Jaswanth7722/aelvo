@@ -925,7 +925,7 @@ class RuntimePipeline:
         try:
             # Send the specialist prompt as the user message.
             # agent.send_user_message handles appending to conversation_history
-            raw_output = agent.send_user_message(specialist_prompt)
+            raw_output = await asyncio.to_thread(agent.send_user_message, specialist_prompt)
             if isinstance(raw_output, str):
                 return raw_output
             return str(raw_output)
@@ -1655,7 +1655,7 @@ class RuntimePipeline:
         prompt that covers all specialist roles.
         """
         try:
-            raw_output = agent.send_user_message(consolidated_prompt)
+            raw_output = await asyncio.to_thread(agent.send_user_message, consolidated_prompt)
             if isinstance(raw_output, str):
                 return raw_output
             return str(raw_output)

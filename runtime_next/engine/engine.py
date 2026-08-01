@@ -145,6 +145,7 @@ class ExecutionEngine:
         self.parallel = parallel
         self.state = EngineState.IDLE
         self._completed_ids = set()
+        self._recovering = set()
 
     async def execute(self, context=None):
         self.state = EngineState.RUNNING
@@ -193,7 +194,8 @@ class ExecutionEngine:
                     # The RecoveryEngine is subscribed to the event bus via subscribe_all.
                     # Directly call handle_failure with the graph's recovery_engine
                     # so recovery can proceed synchronously before we set state.
-                    if self.graph.recovery_engine:
+                    if self.graph.recovery_engine and node_id not in self._recovering:
+                        self._recovering.add(node_id)
                         try:
                             await self.graph.recovery_engine.handle_failure(
                                 node_id, str(ex)
@@ -217,6 +219,8 @@ class ExecutionEngine:
                                 "Engine: recovery handler failed for %s: %s",
                                 node_id, rec_err,
                             )
+                        finally:
+                            self._recovering.discard(node_id)
                     # Only set FAILED if recovery didn't handle it
                     self.state = EngineState.FAILED
 

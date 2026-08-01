@@ -248,8 +248,20 @@ fn respond_error(msg: &str) {
         audit: None,
         success: false,
     };
-    if let Ok(json) = serde_json::to_string(&res) {
-        println!("{}", json);
+    match serde_json::to_string(&res) {
+        Ok(json) => println!("{}", json),
+        // Never fail silently: the Python orchestrator blocks on
+        // stdout until it sees a JSON line. Emit a valid fallback.
+        Err(_) => println!(
+            "{}",
+            serde_json::json!({
+                "status": "error",
+                "data": null,
+                "logs": "response serialization failed",
+                "audit": null,
+                "success": false
+            })
+        ),
     }
 }
 
@@ -262,7 +274,18 @@ fn respond_success(res: RunResult) {
         audit: res.audit,
         success: true,
     };
-    if let Ok(json) = serde_json::to_string(&resp) {
-        println!("{}", json);
+    match serde_json::to_string(&resp) {
+        Ok(json) => println!("{}", json),
+        // Never fail silently (see respond_error).
+        Err(_) => println!(
+            "{}",
+            serde_json::json!({
+                "status": "error",
+                "data": null,
+                "logs": "response serialization failed",
+                "audit": null,
+                "success": false
+            })
+        ),
     }
 }

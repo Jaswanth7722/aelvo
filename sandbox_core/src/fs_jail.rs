@@ -2,6 +2,10 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Monotonic counter used to make atomic-write temp filenames unique.
+static TEMP_SEQ: AtomicU64 = AtomicU64::new(0);
 use crate::{Request, RunResult};
 use serde_json::json;
 
@@ -150,7 +154,11 @@ fn save_whitelist_to_disk(workspace_root: &Path, whitelist: &HashSet<FileId>) ->
         .map_err(|e| format!("Failed to serialize inode whitelist: {}", e))?;
 
     // Atomic write: write to temp, then rename over the real file
-    let temp_ext = format!(".aelvo_tmp_{}", std::process::id());
+    let temp_ext = format!(
+        ".aelvo_tmp_{}_{}",
+        std::process::id(),
+        TEMP_SEQ.fetch_add(1, Ordering::Relaxed)
+    );
     let temp_path = path.with_extension(temp_ext);
     fs::write(&temp_path, &json)
         .map_err(|e| format!("Failed to write inode whitelist temp file: {}", e))?;
@@ -350,7 +358,9 @@ impl FsJail {
 
         // URL-encoded path traversal detection
         let lower = requested_path.to_lowercase();
-        if lower.contains("%2e%2e") || lower.contains("..%2f") || lower.contains("..%5c") {
+        if lower.contains("%2e%2e") || lower.contains("..%2f") || lower.contains("..%5c")
+            || lower.contains("%252e%252e") || lower.contains("..%252f")
+            || lower.contains("..%255c") {
             return Err("URL-encoded path traversal detected.".into());
         }
 
@@ -593,7 +603,11 @@ pub fn write_file(req: &Request, jail: &FsJail) -> Result<RunResult, String> {
     }
 
     // Atomic write: write to a temp file first, then rename
-    let temp_ext = format!(".aelvo_tmp_{}", std::process::id());
+    let temp_ext = format!(
+        ".aelvo_tmp_{}_{}",
+        std::process::id(),
+        TEMP_SEQ.fetch_add(1, Ordering::Relaxed)
+    );
     let temp_path = safe_path.with_extension(
         format!("{}{}", safe_path.extension().unwrap_or_default().to_string_lossy(), temp_ext)
     );

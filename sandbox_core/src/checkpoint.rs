@@ -493,7 +493,22 @@ impl RollbackResult {
 
 /// Sanitize a relative path for use as a backup filename.
 fn sanitize_path(path: &str) -> String {
-    path.replace('\\', "/").replace("..", "__")
+    // Component-wise sanitization. Rebuilding from components (instead
+    // of a whole-string replace) ensures no traversal component, such
+    // as "..", "....//" lookalikes, or an absolute/rooted prefix, can
+    // survive Path::join and escape the backup directory.
+    let normalized = path.replace('\\', "/");
+    let mut parts: Vec<String> = Vec::new();
+    for part in normalized.split('/') {
+        match part {
+            "" | "." => continue,
+            // Strip drive-letter prefixes (e.g. "C:") so Windows absolute
+            // paths cannot escape the backup dir via Path::join.
+            p if p.len() == 2 && p.as_bytes()[1] == b':' && p.as_bytes()[0].is_ascii_alphabetic() => continue,
+            p => parts.push(p.replace("..", "__")),
+        }
+    }
+    parts.join("/")
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -503,6 +518,28 @@ fn sanitize_path(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sanitize_path_neutralizes_traversal() {
+        // Ordinary relative paths pass through unchanged.
+        assert_eq!(sanitize_path("src/main.rs"), "src/main.rs");
+        assert_eq!(sanitize_path("a/b/c.txt"), "a/b/c.txt");
+        // Classic ".." traversal components are neutralized.
+        assert_eq!(sanitize_path("../etc/passwd"), "__/etc/passwd");
+        assert_eq!(sanitize_path("a/../b"), "a/__/b");
+        // The "....//" lookalike bypass is closed by component-wise handling.
+        assert_eq!(sanitize_path("....//etc/passwd"), "____/etc/passwd");
+        // Absolute / rooted prefixes are stripped so Path::join cannot escape.
+        assert_eq!(sanitize_path("/etc/passwd"), "etc/passwd");
+        assert_eq!(sanitize_path("//etc/passwd"), "etc/passwd");
+        // Backslash separators normalize to forward slashes.
+        assert_eq!(sanitize_path(r"..\..\win.ini"), "__/__/win.ini");
+        // Drive-letter prefixes are stripped (Windows absolute paths).
+        assert_eq!(sanitize_path("C:/Windows/system32"), "Windows/system32");
+        assert_eq!(sanitize_path(r"C:\Windows\system32"), "Windows/system32");
+        // Dot components are dropped.
+        assert_eq!(sanitize_path("././a/./b"), "a/b");
+    }
 
     fn setup_test_dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("checkpoint_test_{}", name));

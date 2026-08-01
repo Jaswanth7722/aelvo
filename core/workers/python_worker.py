@@ -52,7 +52,9 @@ def _json(status: str, logs: str, executed: Dict[str, Any] | None = None, data: 
 def _workspace(payload: Dict[str, Any]) -> Path:
     raw = payload.get("workspace") or str(PROJECT_ROOT)
     workspace = Path(raw).resolve()
-    if not str(workspace).startswith(str(PROJECT_ROOT)):
+    try:
+        workspace.relative_to(PROJECT_ROOT)
+    except ValueError:
         raise PermissionError(f"Workspace must stay under {PROJECT_ROOT}")
     return workspace
 

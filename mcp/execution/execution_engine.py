@@ -170,7 +170,10 @@ class MCPExecutionEngine:
                 },
             )
 
-            await transport.send(mcp_message)
+            await asyncio.wait_for(
+                transport.send(mcp_message),
+                timeout=request.timeout_ms / 1000,
+            )
 
             response = await asyncio.wait_for(
                 self._receive_response(transport, mcp_message.id),

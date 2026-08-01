@@ -1326,7 +1326,8 @@ class Orchestrator:
                 if batch_complete:
                     break
 
-                next_output = agent.send_user_message(
+                next_output = await asyncio.to_thread(
+                    agent.send_user_message,
                     "Batch execution complete. If you need further tools, BATCH them into a JSON array for efficiency. "
                     "If you are finished, use the 'respond' tool with your final answer."
                 )

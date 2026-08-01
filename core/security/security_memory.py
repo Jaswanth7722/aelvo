@@ -141,17 +141,24 @@ class SecurityMemory:
         max_entries: int = 10000,
         memory_collection: Any = None,
         project_name: str = "",
+        db_path: Optional[str] = None,
     ):
         self._entries: Dict[str, SecurityMemoryEntry] = {}
         self._max_entries = max_entries
         self._memory_collection = memory_collection
         self._project_name = project_name
+        self._db_path = db_path
 
-        # Indexes for fast lookups
+        # Indexes for fast lookups (must exist before loading persisted entries)
         self._by_type: Dict[str, Set[str]] = {t.value: set() for t in MemoryEntryType}
         self._by_risk: Dict[str, Set[str]] = {r.value: set() for r in RiskLevel}
         self._by_target: Dict[str, Set[str]] = {}
         self._by_specialist: Dict[str, Set[str]] = {}
+
+        # Load persisted entries from SQLite if configured
+        if self._db_path:
+            self._init_db()
+            self._load_entries()
 
         log.info(f"SecurityMemory initialized (max_entries={max_entries})")
 
@@ -481,6 +488,7 @@ class SecurityMemory:
         self._by_risk = {r.value: set() for r in RiskLevel}
         self._by_target.clear()
         self._by_specialist.clear()
+        self._db_clear()
 
     # ------------------------------------------------------------------
     # Internal
@@ -511,6 +519,9 @@ class SecurityMemory:
         # Persist to ChromaDB if available
         self._persist_entry(entry)
 
+        # Persist to SQLite if configured
+        self._db_upsert(entry)
+
         return entry.id
 
     def _remove_entry(self, entry_id: str) -> None:
@@ -525,6 +536,7 @@ class SecurityMemory:
         self._by_target.get(target_key, set()).discard(entry_id)
         if entry.specialist:
             self._by_specialist.get(entry.specialist, set()).discard(entry_id)
+        self._db_delete(entry_id)
 
     def _find_existing(self, target: str, entry_type: MemoryEntryType) -> Optional[SecurityMemoryEntry]:
         """Find an existing entry with a similar target and type."""
@@ -573,3 +585,115 @@ class SecurityMemory:
             )
         except Exception as e:
             log.debug(f"Failed to persist security entry to ChromaDB: {e}")
+
+    # ------------------------------------------------------------------
+    # SQLite persistence
+    # ------------------------------------------------------------------
+
+    def _init_db(self) -> None:
+        """Create the security memory table if it does not exist."""
+        import os
+        import sqlite3
+        try:
+            os.makedirs(os.path.dirname(self._db_path) or ".", exist_ok=True)
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS security_memory (
+                        id TEXT PRIMARY KEY,
+                        data TEXT
+                    )"""
+                )
+        except Exception as e:
+            log.warning("Failed to initialize security memory DB: %s", e)
+
+    def _load_entries(self) -> None:
+        """Load persisted entries from SQLite into memory."""
+        import json
+        import sqlite3
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                rows = conn.execute(
+                    "SELECT id, data FROM security_memory"
+                ).fetchall()
+            for _eid, data in rows:
+                try:
+                    d = json.loads(data)
+                    # Coerce string-serialized enums back to their enum types
+                    d["entry_type"] = MemoryEntryType(d.get("entry_type", MemoryEntryType.POLICY_VIOLATION.value))
+                    d["risk_level"] = RiskLevel(d.get("risk_level", RiskLevel.SAFE.value))
+                    d["trust_level"] = TrustLevel(d.get("trust_level", TrustLevel.TRUSTED.value))
+                    entry = SecurityMemoryEntry(**d)
+                    self._entries[entry.id] = entry
+                    self._index_entry(entry)
+                except Exception as e:
+                    log.warning("Failed to load security memory entry: %s", e)
+        except Exception as e:
+            log.warning("Failed to load security memory DB: %s", e)
+
+    def _db_upsert(self, entry: SecurityMemoryEntry) -> None:
+        """Insert or replace a single entry in SQLite."""
+        if not self._db_path:
+            return
+        import json
+        import sqlite3
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO security_memory (id, data) VALUES (?, ?)",
+                    (entry.id, json.dumps(self._entry_to_json(entry))),
+                )
+        except Exception as e:
+            log.warning("Failed to persist security memory entry: %s", e)
+
+    def _db_delete(self, entry_id: str) -> None:
+        """Delete a single entry from SQLite."""
+        if not self._db_path:
+            return
+        import sqlite3
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute(
+                    "DELETE FROM security_memory WHERE id = ?", (entry_id,)
+                )
+        except Exception as e:
+            log.warning("Failed to delete security memory entry: %s", e)
+
+    def _db_clear(self) -> None:
+        """Delete all entries from SQLite."""
+        if not self._db_path:
+            return
+        import sqlite3
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute("DELETE FROM security_memory")
+        except Exception as e:
+            log.warning("Failed to clear security memory DB: %s", e)
+
+    @staticmethod
+    def _entry_to_json(entry: SecurityMemoryEntry) -> Dict[str, Any]:
+        """Serialize an entry with enum values as plain strings."""
+        return {
+            "id": entry.id,
+            "entry_type": entry.entry_type.value,
+            "risk_level": entry.risk_level.value,
+            "trust_level": entry.trust_level.value,
+            "target": entry.target,
+            "specialist": entry.specialist,
+            "tool_name": entry.tool_name,
+            "reason": entry.reason,
+            "evidence": entry.evidence,
+            "importance": entry.importance,
+            "recurrence_count": entry.recurrence_count,
+            "timestamp": entry.timestamp,
+            "last_seen": entry.last_seen,
+            "tags": entry.tags,
+        }
+
+    def _index_entry(self, entry: SecurityMemoryEntry) -> None:
+        """Add an entry to the lookup indexes (shared by add + load)."""
+        self._by_type.setdefault(entry.entry_type.value, set()).add(entry.id)
+        self._by_risk.setdefault(entry.risk_level.value, set()).add(entry.id)
+        target_key = entry.target[:50]
+        self._by_target.setdefault(target_key, set()).add(entry.id)
+        if entry.specialist:
+            self._by_specialist.setdefault(entry.specialist, set()).add(entry.id)

@@ -319,8 +319,9 @@ impl Auditor {
             "details": details,
         });
 
-        if let Err(_e) = self.write_entry(&record) {
+        if let Err(e) = self.write_entry(&record) {
             self.write_failures += 1;
+            eprintln!("[audit] failed to write audit entry: {}", e);
         } else {
             self.entry_count += 1;
         }

@@ -6,7 +6,6 @@ import asyncio
 import logging
 from collections import defaultdict
 from typing import Dict, Optional, Set
-from datetime import datetime, timezone
 
 from .execution_request import MCPExecutionRequest
 from ..events.event_schemas import ExecutionPriority
@@ -27,6 +26,7 @@ class ExecutionQueue:
         self._max_concurrent: Dict[str, int] = defaultdict(lambda: default_max_concurrent)
         self._active_workers: Dict[str, Set[str]] = defaultdict(set)  # server_id -> {request_ids}
         self._total_enqueued = 0
+        self._seq = 0  # monotonic tiebreaker for priority ordering
         self._total_processed = 0
         self._total_failed = 0
 
@@ -40,7 +40,8 @@ class ExecutionQueue:
         self._ensure_queue(request.server_id)
         priority = self._priority_value(request.priority)
         # Put (priority, timestamp, request) — lower priority_value = higher priority
-        await self._queues[request.server_id].put((priority, datetime.now(timezone.utc), request))
+        self._seq += 1
+        await self._queues[request.server_id].put((priority, self._seq, request))
         self._total_enqueued += 1
 
     async def dequeue(self, server_id: str) -> Optional[MCPExecutionRequest]:

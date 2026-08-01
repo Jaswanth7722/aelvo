@@ -12,12 +12,15 @@ except ImportError:
     class Timeout(Exception):
         """Fallback timeout used when filelock is unavailable."""
 
+    _LOCK_GUARD = threading.Lock()
+
     class FileLock:
         _locks: dict[str, threading.Lock] = {}
 
         def __init__(self, path: str):
             self.path = path
-            self._lock = self._locks.setdefault(path, threading.Lock())
+            with _LOCK_GUARD:
+                self._lock = self._locks.setdefault(path, threading.Lock())
             self._acquired = False
 
         def acquire(self, timeout: float | int | None = None):

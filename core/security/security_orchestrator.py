@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
@@ -153,7 +154,11 @@ class SecurityOrchestrator:
         self.governance = governance or ExecutionGovernance(
             workspace_root=workspace_root,
         )
-        self.memory = memory or SecurityMemory(project_name=workspace_root)
+        self.memory = memory or SecurityMemory(
+            project_name=workspace_root,
+            db_path=os.path.join(workspace_root, ".aelvo", "security_memory.db")
+            if workspace_root else None,
+        )
         self.approval = approval or ApprovalManager()
         self.analytics = analytics or SecurityAnalytics(
             governance=self.governance,

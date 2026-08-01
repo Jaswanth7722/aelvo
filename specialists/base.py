@@ -1,6 +1,7 @@
 # base.py - Core Contract Interface for AELVO OMEGA Specialists
 
 from typing import List, Dict, Tuple, Any
+import asyncio
 import logging
 
 log = logging.getLogger(__name__)
@@ -104,8 +105,8 @@ class BaseSpecialist:
             f"Respond with your specialist output based on the instructions above."
         )
 
-        # Send through the LLM agent (synchronous call in async context)
-        raw_output = agent.send_user_message(combined_prompt)
+        # Send through the LLM agent off the event loop (it is synchronous)
+        raw_output = await asyncio.to_thread(agent.send_user_message, combined_prompt)
         if isinstance(raw_output, str):
             return raw_output
         return str(raw_output)
