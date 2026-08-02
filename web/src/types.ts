@@ -409,3 +409,16 @@ export interface WSConfig {
   reconnectDelay: number;
   maxEvents: number;
 }
+
+/** ── Provider Setup Types ──────────────────────────────────── */
+
+export interface ProviderInfo {
+  key: string;
+  name: string;
+  env_key: string;
+  default_model: string;
+  sdk: string;
+  local: boolean;
+  has_key: boolean;
+  base_url: string;
+}

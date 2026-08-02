@@ -106,15 +106,18 @@ async def run_web(
     bridge = WebBridge(host=host, port=ws_port)
     if orchestrator is not None and hasattr(orchestrator, "runtime_bus"):
         bridge.subscribe_to_runtime(orchestrator.runtime_bus)
-    if agent is not None:
-        bridge.bind_agent(
-            agent=agent,
-            orchestrator=orchestrator,
-            db_path=db_path,
-            kernel=aelvo_kernel,
-            mcp_cli=mcp_cli,
-            runtime_cli=runtime_cli,
-        )
+    # Bind unconditionally (agent may be None when no provider key existed at
+    # boot). The bridge keeps provider_runtime/orchestrator/db_path so the
+    # Providers page can manage keys AND hot-swap in an agent without a restart.
+    bridge.bind_agent(
+        agent=agent,
+        orchestrator=orchestrator,
+        db_path=db_path,
+        kernel=aelvo_kernel,
+        mcp_cli=mcp_cli,
+        runtime_cli=runtime_cli,
+        provider_runtime=provider_runtime,
+    )
     await bridge.start()
 
     # 2. HTTP static server for the built dashboard.

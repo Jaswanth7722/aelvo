@@ -9,6 +9,7 @@ interface UseWebSocketReturn {
   clearEvents: () => void;
   reconnect: () => void;
   sendMessage: (message: string) => boolean;
+  sendCommand: (type: string, payload?: Record<string, unknown>) => boolean;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -100,6 +101,17 @@ export function useWebSocket(): UseWebSocketReturn {
     }
   }, []);
 
+  const sendCommand = useCallback((type: string, payload?: Record<string, unknown>): boolean => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify({ type, ...(payload || {}) }));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const clearEvents = useCallback(() => {
     setEvents([]);
     setLastEvent(null);
@@ -135,5 +147,5 @@ export function useWebSocket(): UseWebSocketReturn {
     };
   }, [connect]);
 
-  return { status, events, lastEvent, clearEvents, reconnect, sendMessage };
+  return { status, events, lastEvent, clearEvents, reconnect, sendMessage, sendCommand };
 }

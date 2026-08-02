@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 import traceback
 from typing import Any, Dict, Optional, Set
@@ -151,6 +152,7 @@ class WebBridge:
         self._kernel = None
         self._mcp_cli = None
         self._runtime_cli = None
+        self._provider_runtime = None
 
     @property
     def url(self) -> str:
@@ -174,6 +176,7 @@ class WebBridge:
         kernel=None,
         mcp_cli=None,
         runtime_cli=None,
+        provider_runtime=None,
     ) -> None:
         """Bind the agent + orchestrator so user chat messages execute real turns."""
         self._agent = agent
@@ -182,6 +185,47 @@ class WebBridge:
         self._kernel = kernel
         self._mcp_cli = mcp_cli
         self._runtime_cli = runtime_cli
+        self._provider_runtime = provider_runtime
+
+    def _maybe_hot_swap_agent(self) -> bool:
+        """Bring the agent online when the app booted without a provider.
+
+        Called after a key is saved from the Providers page (or lazily on the
+        first chat turn). Re-runs provider detection — the key is now in the
+        vault and/or environment — and constructs a fresh AelvoAgent so chat
+        works without a restart. Returns True when an agent is active.
+        """
+        if self._agent is not None:
+            return True
+        if self._orchestrator is None:
+            return False
+        try:
+            from core.registry import MODEL_REGISTRY
+            from core.startup import detect_provider
+
+            provider_name, provider_config, api_key, model = detect_provider(
+                MODEL_REGISTRY
+            )
+            if provider_config is None:
+                return False
+
+            from main import AelvoAgent  # local import: main boots the bridge
+
+            self._agent = AelvoAgent(
+                api_key=api_key,
+                model=model,
+                provider_name=provider_name,
+                provider_config=provider_config,
+                provider_runtime=self._provider_runtime,
+            )
+            log.info(
+                "Hot-swapped agent online: provider=%s model=%s",
+                provider_name, model,
+            )
+            return True
+        except Exception as exc:
+            log.warning("Agent hot-swap failed: %s", exc)
+            return False
 
     async def start(self) -> None:
         """Start the WebSocket server."""
@@ -262,6 +306,12 @@ class WebBridge:
                             asyncio.ensure_future(
                                 self._run_user_turn(user_msg, websocket)
                             )
+                    elif msg_type == "providers_list":
+                        await self._handle_providers_list(websocket)
+                    elif msg_type == "provider_save_key":
+                        await self._handle_provider_save_key(message, websocket)
+                    elif msg_type == "provider_remove_key":
+                        await self._handle_provider_remove_key(message, websocket)
                 except json.JSONDecodeError:
                     log.debug("WebBridge invalid JSON from %s", client_info)
 
@@ -336,12 +386,17 @@ class WebBridge:
             "timestamp": time.time(),
         })
 
+        # If the app booted without a provider, a key may have been saved from
+        # the Providers page since — try to hot-swap in an agent on first turn.
+        if self._agent is None:
+            self._maybe_hot_swap_agent()
+
         if self._agent is None or self._orchestrator is None:
             await self._send_raw(websocket, {
                 "type": "agent_response",
                 "source": "system",
                 "specialist": "",
-                "action": "Agent backend is not initialized.",
+                "action": "Agent backend is not initialized. Open the Providers page to set an API key.",
                 "data": {},
                 "timestamp": time.time(),
             })
@@ -410,6 +465,194 @@ class WebBridge:
             "data": {},
             "timestamp": time.time(),
         })
+
+    # ------------------------------------------------------------------
+    # Provider management (web UI provider setup page)
+    # ------------------------------------------------------------------
+
+    def _provider_configs(self) -> Dict[str, Any]:
+        """Provider key -> config mapping from the runtime (or the registry)."""
+        if self._provider_runtime is not None and hasattr(self._provider_runtime, "provider_configs"):
+            return self._provider_runtime.provider_configs or {}
+        try:
+            from core.registry import MODEL_REGISTRY
+
+            return dict(MODEL_REGISTRY)
+        except Exception as exc:
+            log.warning("Provider registry unavailable: %s", exc)
+            return {}
+
+    def _provider_has_key(self, provider: str) -> bool:
+        """True if the provider has a usable credential (vault or env)."""
+        try:
+            if self._provider_runtime is not None and hasattr(self._provider_runtime, "has_credentials"):
+                return bool(self._provider_runtime.has_credentials(provider))
+        except Exception as exc:
+            log.debug("has_credentials(%s) failed: %s", provider, exc)
+        try:
+            store = self._credential_store()
+            return store.get_for_provider(provider) is not None
+        except Exception:
+            return False
+
+    def _credential_store(self):
+        """Encrypted CredentialStore used by the provider runtime (same vault)."""
+        if self._provider_runtime is not None and hasattr(self._provider_runtime, "credential_store"):
+            return self._provider_runtime.credential_store
+        from auth.cred_storage import CredentialStore
+        from core.provider_runtime import DEFAULT_VAULT_PATH
+
+        return CredentialStore(db_path=DEFAULT_VAULT_PATH)
+
+    def _provider_payload(self, provider: str, cfg: Any) -> Dict[str, Any]:
+        """Serialize a provider config for the web UI (never leaks the key)."""
+        sdk = getattr(cfg, "sdk", None)
+        sdk_val = sdk.value if hasattr(sdk, "value") else (str(sdk) if sdk else "")
+        env_key = getattr(cfg, "env_key", "") or getattr(getattr(cfg, "auth", None), "env_var", "") or ""
+        return {
+            "key": provider,
+            "name": getattr(cfg, "name", provider),
+            "env_key": env_key,
+            "default_model": getattr(cfg, "default_model", "") or "",
+            "sdk": sdk_val,
+            "local": bool(getattr(cfg, "local", False)),
+            "has_key": self._provider_has_key(provider),
+            "base_url": getattr(cfg, "base_url", None) or "",
+        }
+
+    async def _handle_providers_list(self, websocket) -> None:
+        """Reply with all registered providers and their key status."""
+        providers = []
+        for key, cfg in sorted(self._provider_configs().items()):
+            providers.append(self._provider_payload(key, cfg))
+        await self._send_raw(websocket, {
+            "type": "providers_list",
+            "source": "web_bridge",
+            "specialist": "",
+            "action": f"{len(providers)} providers",
+            "data": {"providers": providers},
+            "timestamp": time.time(),
+        })
+
+    async def _handle_provider_save_key(self, message: Dict[str, Any], websocket) -> None:
+        """Save an API key for a provider to the encrypted vault."""
+        provider = (message.get("provider") or "").strip().lower()
+        api_key = (message.get("api_key") or "").strip()
+
+        if not provider or not api_key:
+            await self._send_raw(websocket, self._provider_result(
+                provider, False, "Provider and API key are required."
+            ))
+            return
+
+        cfg = self._provider_configs().get(provider)
+        if cfg is None:
+            await self._send_raw(websocket, self._provider_result(
+                provider, False, f"Unknown provider: {provider}"
+            ))
+            return
+
+        try:
+            import time as _time
+            import uuid
+
+            from auth.types import Credential, CredentialType
+
+            store = self._credential_store()
+            cred = Credential(
+                id=f"key_{provider}_{uuid.uuid4().hex[:8]}",
+                provider=provider,
+                credential_type=CredentialType.API_KEY,
+                value=api_key,
+                label=f"{provider} API key (set from web UI)",
+                created_at=_time.time(),
+                is_valid=True,
+                metadata={"source": "web_ui", "model": getattr(cfg, "default_model", "") or ""},
+            )
+            store.store(cred)
+
+            # Also surface it in the environment so a restart picks it up.
+            env_key = getattr(cfg, "env_key", "") or ""
+            if env_key:
+                os.environ[env_key] = api_key
+
+            # Hot-swap: if the app booted without a provider, bring the agent
+            # online immediately so chat works without a restart. Only claim
+            # activation when the agent was actually offline before — an agent
+            # already on another provider keeps using that provider until restart.
+            was_active = self._agent is not None
+            activated = self._maybe_hot_swap_agent()
+
+            await self._send_raw(websocket, self._provider_result(
+                provider, True,
+                f"API key saved securely for {provider}."
+                + (" Agent activated — you can start chatting now." if activated and not was_active else ""),
+                key_present=True,
+            ))
+            # Broadcast so other tabs update immediately
+            await self._broadcast({
+                "type": "providers_updated",
+                "source": "web_bridge",
+                "specialist": "",
+                "action": f"API key saved for {provider}",
+                "data": {"provider": provider, "has_key": True},
+                "timestamp": time.time(),
+            })
+        except Exception as exc:
+            log.error("Failed to save key for %s: %s", provider, exc)
+            await self._send_raw(websocket, self._provider_result(
+                provider, False, f"Failed to save key: {exc}"
+            ))
+
+    async def _handle_provider_remove_key(self, message: Dict[str, Any], websocket) -> None:
+        """Remove the stored key for a provider from the encrypted vault."""
+        provider = (message.get("provider") or "").strip().lower()
+        if not provider:
+            await self._send_raw(websocket, self._provider_result(
+                provider, False, "Provider is required."
+            ))
+            return
+
+        try:
+            store = self._credential_store()
+            cred = store.get_for_provider(provider)
+            if cred is not None:
+                store.delete(cred.id)
+
+            # Clear the env var if we set it
+            cfg = self._provider_configs().get(provider)
+            env_key = getattr(cfg, "env_key", "") if cfg else ""
+            if env_key:
+                os.environ.pop(env_key, None)
+
+            await self._send_raw(websocket, self._provider_result(
+                provider, True, f"API key removed for {provider}.", key_present=False
+            ))
+            await self._broadcast({
+                "type": "providers_updated",
+                "source": "web_bridge",
+                "specialist": "",
+                "action": f"API key removed for {provider}",
+                "data": {"provider": provider, "has_key": False},
+                "timestamp": time.time(),
+            })
+        except Exception as exc:
+            log.error("Failed to remove key for %s: %s", provider, exc)
+            await self._send_raw(websocket, self._provider_result(
+                provider, False, f"Failed to remove key: {exc}"
+            ))
+
+    @staticmethod
+    def _provider_result(provider: str, success: bool, message: str, key_present: bool = False) -> Dict[str, Any]:
+        """Build a provider_operation_result payload."""
+        return {
+            "type": "provider_operation_result",
+            "source": "web_bridge",
+            "specialist": "",
+            "action": message[:120],
+            "data": {"provider": provider, "success": success, "message": message, "has_key": key_present},
+            "timestamp": time.time(),
+        }
 
     @staticmethod
     def _event_to_payload(event: BaseEvent) -> Optional[Dict[str, Any]]:
