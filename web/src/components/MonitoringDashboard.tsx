@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { UIEvent, MonitorAlert, MonitorRule, MetricSnapshot, EventRateBucket, SubsystemHealthSummary } from "../types";
+import { PALETTE, STATUS } from "../theme";
 
 interface MonitoringDashboardProps {
   events: UIEvent[];
@@ -164,14 +165,14 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
               value={stats.eventRate1m}
               unit="/min"
               sub={`${stats.eventRate5m} in last 5 min`}
-              color="#3b82f6"
+              color={PALETTE.deep}
               icon="◈"
             />
             <SummaryCard
               label="Active Alerts"
               value={stats.unacknowledged}
               sub={`${stats.criticalCount} critical · ${stats.errorCount} error · ${stats.warningCount} warning`}
-              color={stats.criticalCount > 0 ? "#ff5c7a" : stats.errorCount > 0 ? "#f7b731" : "#00e38c"}
+              color={stats.criticalCount > 0 ? STATUS.err : stats.errorCount > 0 ? STATUS.warn : STATUS.ok}
               icon="⚠"
             />
             <SummaryCard
@@ -179,14 +180,14 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
               value={stats.healthySubsystems}
               unit={`/${stats.totalSubsystems}`}
               sub="subsystems active"
-              color={stats.healthySubsystems === stats.totalSubsystems ? "#00e38c" : stats.healthySubsystems > 0 ? "#f7b731" : "#ff5c7a"}
+              color={stats.healthySubsystems === stats.totalSubsystems ? STATUS.ok : stats.healthySubsystems > 0 ? STATUS.warn : STATUS.err}
               icon="◉"
             />
             <SummaryCard
               label="Metric Series"
               value={metricSeries.length}
               sub={`${metricSeries.filter((m) => m.count > 0).length} active`}
-              color="#8c5cff"
+              color={PALETTE.purple}
               icon="◆"
             />
           </div>
@@ -204,7 +205,7 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
                       className="w-full rounded-t transition-all duration-500"
                       style={{
                         height: `${Math.max(pct, 2)}%`,
-                        backgroundColor: bucket.count === 0 ? "#21262d" : bucket.count >= maxBucketCount * 0.8 ? "#ff5c7a" : bucket.count >= maxBucketCount * 0.5 ? "#f7b731" : "#3b82f6",
+                        backgroundColor: bucket.count === 0 ? PALETTE.neutral : bucket.count >= maxBucketCount * 0.8 ? STATUS.err : bucket.count >= maxBucketCount * 0.5 ? STATUS.warn : PALETTE.deep,
                       }}
                     />
                     <span className="text-[10px] text-ink-muted">{bucket.label}</span>
@@ -218,10 +219,10 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
           <div className="panel">
             <div className="flex gap-4 border-b border-surface-border pb-3 mb-3 overflow-x-auto">
               {[
-                { key: "rates" as const, label: "Event Rates", count: rateBuckets.length, color: "#3b82f6" },
-                { key: "alerts" as const, label: "Alert Feed", count: stats.totalAlerts, color: "#ff5c7a" },
-                { key: "metrics" as const, label: "Metric Series", count: metricSeries.length, color: "#8c5cff" },
-                { key: "health" as const, label: "Subsystem Health", count: subsystemHealth.length, color: "#00e38c" },
+                { key: "rates" as const, label: "Event Rates", count: rateBuckets.length, color: PALETTE.deep },
+                { key: "alerts" as const, label: "Alert Feed", count: stats.totalAlerts, color: STATUS.err },
+                { key: "metrics" as const, label: "Metric Series", count: metricSeries.length, color: PALETTE.purple },
+                { key: "health" as const, label: "Subsystem Health", count: subsystemHealth.length, color: STATUS.ok },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -346,10 +347,10 @@ function SummaryCard({ label, value, unit, sub, color, icon }: {
 }
 
 function RuleRow({ rule }: { rule: MonitorRule }) {
-  const sevColor = rule.severity === "critical" ? "#ff5c7a"
-    : rule.severity === "error" ? "#f7b731"
-    : rule.severity === "warning" ? "#3b82f6"
-    : "#52627f";
+  const sevColor = rule.severity === "critical" ? STATUS.err
+    : rule.severity === "error" ? STATUS.warn
+    : rule.severity === "warning" ? PALETTE.deep
+    : PALETTE.neutral;
 
   return (
     <div className="border border-surface-border rounded-lg px-3 py-2 hover:bg-surface-alt/50 transition-colors">
@@ -374,10 +375,10 @@ function RuleRow({ rule }: { rule: MonitorRule }) {
 }
 
 function AlertRow({ alert }: { alert: MonitorAlert }) {
-  const sevColor = alert.severity === "critical" ? "#ff5c7a"
-    : alert.severity === "error" ? "#f7b731"
-    : alert.severity === "warning" ? "#3b82f6"
-    : "#52627f";
+  const sevColor = alert.severity === "critical" ? STATUS.err
+    : alert.severity === "error" ? STATUS.warn
+    : alert.severity === "warning" ? PALETTE.deep
+    : PALETTE.neutral;
 
   const sevIcon = alert.severity === "critical" ? "🔴"
     : alert.severity === "error" ? "🟠"
@@ -404,10 +405,10 @@ function AlertRow({ alert }: { alert: MonitorAlert }) {
 }
 
 function SubsystemRow({ summary }: { summary: SubsystemHealthSummary }) {
-  const statusColor = summary.status === "healthy" ? "#00e38c"
-    : summary.status === "degraded" ? "#f7b731"
-    : summary.status === "unhealthy" ? "#ff5c7a"
-    : "#52627f";
+  const statusColor = summary.status === "healthy" ? STATUS.ok
+    : summary.status === "degraded" ? STATUS.warn
+    : summary.status === "unhealthy" ? STATUS.err
+    : PALETTE.neutral;
 
   const statusIcon = summary.status === "healthy" ? "✓"
     : summary.status === "degraded" ? "⚠"

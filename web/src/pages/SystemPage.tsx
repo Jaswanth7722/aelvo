@@ -1,24 +1,24 @@
 import { useState } from "react";
 import { useWebSocket } from "../hooks/useWebSocket";
-import { ConsensusDashboard } from "../components/ConsensusDashboard";
-import { GovernanceDashboard } from "../components/GovernanceDashboard";
+import { SystemHealthDashboard } from "../components/SystemHealthDashboard";
+import { MonitoringDashboard } from "../components/MonitoringDashboard";
 
-type GovTab = "consensus" | "governance";
+type SystemTab = "health" | "monitoring";
 
-const TABS: { key: GovTab; label: string; icon: string }[] = [
-  { key: "consensus", label: "Consensus", icon: "↻" },
-  { key: "governance", label: "Governance", icon: "◉" },
+const TABS: { key: SystemTab; label: string; icon: string }[] = [
+  { key: "health", label: "Health", icon: "◈" },
+  { key: "monitoring", label: "Monitoring", icon: "◉" },
 ];
 
-export default function GovernancePage() {
+export default function SystemPage() {
   const { events } = useWebSocket();
-  const [activeTab, setActiveTab] = useState<GovTab>("consensus");
+  const [activeTab, setActiveTab] = useState<SystemTab>("health");
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Page-level tab bar (merged Consensus + Governance) */}
+      {/* Page-level tab bar (merged Health + Monitoring) */}
       <header className="border-b border-surface-border px-6 py-2.5 flex items-center gap-1 shrink-0 bg-white/70 backdrop-blur-md">
-        <h2 className="text-sm font-bold text-ink mr-4">Governance</h2>
+        <h2 className="text-sm font-bold text-ink mr-4">System</h2>
         <div className="flex gap-1">
           {TABS.map((tab) => (
             <button
@@ -38,10 +38,10 @@ export default function GovernancePage() {
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {activeTab === "consensus" ? (
-          <ConsensusDashboard events={events} />
+        {activeTab === "health" ? (
+          <SystemHealthDashboard events={events} />
         ) : (
-          <GovernanceDashboard events={events} />
+          <MonitoringDashboard events={events} />
         )}
       </div>
     </div>

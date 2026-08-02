@@ -1,18 +1,19 @@
 import { useMemo, useState } from "react";
 import type { UIEvent, HealthStatus, AgentLiveness, RecoveryEvent, NodeState, EventTypeBreakdown } from "../types";
+import { AGENT_COLORS, AGENT_ICONS, EVENT_COLORS, PALETTE, STATUS } from "../theme";
 
 interface SystemHealthDashboardProps {
   events: UIEvent[];
 }
 
 const SPECIALIST_AGENTS = [
-  { name: "ARCHITECT", label: "Architect", color: "#3b82f6", icon: "◉" },
-  { name: "ORACLE", label: "Oracle", color: "#8c5cff", icon: "◆" },
-  { name: "FORGE", label: "Forge", color: "#00d889", icon: "△" },
-  { name: "SENTINEL", label: "Sentinel", color: "#ff5c7a", icon: "✓" },
-  { name: "TERMINUS", label: "Terminus", color: "#f7b731", icon: "▶" },
-  { name: "HERALD", label: "Herald", color: "#39c8ff", icon: "★" },
-  { name: "CONSENSUS", label: "Consensus", color: "#19f5a5", icon: "↻" },
+  { name: "ARCHITECT", label: "Architect", color: AGENT_COLORS.ARCHITECT, icon: AGENT_ICONS.ARCHITECT },
+  { name: "ORACLE", label: "Oracle", color: AGENT_COLORS.ORACLE, icon: AGENT_ICONS.ORACLE },
+  { name: "FORGE", label: "Forge", color: AGENT_COLORS.FORGE, icon: AGENT_ICONS.FORGE },
+  { name: "SENTINEL", label: "Sentinel", color: AGENT_COLORS.SENTINEL, icon: AGENT_ICONS.SENTINEL },
+  { name: "TERMINUS", label: "Terminus", color: AGENT_COLORS.TERMINUS, icon: AGENT_ICONS.TERMINUS },
+  { name: "HERALD", label: "Herald", color: AGENT_COLORS.HERALD, icon: AGENT_ICONS.HERALD },
+  { name: "CONSENSUS", label: "Consensus", color: AGENT_COLORS.CONSENSUS, icon: AGENT_ICONS.CONSENSUS },
 ];
 
 function fmtRelative(ts: number): string {
@@ -129,23 +130,14 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
       verification_started: "◐", verification_passed: "✓", verification_failed: "✗",
       verification_running: "◌", task_board_transition: "⊘",
     };
-    const colorMap: Record<string, string> = {
-      blackboard_publication: "#8c5cff", finding_consumed: "#00d889", challenge_raised: "#ff5c7a",
-      consensus_formed: "#19f5a5", architect_decision: "#3b82f6", execution_started: "#f7b731",
-      execution_completed: "#00e38c", report_generated: "#39c8ff", recovery_initiated: "#3b82f6",
-      recovery_completed: "#00e38c", recovery_failed: "#ff5c7a", node_transition: "#a565ff",
-      graph_completed: "#00e38c", graph_started: "#f7b731", task_created: "#52627f",
-      task_assigned: "#a565ff", task_completed: "#00e38c", task_failed: "#ff5c7a",
-      system_online: "#00e38c", verification_started: "#f7b731", verification_passed: "#00e38c",
-      verification_failed: "#ff5c7a", verification_running: "#52627f", task_board_transition: "#52627f",
-    };
+    const colorMap = EVENT_COLORS;
 
     const breakdown: EventTypeBreakdown[] = [...typeCounts.entries()]
       .map(([type, count]) => ({
         type,
         count,
         icon: iconMap[type] || "•",
-        color: colorMap[type] || "#52627f",
+        color: colorMap[type] || PALETTE.neutral,
       }))
       .sort((a, b) => b.count - a.count);
 
@@ -223,28 +215,28 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
               label="Event Throughput"
               value={eventThroughput}
               unit="/min"
-              color="#3b82f6"
+              color={PALETTE.deep}
               icon="◈"
             />
             <SummaryCard
               label="Active Agents"
               value={agents.filter((a) => a.status === "active").length}
               sub={`${agents.filter((a) => a.status === "idle").length} idle · ${agents.filter((a) => a.status === "unknown").length} unknown`}
-              color="#00e38c"
+              color={STATUS.ok}
               icon="●"
             />
             <SummaryCard
               label="Recovery Rate"
               value={recoveryStats.total > 0 ? recoveryStats.successRate : 100}
               isPercent
-              color={recoveryStats.successRate >= 90 ? "#00e38c" : recoveryStats.successRate >= 70 ? "#f7b731" : "#ff5c7a"}
+              color={recoveryStats.successRate >= 90 ? STATUS.ok : recoveryStats.successRate >= 70 ? STATUS.warn : STATUS.err}
               icon="🔄"
             />
             <SummaryCard
               label="Error Rate"
               value={errorRate}
               isPercent
-              color={errorRate < 5 ? "#00e38c" : errorRate < 15 ? "#f7b731" : "#ff5c7a"}
+              color={errorRate < 5 ? STATUS.ok : errorRate < 15 ? STATUS.warn : STATUS.err}
               icon="⚠"
             />
           </div>
@@ -297,10 +289,10 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
           <div className="panel">
             <div className="flex gap-4 border-b border-surface-border pb-3 mb-3">
               {[
-                { key: "liveness" as const, label: "Agent Liveness", count: agents.length, color: "#00e38c" },
-                { key: "recovery" as const, label: "Recovery History", count: recoveryEvents.length, color: "#3b82f6" },
-                { key: "nodes" as const, label: "Node Transitions", count: nodeStates.length, color: "#a565ff" },
-                { key: "breakdown" as const, label: "Event Breakdown", count: breakdown.length, color: "#52627f" },
+                { key: "liveness" as const, label: "Agent Liveness", count: agents.length, color: STATUS.ok },
+                { key: "recovery" as const, label: "Recovery History", count: recoveryEvents.length, color: PALETTE.deep },
+                { key: "nodes" as const, label: "Node Transitions", count: nodeStates.length, color: PALETTE.purple },
+                { key: "breakdown" as const, label: "Event Breakdown", count: breakdown.length, color: PALETTE.neutral },
               ].map((tab) => (
                 <button
                   key={tab.key}

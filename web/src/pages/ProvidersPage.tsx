@@ -88,7 +88,7 @@ export default function ProvidersPage() {
   const configured = providers.filter((p) => p.has_key || p.local).length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#FFFBF4]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-brand-cream/60">
       {/* Page header */}
       <header className="border-b border-surface-border px-6 py-4 flex items-center justify-between shrink-0 bg-white/70 backdrop-blur-md">
         <div>

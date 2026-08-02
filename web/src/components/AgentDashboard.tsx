@@ -1,19 +1,20 @@
 import { useMemo } from "react";
 import type { UIEvent, AgentState, AgentAction } from "../types";
+import { AGENT_COLORS, AGENT_ICONS } from "../theme";
 
 interface AgentDashboardProps {
   events: UIEvent[];
 }
 
-/** Specialist configuration */
+/** Specialist configuration — canonical colors from ../theme */
 const AGENTS: Record<string, { label: string; color: string; icon: string }> = {
-  ARCHITECT: { label: "Architect", color: "#3b82f6", icon: "◉" },
-  ORACLE:    { label: "Oracle",    color: "#8c5cff", icon: "◆" },
-  FORGE:     { label: "Forge",     color: "#00e38c", icon: "⚙" },
-  SENTINEL:  { label: "Sentinel",  color: "#ff5c7a", icon: "🛡" },
-  TERMINUS:  { label: "Terminus",  color: "#f7b731", icon: "▶" },
-  HERALD:    { label: "Herald",    color: "#39c8ff", icon: "★" },
-  CONSENSUS: { label: "Consensus", color: "#19f5a5", icon: "↻" },
+  ARCHITECT: { label: "Architect", color: AGENT_COLORS.ARCHITECT, icon: AGENT_ICONS.ARCHITECT },
+  ORACLE:    { label: "Oracle",    color: AGENT_COLORS.ORACLE,    icon: AGENT_ICONS.ORACLE },
+  FORGE:     { label: "Forge",     color: AGENT_COLORS.FORGE,     icon: AGENT_ICONS.FORGE },
+  SENTINEL:  { label: "Sentinel",  color: AGENT_COLORS.SENTINEL,  icon: AGENT_ICONS.SENTINEL },
+  TERMINUS:  { label: "Terminus",  color: AGENT_COLORS.TERMINUS,  icon: AGENT_ICONS.TERMINUS },
+  HERALD:    { label: "Herald",    color: AGENT_COLORS.HERALD,    icon: AGENT_ICONS.HERALD },
+  CONSENSUS: { label: "Consensus", color: AGENT_COLORS.CONSENSUS, icon: AGENT_ICONS.CONSENSUS },
 };
 
 const AGENT_KEYS = Object.keys(AGENTS);

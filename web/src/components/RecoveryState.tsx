@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { UIEvent, RecoveryState } from "../types";
+import { PALETTE, STATUS } from "../theme";
 
 interface RecoveryStateCardProps {
   events: UIEvent[];
@@ -64,13 +65,13 @@ export function RecoveryStateCard({ events }: RecoveryStateCardProps) {
             <circle
               cx="32" cy="32" r="28"
               fill="none"
-              stroke="#21262d"
+              stroke={PALETTE.neutral}
               strokeWidth="4"
             />
             <circle
               cx="32" cy="32" r="28"
               fill="none"
-              stroke={state.totalEvents === 0 ? "#52627f" : state.successRate >= 90 ? "#00e38c" : state.successRate >= 70 ? "#f7b731" : "#ff5c7a"}
+              stroke={state.totalEvents === 0 ? PALETTE.neutral : state.successRate >= 90 ? STATUS.ok : state.successRate >= 70 ? STATUS.warn : STATUS.err}
               strokeWidth="4"
               strokeDasharray={`${(state.successRate / 100) * 176} 176`}
               strokeLinecap="round"

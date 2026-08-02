@@ -19,10 +19,7 @@ export default function DashboardPage() {
           <span className="text-xs text-ink-muted">{events.length} events captured</span>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={clearEvents}
-            className="text-xs text-ink-muted hover:text-ink-soft transition-colors px-3 py-1.5 rounded border border-surface-border hover:border-surface-border"
-          >
+          <button onClick={clearEvents} className="btn-ghost">
             Clear Events
           </button>
           <span

@@ -6,10 +6,8 @@ import EventsPage from "./pages/EventsPage";
 import TasksPage from "./pages/TasksPage";
 import KnowledgePage from "./pages/KnowledgePage";
 import AgentsPage from "./pages/AgentsPage";
-import ConsensusPage from "./pages/ConsensusPage";
-import HealthPage from "./pages/HealthPage";
 import GovernancePage from "./pages/GovernancePage";
-import MonitoringPage from "./pages/MonitoringPage";
+import SystemPage from "./pages/SystemPage";
 import ProvidersPage from "./pages/ProvidersPage";
 import AdminPage from "./pages/AdminPage";
 import ChatPage from "./pages/ChatPage";
@@ -29,10 +27,8 @@ export default function App() {
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/knowledge" element={<KnowledgePage />} />
         <Route path="/agents" element={<AgentsPage />} />
-        <Route path="/consensus" element={<ConsensusPage />} />
-        <Route path="/health" element={<HealthPage />} />
         <Route path="/governance" element={<GovernancePage />} />
-        <Route path="/monitoring" element={<MonitoringPage />} />
+        <Route path="/system" element={<SystemPage />} />
         <Route path="/providers" element={<ProvidersPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/admin" element={<AdminPage />} />

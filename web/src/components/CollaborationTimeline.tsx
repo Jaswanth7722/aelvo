@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import type { UIEvent } from "../types";
+import { AGENT_COLORS, PALETTE } from "../theme";
 
 interface CollaborationTimelineProps {
   events: UIEvent[];
@@ -35,13 +36,13 @@ const COLLAB_EVENT_TYPES = new Set([
 
 /** Group label and color for specialist-related event clusters */
 const SPECIALIST_GROUPS: Record<string, { label: string; color: string }> = {
-  ARCHITECT: { label: "Architect", color: "#3b82f6" },
-  ORACLE: { label: "Oracle", color: "#8c5cff" },
-  FORGE: { label: "Forge", color: "#00e38c" },
-  SENTINEL: { label: "Sentinel", color: "#ff5c7a" },
-  TERMINUS: { label: "Terminus", color: "#f7b731" },
-  HERALD: { label: "Herald", color: "#39c8ff" },
-  CONSENSUS: { label: "Consensus", color: "#19f5a5" },
+  ARCHITECT: { label: "Architect", color: AGENT_COLORS.ARCHITECT },
+  ORACLE: { label: "Oracle", color: AGENT_COLORS.ORACLE },
+  FORGE: { label: "Forge", color: AGENT_COLORS.FORGE },
+  SENTINEL: { label: "Sentinel", color: AGENT_COLORS.SENTINEL },
+  TERMINUS: { label: "Terminus", color: AGENT_COLORS.TERMINUS },
+  HERALD: { label: "Herald", color: AGENT_COLORS.HERALD },
+  CONSENSUS: { label: "Consensus", color: AGENT_COLORS.CONSENSUS },
 };
 
 /** Helper: format timestamp to human-readable string */
@@ -187,7 +188,7 @@ export function CollaborationTimeline({ events }: CollaborationTimelineProps) {
             </button>
             {activeSpecialists.map((spec) => {
               const group = SPECIALIST_GROUPS[spec];
-              const color = group?.color || "#52627f";
+              const color = group?.color || PALETTE.neutral;
               return (
                 <button
                   key={spec}

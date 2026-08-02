@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { UIEvent, ConsensusRecord, DecisionRecord, ChallengeRecord } from "../types";
+import { OUTCOME_COLORS, PALETTE, STATUS } from "../theme";
 
 interface ConsensusDashboardProps {
   events: UIEvent[];
@@ -104,25 +105,25 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
               label="Decisions"
               value={stats.totalDecisions}
               sub={`${stats.approved} approved · ${stats.rejected} rejected · ${stats.escalated} escalated`}
-              color="#3b82f6"
+              color={PALETTE.deep}
             />
             <SummaryCard
               label="Consensus"
               value={stats.totalConsensus}
               sub={`${stats.highConf} high confidence · ${stats.forCount} for`}
-              color="#19f5a5"
+              color={PALETTE.teal}
             />
             <SummaryCard
               label="Challenges"
               value={stats.totalChallenges}
               sub={`across ${stats.totalPositionSlots} positions`}
-              color="#ff5c7a"
+              color={STATUS.err}
             />
             <SummaryCard
               label="Approval Rate"
               value={stats.totalDecisions > 0 ? Math.round((stats.approved / stats.totalDecisions) * 100) : 0}
               sub={`${stats.replanned} replanned/override`}
-              color="#00e38c"
+              color={STATUS.ok}
               isPercent
             />
           </div>
@@ -135,14 +136,14 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
                 {stats.approved > 0 && <div className="h-full bg-accent-green transition-all" style={{ width: `${(stats.approved / stats.totalDecisions) * 100}%` }} title={`${stats.approved} approved`} />}
                 {stats.rejected > 0 && <div className="h-full bg-accent-red transition-all" style={{ width: `${(stats.rejected / stats.totalDecisions) * 100}%` }} title={`${stats.rejected} rejected`} />}
                 {stats.escalated > 0 && <div className="h-full bg-accent-amber transition-all" style={{ width: `${(stats.escalated / stats.totalDecisions) * 100}%` }} title={`${stats.escalated} escalated`} />}
-                {stats.revision > 0 && <div className="h-full transition-all" style={{ width: `${(stats.revision / stats.totalDecisions) * 100}%`, backgroundColor: "#39c8ff" }} title={`${stats.revision} revision`} />}
+                {stats.revision > 0 && <div className="h-full transition-all" style={{ width: `${(stats.revision / stats.totalDecisions) * 100}%`, backgroundColor: OUTCOME_COLORS.revision }} title={`${stats.revision} revision`} />}
                 {stats.replanned > 0 && <div className="h-full bg-accent-purple transition-all" style={{ width: `${(stats.replanned / stats.totalDecisions) * 100}%` }} title={`${stats.replanned} replanned`} />}
               </div>
               <div className="flex gap-4 mt-2 text-[10px] text-ink-muted">
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-green mr-1" /> Approved ({stats.approved})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-red mr-1" /> Rejected ({stats.rejected})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-amber mr-1" /> Escalated ({stats.escalated})</span>
-                <span><span className="w-2 h-2 inline-block rounded-full mr-1" style={{ backgroundColor: "#39c8ff" }} /> Revision ({stats.revision})</span>
+                <span><span className="w-2 h-2 inline-block rounded-full mr-1" style={{ backgroundColor: OUTCOME_COLORS.revision }} /> Revision ({stats.revision})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-purple mr-1" /> Replanned ({stats.replanned})</span>
               </div>
             </div>
@@ -153,9 +154,9 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
             {/* Tabs */}
             <div className="flex gap-4 border-b border-surface-border pb-3 mb-3">
               {[ 
-                { key: "decisions" as const, label: "Architect Decisions", count: stats.totalDecisions, color: "#3b82f6" },
-                { key: "consensus" as const, label: "Consensus Sessions", count: stats.totalConsensus, color: "#19f5a5" },
-                { key: "challenges" as const, label: "Challenges", count: stats.totalChallenges, color: "#ff5c7a" },
+                { key: "decisions" as const, label: "Architect Decisions", count: stats.totalDecisions, color: PALETTE.deep },
+                { key: "consensus" as const, label: "Consensus Sessions", count: stats.totalConsensus, color: PALETTE.teal },
+                { key: "challenges" as const, label: "Challenges", count: stats.totalChallenges, color: STATUS.err },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -218,11 +219,11 @@ function SummaryCard({ label, value, sub, color, isPercent }: {
 }
 
 function DecisionRow({ decision }: { decision: DecisionRecord }) {
-  const outcomeColor = decision.outcome.toLowerCase().includes("approv") ? "#00e38c"
-    : decision.outcome.toLowerCase().includes("reject") ? "#ff5c7a"
-    : decision.outcome.toLowerCase().includes("escalat") ? "#f7b731"
-    : decision.outcome.toLowerCase().includes("override") ? "#8c5cff"
-    : "#52627f";
+  const outcomeColor = decision.outcome.toLowerCase().includes("approv") ? STATUS.ok
+    : decision.outcome.toLowerCase().includes("reject") ? STATUS.err
+    : decision.outcome.toLowerCase().includes("escalat") ? STATUS.warn
+    : decision.outcome.toLowerCase().includes("override") ? PALETTE.purple
+    : PALETTE.neutral;
 
   return (
     <div className="border border-surface-border rounded-lg px-4 py-2.5 hover:bg-surface-alt/50 transition-colors">
@@ -249,7 +250,7 @@ function ConsensusRow({ item }: { item: ConsensusRecord }) {
   return (
     <div className="border border-surface-border rounded-lg px-4 py-2.5 hover:bg-surface-alt/50 transition-colors">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-xs font-semibold" style={{ color: "#19f5a5" }}>CONSENSUS</span>
+        <span className="text-xs font-semibold" style={{ color: PALETTE.teal }}>CONSENSUS</span>
         <span className="text-xs text-ink-muted">{item.method}</span>
         <span className="text-xs text-ink-muted">
           {item.confidence >= 0.7 ? "✅" : item.confidence >= 0.4 ? "◌" : "⚠"} {Math.round(item.confidence * 100)}%
@@ -270,8 +271,8 @@ function ConsensusRow({ item }: { item: ConsensusRecord }) {
         <div className="flex flex-wrap gap-1 mt-1.5">
           {positions.slice(0, 6).map(([spec, pos]) => (
             <span key={spec} className="text-[10px] px-1.5 py-0.5 rounded" style={{
-              color: pos.toLowerCase() === "for" || pos.toLowerCase() === "approve" ? "#00e38c" : pos.toLowerCase() === "against" || pos.toLowerCase() === "reject" ? "#ff5c7a" : "#52627f",
-              backgroundColor: pos.toLowerCase() === "for" || pos.toLowerCase() === "approve" ? "#00e38c15" : pos.toLowerCase() === "against" || pos.toLowerCase() === "reject" ? "#ff5c7a15" : "#52627f15",
+              color: pos.toLowerCase() === "for" || pos.toLowerCase() === "approve" ? STATUS.ok : pos.toLowerCase() === "against" || pos.toLowerCase() === "reject" ? STATUS.err : PALETTE.neutral,
+              backgroundColor: pos.toLowerCase() === "for" || pos.toLowerCase() === "approve" ? `${STATUS.ok}15` : pos.toLowerCase() === "against" || pos.toLowerCase() === "reject" ? `${STATUS.err}15` : `${PALETTE.neutral}15`,
             }}>
               {spec}: {pos.toUpperCase()}
             </span>

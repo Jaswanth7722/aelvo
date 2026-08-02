@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ChatMessage, AgentStep, VerificationStepStatus } from "../types";
+import { AGENT_COLORS, AGENT_ICONS, PALETTE, STATUS } from "../theme";
 
 interface ChatMessageProps {
   message: ChatMessage;
@@ -15,18 +16,18 @@ function fmtRel(ts: number): string {
 }
 
 const AGENT_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  HERMES:    { label: "Hermes",    color: "#0891B2", icon: "◉" },
-  ARCHITECT: { label: "Architect", color: "#7C3AED", icon: "◈" },
-  ORACLE:    { label: "Oracle",    color: "#8B5CF6", icon: "◆" },
-  FORGE:     { label: "Forge",     color: "#16A34A", icon: "⚙" },
-  SENTINEL:  { label: "Sentinel",  color: "#E11D48", icon: "🛡" },
-  TERMINUS:  { label: "Terminus",  color: "#F59E0B", icon: "▶" },
-  HERALD:    { label: "Herald",    color: "#FF9F45", icon: "★" },
+  HERMES:    { label: "Hermes",    color: AGENT_COLORS.HERMES,    icon: AGENT_ICONS.HERMES },
+  ARCHITECT: { label: "Architect", color: AGENT_COLORS.ARCHITECT, icon: AGENT_ICONS.ARCHITECT },
+  ORACLE:    { label: "Oracle",    color: AGENT_COLORS.ORACLE,    icon: AGENT_ICONS.ORACLE },
+  FORGE:     { label: "Forge",     color: AGENT_COLORS.FORGE,     icon: AGENT_ICONS.FORGE },
+  SENTINEL:  { label: "Sentinel",  color: AGENT_COLORS.SENTINEL,  icon: AGENT_ICONS.SENTINEL },
+  TERMINUS:  { label: "Terminus",  color: AGENT_COLORS.TERMINUS,  icon: AGENT_ICONS.TERMINUS },
+  HERALD:    { label: "Herald",    color: AGENT_COLORS.HERALD,    icon: AGENT_ICONS.HERALD },
 };
 
 function getAgentCfg(name: string) {
   const key = name.toUpperCase();
-  return AGENT_CONFIG[key] || { label: name, color: "#7C3AED", icon: "●" };
+  return AGENT_CONFIG[key] || { label: name, color: PALETTE.deep, icon: "●" };
 }
 
 function AgentStepRow({ step }: { step: AgentStep }) {
@@ -37,8 +38,8 @@ function AgentStepRow({ step }: { step: AgentStep }) {
     step.status === "active" ? "◌" : "○";
   const statusColor =
     step.status === "completed" ? cfg.color :
-    step.status === "failed" ? "#E11D48" :
-    step.status === "active" ? "#F59E0B" : "#9CA3AF";
+    step.status === "failed" ? STATUS.err :
+    step.status === "active" ? STATUS.warn : PALETTE.muted;
 
   return (
     <div className="flex items-center gap-2 py-1.5 fade-up">
@@ -58,9 +59,9 @@ function AgentStepRow({ step }: { step: AgentStep }) {
 
 function VerificationBadge({ check }: { check: VerificationStepStatus }) {
   const color =
-    check.status === "passed" ? "#16A34A" :
-    check.status === "failed" ? "#E11D48" :
-    check.status === "running" ? "#F59E0B" : "#9CA3AF";
+    check.status === "passed" ? STATUS.ok :
+    check.status === "failed" ? STATUS.err :
+    check.status === "running" ? STATUS.warn : PALETTE.muted;
   const icon =
     check.status === "passed" ? "✓" :
     check.status === "failed" ? "✗" :
@@ -85,9 +86,9 @@ function PhaseTimeline({ phases }: { phases: ChatMessage["phases"] }) {
     <div className="flex items-center gap-1 my-2 flex-wrap">
       {phases.map((phase, i) => {
         const color =
-          phase.status === "completed" ? "#16A34A" :
-          phase.status === "failed" ? "#E11D48" :
-          phase.status === "active" ? "#FF9F45" : "#9CA3AF";
+          phase.status === "completed" ? STATUS.ok :
+          phase.status === "failed" ? STATUS.err :
+          phase.status === "active" ? PALETTE.orange : PALETTE.muted;
         return (
           <span
             key={i}

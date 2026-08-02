@@ -89,6 +89,21 @@
       transition-colors duration-150;
   }
 
+  /* Cool-purple soft button — secondary actions */
+  .btn-soft {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium
+      text-brand-purple bg-brand-purple/10 border border-brand-purple/20
+      hover:bg-brand-purple/20 hover:text-brand-deep
+      transition-colors duration-150;
+  }
+
+  /* Danger button — destructive / error actions */
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium
+      text-accent-red bg-accent-red/10 border border-accent-red/20
+      hover:bg-accent-red/20 transition-colors duration-150;
+  }
+
   .input-field {
     @apply w-full bg-white border border-surface-border rounded-xl px-4 py-3 text-sm text-ink
       placeholder-ink-muted focus:outline-none focus:border-brand-purple/60 focus:ring-2 focus:ring-brand-purple/15

@@ -199,7 +199,7 @@ export function AdminSettings({
             <div className="mt-4 flex gap-2">
               <button
                 onClick={onReconnect}
-                className="text-xs px-3 py-1.5 rounded-lg bg-accent-blue/10 text-accent-blue border border-accent-blue/20 hover:bg-accent-blue/20 transition-colors"
+                className="btn-soft"
               >
                 ↻ Reconnect
               </button>
@@ -275,7 +275,7 @@ export function AdminSettings({
             <div className="mt-6 flex items-center gap-3">
               <button
                 onClick={handleSaveConnection}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-blue/10 text-accent-blue border border-accent-blue/20 hover:bg-accent-blue/20 transition-colors"
+                className="btn-soft !px-4 !py-2 !text-sm"
               >
                 Save & Reconnect
               </button>
@@ -366,7 +366,7 @@ export function AdminSettings({
 
             <button
               onClick={handleClear}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-red-600/10 text-red-400 border border-red-600/20 hover:bg-red-600/20 transition-colors"
+              className="btn-danger"
             >
               Clear All
             </button>

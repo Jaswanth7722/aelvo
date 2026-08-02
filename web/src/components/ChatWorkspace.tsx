@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { UIEvent, ChatMessage, AgentStep, VerificationStepStatus, ChatPhase } from "../types";
 import { ChatMessageBubble } from "./ChatMessage";
+import { AGENT_COLORS, AGENT_ICONS } from "../theme";
 
 interface ChatWorkspaceProps {
   events: UIEvent[];
@@ -11,13 +12,13 @@ interface ChatWorkspaceProps {
 const AGENT_NAMES = ["HERMES", "ARCHITECT", "ORACLE", "FORGE", "SENTINEL", "TERMINUS", "HERALD"];
 
 const AGENT_DISPLAY: Record<string, { label: string; color: string; icon: string }> = {
-  HERMES:    { label: "Hermes",    color: "#0891B2", icon: "◉" },
-  ARCHITECT: { label: "Architect", color: "#7C3AED", icon: "◈" },
-  ORACLE:    { label: "Oracle",    color: "#8B5CF6", icon: "◆" },
-  FORGE:     { label: "Forge",     color: "#16A34A", icon: "⚙" },
-  SENTINEL:  { label: "Sentinel",  color: "#E11D48", icon: "🛡" },
-  TERMINUS:  { label: "Terminus",  color: "#F59E0B", icon: "▶" },
-  HERALD:    { label: "Herald",    color: "#FF9F45", icon: "★" },
+  HERMES:    { label: "Hermes",    color: AGENT_COLORS.HERMES,    icon: AGENT_ICONS.HERMES },
+  ARCHITECT: { label: "Architect", color: AGENT_COLORS.ARCHITECT, icon: AGENT_ICONS.ARCHITECT },
+  ORACLE:    { label: "Oracle",    color: AGENT_COLORS.ORACLE,    icon: AGENT_ICONS.ORACLE },
+  FORGE:     { label: "Forge",     color: AGENT_COLORS.FORGE,     icon: AGENT_ICONS.FORGE },
+  SENTINEL:  { label: "Sentinel",  color: AGENT_COLORS.SENTINEL,  icon: AGENT_ICONS.SENTINEL },
+  TERMINUS:  { label: "Terminus",  color: AGENT_COLORS.TERMINUS,  icon: AGENT_ICONS.TERMINUS },
+  HERALD:    { label: "Herald",    color: AGENT_COLORS.HERALD,    icon: AGENT_ICONS.HERALD },
 };
 
 let msgCounter = 0;
@@ -257,7 +258,7 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Full-width chat (no sidebars) */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#FFFBF4]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-brand-cream/60">
         {/* Top bar */}
         <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0 bg-white/70 backdrop-blur-md">
           <h2 className="text-lg font-extrabold text-ink">Chat</h2>

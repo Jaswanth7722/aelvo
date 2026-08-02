@@ -1,17 +1,18 @@
 import { useMemo, useState } from "react";
 import type { UIEvent, TaskBoardItem, TaskStatus, KanbanColumn } from "../types";
+import { TASK_STATUS_COLORS } from "../theme";
 
 interface TaskBoardProps {
   events: UIEvent[];
 }
 
 const COLUMNS: KanbanColumn[] = [
-  { key: "pending",    label: "Pending",    icon: "○",  color: "#52627f" },
-  { key: "assigned",   label: "Assigned",   icon: "→",  color: "#a565ff" },
-  { key: "active",     label: "Active",     icon: "◉",  color: "#3b82f6" },
-  { key: "review",     label: "Review",     icon: "◐",  color: "#f7b731" },
-  { key: "blocked",    label: "Blocked",    icon: "⊘",  color: "#ff5c7a" },
-  { key: "completed",  label: "Complete",   icon: "✓",  color: "#00e38c" },
+  { key: "pending",    label: "Pending",    icon: "○",  color: TASK_STATUS_COLORS.pending },
+  { key: "assigned",   label: "Assigned",   icon: "→",  color: TASK_STATUS_COLORS.assigned },
+  { key: "active",     label: "Active",     icon: "◉",  color: TASK_STATUS_COLORS.active },
+  { key: "review",     label: "Review",     icon: "◐",  color: TASK_STATUS_COLORS.review },
+  { key: "blocked",    label: "Blocked",    icon: "⊘",  color: TASK_STATUS_COLORS.blocked },
+  { key: "completed",  label: "Complete",   icon: "✓",  color: TASK_STATUS_COLORS.completed },
 ];
 
 /** Map incoming to_status values to kanban TaskStatus */

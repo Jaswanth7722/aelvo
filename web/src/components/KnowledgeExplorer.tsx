@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { UIEvent, KnowledgeItem, KnowledgeSortKey, SortDirection, ConsumptionLink } from "../types";
+import { agentColor } from "../theme";
 
 interface KnowledgeExplorerProps {
   events: UIEvent[];
@@ -414,17 +415,7 @@ interface KnowledgeCardProps {
 }
 
 function KnowledgeCard({ item, isSelected, onSelect }: KnowledgeCardProps) {
-  const specColor = (
-    {
-      ORACLE: "#8c5cff",
-      FORGE: "#00e38c",
-      SENTINEL: "#ff5c7a",
-      ARCHITECT: "#3b82f6",
-      HERALD: "#39c8ff",
-      TERMINUS: "#f7b731",
-      CONSENSUS: "#19f5a5",
-    } as Record<string, string>
-  )[item.specialist.toUpperCase()] || "#52627f";
+  const specColor = agentColor(item.specialist);
 
   return (
     <div

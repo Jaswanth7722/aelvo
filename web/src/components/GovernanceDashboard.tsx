@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { UIEvent, GovernanceEvaluation, SecurityAudit, PolicyDefinition, AuditEntry } from "../types";
+import { OUTCOME_COLORS, PALETTE, STATUS } from "../theme";
 
 interface GovernanceDashboardProps {
   events: UIEvent[];
@@ -219,35 +220,35 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
               label="Evaluations"
               value={stats.totalEvaluations}
               sub={`${stats.approved} approved`}
-              color="#3b82f6"
+              color={PALETTE.deep}
               icon="◉"
             />
             <SummaryCard
               label="Approved"
               value={stats.approved}
               sub={`${stats.approvalRate}% rate`}
-              color="#00e38c"
+              color={STATUS.ok}
               icon="✓"
             />
             <SummaryCard
               label="Denied"
               value={stats.rejected}
               sub={`${stats.escalated} escalated`}
-              color="#ff5c7a"
+              color={STATUS.err}
               icon="✗"
             />
             <SummaryCard
               label="Security Checks"
               value={stats.totalSecurity}
               sub={`${stats.securityPassed} passed · ${stats.securityFailed} failed`}
-              color="#8c5cff"
+              color={PALETTE.purple}
               icon="◐"
             />
             <SummaryCard
               label="Pass Rate"
               value={stats.securityPassRate}
               isPercent
-              color={stats.securityPassRate >= 90 ? "#00e38c" : stats.securityPassRate >= 70 ? "#f7b731" : "#ff5c7a"}
+              color={stats.securityPassRate >= 90 ? STATUS.ok : stats.securityPassRate >= 70 ? STATUS.warn : STATUS.err}
               icon="◈"
             />
           </div>
@@ -267,7 +268,7 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
                   <div className="h-full bg-accent-amber transition-all" style={{ width: `${(stats.escalated / stats.totalEvaluations) * 100}%` }} title={`${stats.escalated} escalated`} />
                 )}
                 {stats.replanned > 0 && (
-                  <div className="h-full transition-all" style={{ width: `${(stats.replanned / stats.totalEvaluations) * 100}%`, backgroundColor: "#39c8ff" }} title={`${stats.replanned} replanned`} />
+                  <div className="h-full transition-all" style={{ width: `${(stats.replanned / stats.totalEvaluations) * 100}%`, backgroundColor: OUTCOME_COLORS.revision }} title={`${stats.replanned} replanned`} />
                 )}
                 {stats.overridden > 0 && (
                   <div className="h-full bg-accent-purple transition-all" style={{ width: `${(stats.overridden / stats.totalEvaluations) * 100}%` }} title={`${stats.overridden} overridden`} />
@@ -277,7 +278,7 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-green mr-1" /> Approved ({stats.approved})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-red mr-1" /> Rejected ({stats.rejected})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-amber mr-1" /> Escalated ({stats.escalated})</span>
-                <span><span className="w-2 h-2 inline-block rounded-full mr-1" style={{ backgroundColor: "#39c8ff" }} /> Replanned ({stats.replanned})</span>
+                <span><span className="w-2 h-2 inline-block rounded-full mr-1" style={{ backgroundColor: OUTCOME_COLORS.revision }} /> Replanned ({stats.replanned})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-purple mr-1" /> Overridden ({stats.overridden})</span>
               </div>
             </div>
@@ -287,11 +288,11 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
           <div className="panel">
             <div className="flex gap-4 border-b border-surface-border pb-3 mb-3 overflow-x-auto">
               {[
-                { key: "evaluations" as const, label: "Policy Evaluations", count: stats.totalEvaluations, color: "#3b82f6" },
-                { key: "security" as const, label: "Security Audits", count: stats.totalSecurity, color: "#8c5cff" },
-                { key: "sandbox" as const, label: "Sandbox Integrity", count: stats.totalSandbox, color: "#ff5c7a" },
-                { key: "audit" as const, label: "Audit Trail", count: stats.totalAudit, color: "#52627f" },
-                { key: "policies" as const, label: "Active Policies", count: DEFAULT_POLICIES.length, color: "#19f5a5" },
+                { key: "evaluations" as const, label: "Policy Evaluations", count: stats.totalEvaluations, color: PALETTE.deep },
+                { key: "security" as const, label: "Security Audits", count: stats.totalSecurity, color: PALETTE.purple },
+                { key: "sandbox" as const, label: "Sandbox Integrity", count: stats.totalSandbox, color: STATUS.err },
+                { key: "audit" as const, label: "Audit Trail", count: stats.totalAudit, color: PALETTE.neutral },
+                { key: "policies" as const, label: "Active Policies", count: DEFAULT_POLICIES.length, color: PALETTE.teal },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -423,12 +424,12 @@ function SummaryCard({ label, value, sub, isPercent, color, icon }: {
 
 function EvaluationRow({ evaluation }: { evaluation: GovernanceEvaluation }) {
   const outcomeColor = {
-    approve: "#00e38c",
-    reject: "#ff5c7a",
-    escalate: "#f7b731",
-    replan: "#39c8ff",
-    override: "#8c5cff",
-  }[evaluation.outcome] || "#52627f";
+    approve: STATUS.ok,
+    reject: STATUS.err,
+    escalate: STATUS.warn,
+    replan: OUTCOME_COLORS.revision,
+    override: PALETTE.purple,
+  }[evaluation.outcome] || PALETTE.neutral;
 
   const outcomeIcon = {
     approve: "✓",
@@ -470,7 +471,7 @@ function EvaluationRow({ evaluation }: { evaluation: GovernanceEvaluation }) {
 
 function SecurityRow({ audit }: { audit: SecurityAudit }) {
   const statusIcon = audit.status === "passed" ? "✓" : audit.status === "failed" ? "✗" : audit.status === "running" ? "◌" : "○";
-  const statusColor = audit.status === "passed" ? "#00e38c" : audit.status === "failed" ? "#ff5c7a" : audit.status === "running" ? "#f7b731" : "#52627f";
+  const statusColor = audit.status === "passed" ? STATUS.ok : audit.status === "failed" ? STATUS.err : audit.status === "running" ? STATUS.warn : PALETTE.neutral;
 
   return (
     <div className="border border-surface-border rounded-lg px-3 py-2 hover:bg-surface-alt/50 transition-colors flex items-center gap-3">
@@ -491,14 +492,14 @@ function SecurityRow({ audit }: { audit: SecurityAudit }) {
 }
 
 function AuditRow({ entry }: { entry: AuditEntry }) {
-  const outcomeColor = entry.outcome === "allowed" || entry.outcome === "approve" ? "#00e38c"
-    : entry.outcome === "denied" || entry.outcome === "reject" ? "#ff5c7a"
-    : entry.outcome === "escalated" || entry.outcome === "escalate" ? "#f7b731"
-    : "#52627f";
+  const outcomeColor = entry.outcome === "allowed" || entry.outcome === "approve" ? STATUS.ok
+    : entry.outcome === "denied" || entry.outcome === "reject" ? STATUS.err
+    : entry.outcome === "escalated" || entry.outcome === "escalate" ? STATUS.warn
+    : PALETTE.neutral;
 
-  const subColor = entry.subsystem === "security" ? "#8c5cff"
-    : entry.subsystem === "recovery" ? "#3b82f6"
-    : "#19f5a5";
+  const subColor = entry.subsystem === "security" ? PALETTE.purple
+    : entry.subsystem === "recovery" ? PALETTE.deep
+    : PALETTE.teal;
 
   return (
     <div className="border border-surface-border rounded-lg px-3 py-2 hover:bg-surface-alt/50 transition-colors flex items-center gap-3">
@@ -520,7 +521,7 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
 
 function SandboxCheckRow({ check }: { check: SandboxCheck }) {
   const statusIcon = check.passed ? "✓" : check.status === "pending_bridge" ? "○" : "✗";
-  const statusColor = check.passed ? "#00e38c" : check.status === "pending_bridge" ? "#52627f" : "#ff5c7a";
+  const statusColor = check.passed ? STATUS.ok : check.status === "pending_bridge" ? PALETTE.neutral : STATUS.err;
 
   return (
     <div className="border border-surface-border rounded-lg px-3 py-2.5 hover:bg-surface-alt/50 transition-colors">
@@ -538,10 +539,10 @@ function SandboxCheckRow({ check }: { check: SandboxCheck }) {
 }
 
 function PolicyRow({ policy }: { policy: PolicyDefinition }) {
-  const effectColor = policy.effect === "allow" ? "#00e38c"
-    : policy.effect === "deny" ? "#ff5c7a"
-    : policy.effect === "require_approval" ? "#f7b731"
-    : "#52627f";
+  const effectColor = policy.effect === "allow" ? STATUS.ok
+    : policy.effect === "deny" ? STATUS.err
+    : policy.effect === "require_approval" ? STATUS.warn
+    : PALETTE.neutral;
 
   const effectLabel = policy.effect === "require_approval" ? "REQUIRE APPROVAL"
     : policy.effect === "log_only" ? "LOG ONLY"

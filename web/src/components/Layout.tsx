@@ -13,11 +13,9 @@ const NAV_ITEMS = [
   { path: "/events", label: "Timeline", icon: "◈" },
   { path: "/tasks", label: "Tasks", icon: "☰" },
   { path: "/knowledge", label: "Knowledge", icon: "◈" },
-  { path: "/consensus", label: "Consensus", icon: "↻" },
   { path: "/agents", label: "Agents", icon: "●" },
-  { path: "/health", label: "Health", icon: "◈" },
-  { path: "/governance", label: "Governance", icon: "◉" },
-  { path: "/monitoring", label: "Monitoring", icon: "◈" },
+  { path: "/governance", label: "Governance", icon: "↻" },
+  { path: "/system", label: "System", icon: "◉" },
   { path: "/providers", label: "Providers", icon: "🔑" },
   { path: "/admin", label: "Admin", icon: "⚙" },
 ];
