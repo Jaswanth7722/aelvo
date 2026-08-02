@@ -18,7 +18,6 @@ const NAV_ITEMS = [
   { path: "/health", label: "Health", icon: "◈" },
   { path: "/governance", label: "Governance", icon: "◉" },
   { path: "/monitoring", label: "Monitoring", icon: "◈" },
-  { path: "/security", label: "Security", icon: "🔒" },
   { path: "/admin", label: "Admin", icon: "⚙" },
 ];
 

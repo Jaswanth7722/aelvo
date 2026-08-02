@@ -10,7 +10,6 @@ import ConsensusPage from "./pages/ConsensusPage";
 import HealthPage from "./pages/HealthPage";
 import GovernancePage from "./pages/GovernancePage";
 import MonitoringPage from "./pages/MonitoringPage";
-import SecurityPage from "./pages/SecurityPage";
 import AdminPage from "./pages/AdminPage";
 import ChatPage from "./pages/ChatPage";
 
@@ -33,7 +32,6 @@ export default function App() {
         <Route path="/health" element={<HealthPage />} />
         <Route path="/governance" element={<GovernancePage />} />
         <Route path="/monitoring" element={<MonitoringPage />} />
-        <Route path="/security" element={<SecurityPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/admin" element={<AdminPage />} />
       </Routes>

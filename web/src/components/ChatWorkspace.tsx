@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import type { UIEvent, ChatMessage, ChatSession, AgentLiveStatus, AgentStep, VerificationStepStatus, ChatPhase } from "../types";
+import { useState, useRef, useEffect, useCallback } from "react";
+import type { UIEvent, ChatMessage, ChatSession, AgentStep, VerificationStepStatus, ChatPhase } from "../types";
 import { ChatMessageBubble } from "./ChatMessage";
 import { SessionSidebar } from "./SessionSidebar";
-import { AgentActivityPanel } from "./AgentActivityPanel";
 
 interface ChatWorkspaceProps {
   events: UIEvent[];
@@ -65,55 +64,6 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
 
   // Active session's messages
   const activeMessages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
-
-  // Derive agent live status from events
-  const agentStatuses = useMemo((): AgentLiveStatus[] => {
-    return AGENT_NAMES.map((name) => {
-      const cfg = AGENT_DISPLAY[name];
-      const agentEvents = events.filter(
-        (e) => e.specialist?.toUpperCase() === name
-      );
-      const lastEvent = agentEvents[agentEvents.length - 1];
-      const recentCount = agentEvents.length;
-
-      let status: AgentLiveStatus["status"] = "idle";
-      let currentTask = "Waiting...";
-      let progress = 0;
-
-      if (lastEvent) {
-        const type = lastEvent.type || "";
-        if (type.includes("thinking") || type.includes("running") || type.includes("started")) {
-          status = "thinking";
-          progress = 0.3;
-        } else if (type.includes("action") || type.includes("executing") || type.includes("working")) {
-          status = "acting";
-          progress = 0.6;
-        } else if (type.includes("completed") || type.includes("passed") || type.includes("succeeded")) {
-          status = "done";
-          progress = 1;
-        } else if (type.includes("failed") || type.includes("error")) {
-          status = "done";
-          progress = 0;
-        }
-
-        currentTask = lastEvent.action || "Working...";
-        if (lastEvent.action && recentCount > 1) {
-          progress = Math.min(1, progress + recentCount * 0.05);
-        }
-      }
-
-      return {
-        name,
-        label: cfg.label,
-        color: cfg.color,
-        icon: cfg.icon,
-        status,
-        currentTask,
-        progress: Math.min(1, Math.max(0, progress)),
-        lastAction: lastEvent?.action || "",
-      };
-    });
-  }, [events]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -553,8 +503,6 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
         </div>
       </div>
 
-      {/* Right sidebar — Agent Activity */}
-      <AgentActivityPanel agents={agentStatuses} eventCount={events.length} />
     </div>
   );
 }
