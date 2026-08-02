@@ -347,79 +347,6 @@ export interface SubsystemHealthSummary {
   description: string;
 }
 
-/** ── Phase 15: Security Dashboard Types ──────────────────────── */
-
-export type SecuritySeverity = "critical" | "high" | "medium" | "low" | "info";
-
-export type SecurityCategory =
-  | "credential_leak" | "path_traversal" | "command_injection"
-  | "secret_exposure" | "policy_violation" | "unsafe_command"
-  | "suspicious_pattern" | "sandbox_tamper" | "configuration_issue";
-
-export interface SecurityFinding {
-  id: string;
-  category: SecurityCategory;
-  severity: SecuritySeverity;
-  title: string;
-  message: string;
-  location: string;
-  recommendation: string;
-  timestamp: number;
-  source: string;
-}
-
-export interface SecurityScan {
-  id: string;
-  timestamp: number;
-  durationMs: number;
-  passed: boolean;
-  totalFindings: number;
-  criticalCount: number;
-  highCount: number;
-  mediumCount: number;
-  lowCount: number;
-  infoCount: number;
-  targetsScanned: number;
-}
-
-export interface AuditRecord {
-  id: string;
-  action: string;
-  decision: string;
-  actor: string;
-  subsystem: string;
-  resource: string;
-  reason: string;
-  message: string;
-  severity: string;
-  timestamp: number;
-}
-
-export interface IntegrityCheck {
-  id: string;
-  name: string;
-  passed: boolean;
-  status: string;
-  message: string;
-  timestamp: number;
-}
-
-export interface SecurityPosture {
-  overallStatus: "healthy" | "attention_needed" | "critical" | "unknown";
-  totalScans: number;
-  totalFindings: number;
-  criticalFindings: number;
-  highFindings: number;
-  mediumFindings: number;
-  lowFindings: number;
-  auditRecordsCount: number;
-  auditChainValid: boolean;
-  integrityChecksPassed: number;
-  integrityChecksFailed: number;
-  lastScanTime: number;
-  recommendations: string[];
-}
-
 /** ── Phase 17: Chat Workspace Types ────────────────────────── */
 
 /** A single message in the chat */
@@ -473,18 +400,6 @@ export interface ChatSession {
   updatedAt: number;
   messageCount: number;
   pinned: boolean;
-}
-
-/** Live agent status for the right sidebar */
-export interface AgentLiveStatus {
-  name: string;
-  label: string;
-  color: string;
-  icon: string;
-  status: "idle" | "thinking" | "acting" | "done";
-  currentTask: string;
-  progress: number;
-  lastAction: string;
 }
 
 /** ── Phase 16: Admin Settings Types ─────────────────────────── */
