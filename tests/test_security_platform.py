@@ -1040,9 +1040,9 @@ class TestFullPipeline:
         assert len(approved) >= 1
 
     @pytest.mark.asyncio
-    async def test_security_memory_persists_violations_across_actions(self):
+    async def test_security_memory_persists_violations_across_actions(self, tmp_path):
         """Security memory persists violations across multiple actions."""
-        sec = SecurityOrchestrator(workspace_root="/tmp/test_ws")
+        sec = SecurityOrchestrator(workspace_root=str(tmp_path))
 
         # Execute several actions including violations
         for cmd in ["rm -rf /", "sudo apt install nginx", ":(){ :|:& };:"]:

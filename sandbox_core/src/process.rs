@@ -326,3 +326,106 @@ pub fn bash_exec(
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    /// RAII guard: jail + auditor + temp root, removed on drop so repeated
+    /// test runs don't litter the system temp directory.
+    struct TestEnv {
+        jail: FsJail,
+        auditor: Auditor,
+        root: PathBuf,
+    }
+
+    impl Drop for TestEnv {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn make_env() -> TestEnv {
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "aelvo_proc_test_{}_{}",
+            std::process::id(),
+            seq
+        ));
+        std::fs::create_dir_all(&root).expect("create temp workspace");
+        let root_str = root.to_str().expect("utf8 temp path");
+        let jail = FsJail::new(root_str, root_str).expect("jail construction");
+        let auditor = Auditor::new(root_str);
+        TestEnv { jail, auditor, root }
+    }
+
+    fn bash_request(command: &str) -> Request {
+        Request {
+            action: "bash_exec".to_string(),
+            workspace_root: String::new(),
+            repo_root: String::new(),
+            write_mode: true,
+            params: json!({
+                "command": command,
+                "timeout_seconds": 10,
+            }),
+        }
+    }
+
+    #[test]
+    fn bash_exec_runs_allowed_command() {
+        let mut env = make_env();
+        let policy = PolicyEngine::new();
+        let res = bash_exec(
+            &bash_request("echo sandbox-test-42"),
+            &env.jail,
+            &mut env.auditor,
+            &policy,
+        )
+        .expect("echo should run");
+        let data = res.data.expect("result data");
+        let stdout = data["stdout"].as_str().unwrap_or("");
+        assert!(stdout.contains("sandbox-test-42"), "stdout: {stdout}");
+        assert_eq!(data["exit_code"].as_i64(), Some(0));
+    }
+
+    #[test]
+    fn bash_exec_blocks_dangerous_command() {
+        let mut env = make_env();
+        let policy = PolicyEngine::new();
+        let err = bash_exec(
+            &bash_request("rm -rf /"),
+            &env.jail,
+            &mut env.auditor,
+            &policy,
+        )
+        .err()
+        .expect("rm -rf / must be blocked by policy");
+        assert!(err.contains("blocked by security policy"), "err: {err}");
+    }
+
+    #[test]
+    fn bash_exec_rejects_empty_command() {
+        let mut env = make_env();
+        let policy = PolicyEngine::new();
+        let err = bash_exec(&bash_request(""), &env.jail, &mut env.auditor, &policy)
+            .err()
+            .expect("empty command must be rejected");
+        assert!(err.contains("Empty command is not allowed"), "err: {err}");
+    }
+
+    #[test]
+    fn track_and_cleanup_children_is_safe() {
+        // Bogus PID: taskkill/kill fails silently, nothing real to clean.
+        track_child(999_999);
+        cleanup_all_children();
+        cleanup_all_children(); // idempotent — second call is a no-op
+    }
+}

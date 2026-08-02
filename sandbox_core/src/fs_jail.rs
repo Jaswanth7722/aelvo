@@ -1222,3 +1222,119 @@ fn build_tree(
 
     Ok(())
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// RAII guard: builds an isolated FsJail over a fresh temp dir and
+    /// removes the dir on drop so repeated test runs don't litter /tmp.
+    struct TestJail {
+        jail: FsJail,
+        root: PathBuf,
+    }
+
+    impl Drop for TestJail {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn make_jail() -> TestJail {
+        let seq = TEMP_SEQ.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "aelvo_fsjail_test_{}_{}", std::process::id(), seq
+        ));
+        fs::create_dir_all(&root).expect("create temp workspace");
+        let root_str = root.to_str().expect("utf8 temp path");
+        let jail = FsJail::new(root_str, root_str).expect("jail construction");
+        TestJail { jail, root }
+    }
+
+    #[test]
+    fn single_encoded_traversal_is_rejected() {
+        let tj = make_jail();
+        let jail = &tj.jail;
+        for path in [
+            "%2e%2e/etc/passwd",
+            "..%2fetc/passwd",
+            "..%5cetc/passwd",
+            "src/..%2fetc/passwd",  // mixed with a benign prefix
+        ] {
+            let err = jail.resolve_and_verify(path).unwrap_err();
+            assert!(
+                err.contains("URL-encoded path traversal detected"),
+                "path {path} should be rejected, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn double_encoded_traversal_is_rejected() {
+        let tj = make_jail();
+        let jail = &tj.jail;
+        for path in [
+            "%252e%252e/etc/passwd",
+            "..%252fetc/passwd",
+            "..%255cetc/passwd",
+            "a/%252e%252e/b",  // embedded double-encoded dot-dot
+        ] {
+            let err = jail.resolve_and_verify(path).unwrap_err();
+            assert!(
+                err.contains("URL-encoded path traversal detected"),
+                "path {path} should be rejected, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn encoded_traversal_check_is_case_insensitive() {
+        let tj = make_jail();
+        let jail = &tj.jail;
+        for path in [
+            "%2E%2E/etc/passwd",
+            "..%2Fetc/passwd",
+            "..%5Cetc/passwd",
+            "%252E%252E/etc/passwd",
+            "..%252Fetc/passwd",
+            "..%255Cetc/passwd",
+        ] {
+            let err = jail.resolve_and_verify(path).unwrap_err();
+            assert!(
+                err.contains("URL-encoded path traversal detected"),
+                "uppercase path {path} should be rejected, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn benign_paths_pass_the_encoding_gate() {
+        let tj = make_jail();
+        let jail = &tj.jail;
+        // A file created AFTER jail construction must be whitelisted
+        // explicitly; register it so the inode check passes.
+        let file = jail.workspace_root().join("notes.txt");
+        fs::write(&file, "hi").expect("write fixture");
+        jail.add_file_to_whitelist(&file);
+        let resolved = jail
+            .resolve_and_verify("notes.txt")
+            .expect("plain file must resolve");
+        assert!(resolved.starts_with(jail.workspace_root()));
+
+        // Non-existent nested path resolves to an in-jail candidate.
+        let future = jail
+            .resolve_and_verify("safe_dir/file.txt")
+            .expect("non-existent in-jail path must resolve");
+        assert!(future.starts_with(jail.workspace_root()));
+
+        // A lone %2e (not doubled) is harmless and passes the gate.
+        let odd = jail
+            .resolve_and_verify("file%2ename.txt")
+            .expect("lone encoded dot must not trigger the gate");
+        assert!(odd.starts_with(jail.workspace_root()));
+    }
+}

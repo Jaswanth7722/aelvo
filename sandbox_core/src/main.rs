@@ -239,6 +239,25 @@ fn handle_request(req: &Request) -> Result<RunResult, String> {
 // Response Helpers
 // ═══════════════════════════════════════════════════════════════════════
 
+/// Serialize any value to a single JSON line for stdout.
+///
+/// Never fails silently: the Python orchestrator blocks on stdout
+/// until it sees a JSON line. If serialization errors, emit a valid
+/// error payload instead so the orchestrator always gets a response.
+fn render_serializable<T: serde::Serialize>(value: &T) -> String {
+    match serde_json::to_string(value) {
+        Ok(json) => json,
+        Err(_) => serde_json::json!({
+            "status": "error",
+            "data": null,
+            "logs": "response serialization failed",
+            "audit": null,
+            "success": false
+        })
+        .to_string(),
+    }
+}
+
 /// Send an error response to stdout (must be valid JSON for Python parser).
 fn respond_error(msg: &str) {
     let res = Response {
@@ -248,21 +267,7 @@ fn respond_error(msg: &str) {
         audit: None,
         success: false,
     };
-    match serde_json::to_string(&res) {
-        Ok(json) => println!("{}", json),
-        // Never fail silently: the Python orchestrator blocks on
-        // stdout until it sees a JSON line. Emit a valid fallback.
-        Err(_) => println!(
-            "{}",
-            serde_json::json!({
-                "status": "error",
-                "data": null,
-                "logs": "response serialization failed",
-                "audit": null,
-                "success": false
-            })
-        ),
-    }
+    println!("{}", render_serializable(&res));
 }
 
 /// Send a success response to stdout.
@@ -274,18 +279,72 @@ fn respond_success(res: RunResult) {
         audit: res.audit,
         success: true,
     };
-    match serde_json::to_string(&resp) {
-        Ok(json) => println!("{}", json),
-        // Never fail silently (see respond_error).
-        Err(_) => println!(
-            "{}",
-            serde_json::json!({
-                "status": "error",
-                "data": null,
-                "logs": "response serialization failed",
-                "audit": null,
-                "success": false
-            })
-        ),
+    println!("{}", render_serializable(&resp));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::ser::Error as _; // for S::Error::custom
+
+    #[test]
+    fn render_serializable_emits_valid_json_for_success() {
+        let res = Response {
+            status: "success".to_string(),
+            data: Some(serde_json::json!({"ok": true})),
+            logs: "done".to_string(),
+            audit: None,
+            success: true,
+        };
+        let line = render_serializable(&res);
+        let v: Value = serde_json::from_str(&line).expect("must be valid JSON");
+        assert_eq!(v["status"], "success");
+        assert_eq!(v["success"], true);
+        assert_eq!(v["data"]["ok"], true);
+        assert_eq!(v["logs"], "done");
+    }
+
+    #[test]
+    fn render_serializable_emits_valid_json_for_error() {
+        let res = Response {
+            status: "error".to_string(),
+            data: None,
+            logs: "boom".to_string(),
+            audit: None,
+            success: false,
+        };
+        let line = render_serializable(&res);
+        let v: Value = serde_json::from_str(&line).expect("must be valid JSON");
+        assert_eq!(v["status"], "error");
+        assert_eq!(v["logs"], "boom");
+        assert_eq!(v["success"], false);
+        assert!(v["data"].is_null());
+    }
+
+    /// A type whose Serialize impl always fails, forcing the fallback.
+    struct AlwaysFailsToSerialize;
+
+    impl serde::Serialize for AlwaysFailsToSerialize {
+        fn serialize<S: serde::Serializer>(
+            &self,
+            _serializer: S,
+        ) -> Result<S::Ok, S::Error> {
+            Err(S::Error::custom("intentional failure"))
+        }
+    }
+
+    #[test]
+    fn render_serializable_falls_back_to_valid_error_json_on_failure() {
+        let line = render_serializable(&AlwaysFailsToSerialize);
+        let v: Value = serde_json::from_str(&line).expect("fallback must be valid JSON");
+        assert_eq!(v["status"], "error");
+        assert_eq!(v["logs"], "response serialization failed");
+        assert_eq!(v["success"], false);
+        assert!(v["data"].is_null());
+        assert!(v["audit"].is_null());
     }
 }

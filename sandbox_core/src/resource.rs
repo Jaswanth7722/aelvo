@@ -392,3 +392,85 @@ pub fn diagnose_limit_violation(exit_code: Option<i32>) -> Option<ResourceKind> 
     }
     None
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resource_kind_maps_to_audit_strings() {
+        assert_eq!(ResourceKind::CpuTime.as_str(), "cpu_time");
+        assert_eq!(ResourceKind::Memory.as_str(), "memory");
+        assert_eq!(ResourceKind::ProcessCount.as_str(), "process_count");
+        assert_eq!(ResourceKind::HandleCount.as_str(), "handle_count");
+    }
+
+    #[test]
+    fn default_limits_are_sane() {
+        let l = Limits::default();
+        assert_eq!(l.cpu_time_seconds, DEFAULT_CPU_TIME_SECS);
+        assert_eq!(l.memory_bytes, DEFAULT_MEMORY_LIMIT_BYTES);
+        assert_eq!(l.max_processes, DEFAULT_PROCESS_LIMIT);
+        assert_eq!(l.max_handles, DEFAULT_HANDLE_LIMIT);
+    }
+
+    #[test]
+    fn clamp_caps_excessive_values() {
+        let mut l = Limits {
+            cpu_time_seconds: 100_000,
+            memory_bytes: 100 * 1024 * 1024 * 1024,
+            max_processes: 100_000,
+            max_handles: 100_000_000,
+        };
+        l.clamp();
+        assert_eq!(l.cpu_time_seconds, 300);
+        assert_eq!(l.memory_bytes, 4 * 1024 * 1024 * 1024);
+        assert_eq!(l.max_processes, 100);
+        assert_eq!(l.max_handles, 10_000);
+    }
+
+    #[test]
+    fn clamp_keeps_sane_values_unchanged() {
+        let mut l = Limits::default();
+        l.clamp();
+        assert_eq!(l.cpu_time_seconds, DEFAULT_CPU_TIME_SECS);
+        assert_eq!(l.memory_bytes, DEFAULT_MEMORY_LIMIT_BYTES);
+        assert_eq!(l.max_processes, DEFAULT_PROCESS_LIMIT);
+        assert_eq!(l.max_handles, DEFAULT_HANDLE_LIMIT);
+    }
+
+    #[test]
+    fn diagnose_limit_violation_detects_job_object_kill() {
+        // STATUS_PROCESS_IS_TERMINATING (0xC000010A as i32)
+        assert_eq!(
+            diagnose_limit_violation(Some(-1073740790)),
+            Some(ResourceKind::CpuTime)
+        );
+        assert_eq!(diagnose_limit_violation(Some(3)), Some(ResourceKind::CpuTime));
+        assert_eq!(diagnose_limit_violation(Some(0)), None);
+        assert_eq!(diagnose_limit_violation(Some(1)), None);
+        assert_eq!(diagnose_limit_violation(None), None);
+    }
+
+    #[test]
+    fn create_governor_clamps_and_builds() {
+        let gov = create_governor(None).expect("default governor should build");
+        assert_eq!(gov.limits().cpu_time_seconds, DEFAULT_CPU_TIME_SECS);
+
+        let excessive = Limits {
+            cpu_time_seconds: 50_000,
+            memory_bytes: 999 * 1024 * 1024 * 1024,
+            max_processes: 500,
+            max_handles: 50_000,
+        };
+        let gov = create_governor(Some(excessive)).expect("governor with limits");
+        assert_eq!(gov.limits().cpu_time_seconds, 300);
+        assert_eq!(gov.limits().memory_bytes, 4 * 1024 * 1024 * 1024);
+        assert_eq!(gov.limits().max_processes, 100);
+        assert_eq!(gov.limits().max_handles, 10_000);
+    }
+}
