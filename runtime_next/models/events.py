@@ -42,6 +42,8 @@ class EventType(str, Enum):
     REPORT_GENERATED = "report_generated"
     EXECUTION_STARTED = "execution_started"
     EXECUTION_COMPLETED = "execution_completed"
+    # Live per-agent operational metrics (AgentMetricsTracker snapshots)
+    AGENT_METRICS_UPDATED = "agent_metrics_updated"
 
 
 class BaseEvent(BaseModel):

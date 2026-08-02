@@ -94,6 +94,8 @@ async def run_web(
     mcp_cli=None,
     runtime_cli=None,
     provider_runtime=None,
+    fs=None,
+    workspace_switcher=None,
 ) -> None:
     """Start the web-only AELVO interface and block until interrupted.
 
@@ -117,6 +119,8 @@ async def run_web(
         mcp_cli=mcp_cli,
         runtime_cli=runtime_cli,
         provider_runtime=provider_runtime,
+        fs=fs,
+        workspace_switcher=workspace_switcher,
     )
     await bridge.start()
 

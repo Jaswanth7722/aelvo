@@ -10,14 +10,11 @@ interface LayoutProps {
 const NAV_ITEMS = [
   { path: "/", label: "Chat", icon: "◈" },
   { path: "/dashboard", label: "Dashboard", icon: "◉" },
-  { path: "/events", label: "Timeline", icon: "◈" },
+  { path: "/files", label: "Files", icon: "▤" },
   { path: "/tasks", label: "Tasks", icon: "☰" },
   { path: "/knowledge", label: "Knowledge", icon: "◈" },
   { path: "/agents", label: "Agents", icon: "●" },
-  { path: "/governance", label: "Governance", icon: "↻" },
-  { path: "/system", label: "System", icon: "◉" },
   { path: "/providers", label: "Providers", icon: "🔑" },
-  { path: "/admin", label: "Admin", icon: "⚙" },
 ];
 
 const STATUS_STYLES: Record<string, { color: string; label: string; dot: string }> = {

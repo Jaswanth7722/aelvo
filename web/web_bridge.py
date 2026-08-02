@@ -24,7 +24,8 @@ import logging
 import os
 import time
 import traceback
-from typing import Any, Dict, Optional, Set
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import websockets
 from websockets.server import WebSocketServerProtocol
@@ -153,6 +154,8 @@ class WebBridge:
         self._mcp_cli = None
         self._runtime_cli = None
         self._provider_runtime = None
+        self._fs = None
+        self._workspace_switcher = None
 
     @property
     def url(self) -> str:
@@ -177,6 +180,8 @@ class WebBridge:
         mcp_cli=None,
         runtime_cli=None,
         provider_runtime=None,
+        fs=None,
+        workspace_switcher=None,
     ) -> None:
         """Bind the agent + orchestrator so user chat messages execute real turns."""
         self._agent = agent
@@ -186,6 +191,8 @@ class WebBridge:
         self._mcp_cli = mcp_cli
         self._runtime_cli = runtime_cli
         self._provider_runtime = provider_runtime
+        self._fs = fs
+        self._workspace_switcher = workspace_switcher
 
     def _maybe_hot_swap_agent(self) -> bool:
         """Bring the agent online when the app booted without a provider.
@@ -260,6 +267,238 @@ class WebBridge:
 
         log.info("WebBridge server stopped")
 
+    # ------------------------------------------------------------------
+    # Workspace file access (CLI-style folder browser)
+    # ------------------------------------------------------------------
+
+    def _workspace_root(self) -> Path:
+        """Resolve the sandboxed workspace root for file access.
+
+        Prefers the orchestrator's base_path (the project root), falling
+        back to the parent of the web/ directory.
+        """
+        if self._orchestrator is not None and getattr(
+            self._orchestrator, "base_path", None
+        ):
+            return Path(self._orchestrator.base_path).resolve()
+        return Path(__file__).resolve().parent.parent
+
+    def _resolve_fs_path(self, raw: str) -> Tuple[Path, Path]:
+        """Resolve a client-supplied path against the workspace root.
+
+        Returns (resolved_path, root) after enforcing sandbox containment.
+        Raises ValueError for traversal attempts outside the root.
+        """
+        root = self._workspace_root()
+        raw = (raw or "").strip()
+        if not raw or raw in (".", "~", "/"):
+            return root, root
+        candidate = (root / raw.lstrip("/\\")).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            raise ValueError(f"Path escapes workspace: {raw}")
+        return candidate, root
+
+    def _fs_list(self, path: str) -> Dict[str, Any]:
+        """List directory entries relative to the workspace root."""
+        target, root = self._resolve_fs_path(path)
+        if not target.is_dir():
+            raise ValueError(f"Not a directory: {path or '.'}")
+        entries: List[Dict[str, Any]] = []
+        for child in sorted(
+            target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
+        ):
+            try:
+                stat = child.stat()
+            except OSError:
+                continue
+            entries.append({
+                "name": child.name,
+                "type": "dir" if child.is_dir() else "file",
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+            })
+        rel = target.relative_to(root)
+        cwd = "." if str(rel) == "." else str(rel).replace(os.sep, "/")
+        return {"cwd": cwd, "entries": entries}
+
+    def _fs_read(self, path: str, max_chars: int = 20000) -> Dict[str, Any]:
+        """Read a file's content relative to the workspace root."""
+        target, root = self._resolve_fs_path(path)
+        if not target.is_file():
+            raise ValueError(f"Not a file: {path}")
+        raw = target.read_bytes()
+        # Decode as UTF-8 with fallbacks for binary content
+        try:
+            text = raw.decode("utf-8")
+            encoding = "utf-8"
+        except UnicodeDecodeError:
+            try:
+                text = raw.decode("latin-1")
+                encoding = "latin-1"
+            except Exception:
+                text = repr(raw[:500])
+                encoding = "binary"
+        truncated = len(text) > max_chars
+        content = text[:max_chars]
+        rel = target.relative_to(root)
+        return {
+            "path": str(rel).replace(os.sep, "/"),
+            "content": content,
+            "truncated": truncated,
+            "encoding": encoding,
+            "size": len(raw),
+        }
+
+    async def _handle_fs_list(self, message: Dict[str, Any], websocket) -> None:
+        """Handle an fs_list request."""
+        path = str(message.get("path", "") or "")
+        try:
+            result = self._fs_list(path)
+            result["root"] = str(self._workspace_root())
+            await self._send_raw(websocket, {
+                "type": "fs_list",
+                "source": "web_bridge",
+                "specialist": "",
+                "action": f"Listed {len(result['entries'])} entries",
+                "data": result,
+                "timestamp": time.time(),
+            })
+        except Exception as exc:
+            await self._send_raw(websocket, self._fs_error("fs_list", path, exc))
+
+    async def _handle_fs_read(self, message: Dict[str, Any], websocket) -> None:
+        """Handle an fs_read request."""
+        path = str(message.get("path", "") or "")
+        try:
+            result = self._fs_read(path)
+            await self._send_raw(websocket, {
+                "type": "fs_read",
+                "source": "web_bridge",
+                "specialist": "",
+                "action": f"Read {result['path']}",
+                "data": result,
+                "timestamp": time.time(),
+            })
+        except Exception as exc:
+            await self._send_raw(websocket, self._fs_error("fs_read", path, exc))
+
+    @staticmethod
+    def _fs_error(kind: str, path: str, exc: Exception) -> Dict[str, Any]:
+        """Build an fs_* error payload."""
+        return {
+            "type": f"{kind}_error",
+            "source": "web_bridge",
+            "specialist": "",
+            "action": str(exc)[:200],
+            "data": {"path": path, "error": str(exc)[:200]},
+            "timestamp": time.time(),
+        }
+
+    async def _handle_fs_set_workspace(
+        self, message: Dict[str, Any], websocket
+    ) -> None:
+        """Point the agent at a new workspace folder (CLI/web "open folder").
+
+        Re-jails the agent's filesystem (all file tools), the orchestrator's
+        shared context, and the system-prompt workspace jail path so the agent
+        works directly on the chosen folder.
+        """
+        raw = str(message.get("path", "") or "").strip()
+        if not raw:
+            await self._send_raw(websocket, {
+                "type": "fs_workspace_result",
+                "source": "web_bridge",
+                "specialist": "",
+                "action": "Workspace path is required.",
+                "data": {"success": False, "error": "Workspace path is required."},
+                "timestamp": time.time(),
+            })
+            return
+        try:
+            # Resolve relative to the current workspace root for convenience
+            candidate = Path(raw).expanduser()
+            if not candidate.is_absolute():
+                candidate = self._workspace_root() / candidate
+            resolved = str(candidate.resolve())
+
+            # 1. Re-jail the agent's filesystem tools (read/write/bash/list/tree).
+            #    The tool registry closes over the module-level fs in main.py,
+            #    so if it was never bound here the tools would keep resolving
+            #    against the old folder while the UI reports the new one.
+            if self._fs is not None:
+                self._fs.set_base_path(resolved)
+            else:
+                log.warning(
+                    "fs_set_workspace: no tool-registry fs bound — agent tools "
+                    "may still resolve against the previous workspace root."
+                )
+            # 2. Update the orchestrator's shared context + caches
+            if self._orchestrator is not None and hasattr(
+                self._orchestrator, "set_workspace_root"
+            ):
+                self._orchestrator.set_workspace_root(resolved)
+            # 3. Update the system-prompt workspace jail path
+            if self._workspace_switcher is not None:
+                self._workspace_switcher(resolved)
+
+            await self._send_raw(websocket, {
+                "type": "fs_workspace_result",
+                "source": "web_bridge",
+                "specialist": "",
+                "action": f"Agent workspace set to {resolved}",
+                "data": {
+                    "success": True,
+                    "root": resolved,
+                    "message": f"Agent workspace set to {resolved}",
+                },
+                "timestamp": time.time(),
+            })
+        except Exception as exc:
+            log.warning("Failed to set workspace %s: %s", raw, exc)
+            await self._send_raw(websocket, {
+                "type": "fs_workspace_result",
+                "source": "web_bridge",
+                "specialist": "",
+                "action": str(exc)[:200],
+                "data": {"success": False, "error": str(exc)[:200]},
+                "timestamp": time.time(),
+            })
+
+    async def _handle_fs_workspace(self, websocket) -> None:
+        """Reply with the currently active agent workspace root."""
+        root = str(self._workspace_root())
+        await self._send_raw(websocket, {
+            "type": "fs_workspace",
+            "source": "web_bridge",
+            "specialist": "",
+            "action": f"Agent workspace: {root}",
+            "data": {"root": root},
+            "timestamp": time.time(),
+        })
+
+    async def _handle_agent_metrics(self, websocket) -> None:
+        """Reply with the current AgentMetricsTracker report."""
+        report: Dict[str, Any] = {}
+        source = "web_bridge"
+        if self._orchestrator is not None and hasattr(
+            self._orchestrator, "agent_metrics"
+        ):
+            try:
+                report = self._orchestrator.agent_metrics.generate_report()
+                source = "orchestrator"
+            except Exception as exc:
+                log.debug("Agent metrics fetch failed: %s", exc)
+        await self._send_raw(websocket, {
+            "type": "agent_metrics",
+            "source": source,
+            "specialist": "",
+            "action": f"Metrics for {report.get('total_events', 0)} events",
+            "data": report,
+            "timestamp": time.time(),
+        })
+
     async def _handle_connection(
         self, websocket: WebSocketServerProtocol
     ) -> None:
@@ -312,6 +551,16 @@ class WebBridge:
                         await self._handle_provider_save_key(message, websocket)
                     elif msg_type == "provider_remove_key":
                         await self._handle_provider_remove_key(message, websocket)
+                    elif msg_type == "fs_list":
+                        await self._handle_fs_list(message, websocket)
+                    elif msg_type == "fs_read":
+                        await self._handle_fs_read(message, websocket)
+                    elif msg_type == "fs_workspace":
+                        await self._handle_fs_workspace(websocket)
+                    elif msg_type == "fs_set_workspace":
+                        await self._handle_fs_set_workspace(message, websocket)
+                    elif msg_type == "agent_metrics":
+                        await self._handle_agent_metrics(websocket)
                 except json.JSONDecodeError:
                     log.debug("WebBridge invalid JSON from %s", client_info)
 

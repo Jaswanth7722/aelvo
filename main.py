@@ -81,6 +81,55 @@ ANCHOR_PATH = os.path.join(WORKSPACE_BASE, _ws_name, "anchor.md")
 WORKSPACE_PATH = os.path.join(WORKSPACE_BASE, _ws_name)
 BACKUP_DIR = os.path.join(WORKSPACE_BASE, _ws_name, "backups")
 
+def set_active_workspace(path: str) -> str:
+    """Point the agent at a new workspace folder at runtime.
+
+    Updates the module-level ``WORKSPACE_PATH`` used by the system prompt
+    (Workspace Jail) and invalidates the cached system prompt so the very
+    next LLM call reflects the new folder — giving the agent direct
+    folder/workspace access, like CLI/web/desktop coding agents.
+
+    Returns the resolved absolute path.
+    """
+    global WORKSPACE_PATH
+    resolved = os.path.abspath(path)
+    if not os.path.isdir(resolved):
+        raise NotADirectoryError(f"Not a folder: {resolved}")
+    WORKSPACE_PATH = resolved
+    # Invalidate the cached system prompt so the new jail path is injected.
+    agent = _ACTIVE_AGENT.get()
+    if agent is not None:
+        try:
+            agent._cached_system_prompt = None
+            agent._cache_time = 0.0
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
+    log.info("Active workspace set to %s", resolved)
+    return resolved
+
+
+class _AgentRef:
+    """Thread-safe holder for the active AelvoAgent instance."""
+
+    def __init__(self):
+        import threading
+        self._lock = threading.Lock()
+        self._value = None
+
+    def set(self, agent):
+        with self._lock:
+            self._value = agent
+
+    def get(self):
+        with self._lock:
+            return self._value
+
+
+# Holds the live agent instance so runtime workspace switching can invalidate
+# the cached system prompt. Set in main_async after the agent is built.
+_ACTIVE_AGENT = _AgentRef()
+
+
 def init_global_metadata():
     """Ensures the global database for tracking projects is ready."""
     try:
@@ -1035,6 +1084,7 @@ async def main_async():
             provider_runtime=provider_runtime,
         )
         log.info(f"âœ“ Using provider: {provider_name} | Model: {model}")
+        _ACTIVE_AGENT.set(agent)
     else:
         agent = None
         log.warning(
@@ -1171,6 +1221,8 @@ async def main_async():
         mcp_cli=mcp_cli,
         runtime_cli=runtime_cli,
         provider_runtime=provider_runtime,
+        fs=fs,
+        workspace_switcher=set_active_workspace,
     )
     log.info("Web session ended.")
     if lhp:

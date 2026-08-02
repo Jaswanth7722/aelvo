@@ -65,6 +65,24 @@ class AelvoFileSystem:
         if not self.base_path.exists():
             self.base_path.mkdir(parents=True, exist_ok=True)
 
+    def set_base_path(self, base_path: str) -> str:
+        """Re-jail the filesystem to a new workspace root.
+
+        All tool operations (read/write/edit/list/tree/bash/python) resolve
+        against ``self.base_path`` on every call, so switching it here gives
+        the agent direct folder/workspace access to the new directory — the
+        same way CLI/web/desktop coding agents let you open a folder.
+
+        Returns the resolved absolute path of the new root.
+        """
+        new_root = Path(base_path).resolve()
+        if not new_root.exists():
+            raise FileNotFoundError(f"Workspace folder does not exist: {new_root}")
+        if not new_root.is_dir():
+            raise NotADirectoryError(f"Not a folder: {new_root}")
+        self.base_path = new_root
+        return str(new_root)
+
     def _invoke_rust_sandbox(self, action: str, write_mode: bool, params: dict) -> dict:
         """Invoke the compiled Rust sandbox core binary with a JSON-RPC request."""
         # Locate the compiled Rust sandbox executable

@@ -22,12 +22,9 @@ from cognition.consensus import MultiAgentConsensusSystem
 
 log = logging.getLogger("aelvo.cognition.consensus_extended")
 
-# Try EventBus imports for TUI visibility
-try:
-    from ui.events.event_bus import EventBus, Event, EventType as UIEventType
-    HAS_UI_EVENTS = True
-except ImportError:
-    HAS_UI_EVENTS = False
+# TUI visibility was removed with the Python TUI — consensus events stream
+# to the web via the orchestrator's runtime EventBus instead of ui.events.
+HAS_UI_EVENTS = False
 
 # Try ChromaDB import
 _HAS_CHROMADB = False
@@ -188,13 +185,13 @@ class ExtendedConsensusEngine:
         self._positions: Dict[str, List[ConsensusPosition]] = {}
         self._outcomes: Dict[str, ConsensusOutcome] = {}
         self._timer_tasks: Dict[str, asyncio.Task] = {}
-        self._ui_event_bus: Optional[EventBus] = None
+        self._ui_event_bus: Optional[Any] = None
 
     # ======================================================================
     # Public API
     # ======================================================================
 
-    def set_ui_event_bus(self, bus: EventBus) -> None:
+    def set_ui_event_bus(self, bus: Any) -> None:
         """Connect the UI event bus for consensus visibility."""
         self._ui_event_bus = bus
 
@@ -828,21 +825,15 @@ class ExtendedConsensusEngine:
     async def _publish_event_async(self, event_name: str, data: Dict[str, Any]) -> None:
         """Publish a consensus event to the UI EventBus.
 
-        Uses the dedicated COLLABORATION_CONSENSUS event type so the
-        bridge's _on_collaboration_consensus handler receives it.
-        The ``event_name`` field in data differentiates the event subtype
-        (CONSENSUS_STARTED, CONSENSUS_POSITION_SUBMITTED, CONSENSUS_COMPLETED).
+        The Python TUI was removed — the TUI bus no longer exists. Consensus
+        visibility now flows through the orchestrator's runtime EventBus.
+        This method is retained as a no-op for API compatibility; attach a
+        bus via set_ui_event_bus if a custom sink is wired up.
         """
-        if HAS_UI_EVENTS and self._ui_event_bus:
+        if self._ui_event_bus is not None:
             try:
-                # Include the event_name in data for the bridge to route
                 data["event_name"] = event_name
-                event = Event(
-                    event_type=UIEventType.COLLABORATION_CONSENSUS,
-                    data=data,
-                    source="consensus_engine",
-                )
-                await self._ui_event_bus.publish(event)
+                await self._ui_event_bus.publish(data)
             except Exception as e:
                 log.debug("UI event bus publish failed: %s", e)
 

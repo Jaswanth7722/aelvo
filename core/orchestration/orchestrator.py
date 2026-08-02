@@ -22,6 +22,7 @@ from specialists import get_specialist
 from memory.user_model import UserModelManager
 from cognition.hermes_context import HermesContext
 from cognition.architect_decision import ExecutionMode
+from learning.agent_metrics import AgentMetricsTracker
 
 # New Runtime Integration
 from runtime_next.events.bus import EventBus
@@ -65,12 +66,8 @@ from core.orchestration.ui_notifier import UINotifier
 from runtime_next.plan.architect import ArchitectOrchestrator
 from runtime_next.plan.calibration import PlanCalibrationSystem
 
-# UI Integration (direct, no bridge layer)
-try:
-    from ui.events import get_event_bus
-    UI_AVAILABLE = True
-except ImportError:
-    UI_AVAILABLE = False
+# UI Integration — the Python TUI was removed; events stream to the web via
+# the runtime EventBus (orchestrator.runtime_bus) instead of ui.events.
 
 # Default cadence for compacting conversation history into a session summary
 SESSION_SUMMARY_INTERVAL = 50
@@ -113,6 +110,10 @@ class Orchestrator:
             base_path=self.base_path,
             kernel=self.kernel,
         )
+
+        # Track the active workspace root so the web UI can point the agent
+        # at any folder (CLI/web/desktop-agent style "open folder").
+        self._workspace_root = self.base_path
         self.session_manager = SessionManager(memory_engine=self.memory_engine)
         self.ui_notifier = UINotifier(self)
 
@@ -139,6 +140,14 @@ class Orchestrator:
 
         # Subscribe Orchestrator to event bus for graph checkpointing
         self.runtime_bus.subscribe_all(self.on_bus_event)
+
+        # ── Live Agent Metrics ──
+        # AgentMetricsTracker records per-specialist operational metrics from
+        # runtime events and publishes agent_metrics_updated snapshots to the
+        # bus (streamed to the web dashboard).
+        self.agent_metrics = AgentMetricsTracker()
+        self._last_metrics_publish = 0.0
+        self.runtime_bus.subscribe_all(self._on_metrics_event)
 
         # Check for serialized graph checkpoint in SQLite and restore it
         try:
@@ -250,12 +259,9 @@ class Orchestrator:
         # ── Task Board Pipeline (Mode B) ──
         self.task_board_pipeline: TaskBoardPipeline = TaskBoardPipeline(self)
 
-        # UI Integration (direct)
+        # UI Integration — no Python TUI; the web reads runtime_bus directly.
         self.ui_panel = None
         self.event_bus = None
-        if UI_AVAILABLE:
-            self.event_bus = get_event_bus()
-            log.info("[Orchestrator] UI system integrated directly")
 
         # Link context_builder back to runtime_registry and provider_runtime
         self.context_builder.runtime_registry = self.runtime_registry
@@ -287,6 +293,35 @@ class Orchestrator:
         self.tree_cache = tree
         self.tree_cache_time = now
         return tree
+
+    def set_workspace_root(self, new_root: str) -> str:
+        """Point the agent at a new workspace folder.
+
+        Re-jails the filesystem (all file tools resolve against the new root),
+        updates the shared-context builder, invalidates caches, and refreshes
+        the capability registry so the agent operates directly on the chosen
+        folder — matching how CLI/web/desktop coding agents open a folder.
+
+        Returns the resolved absolute path.
+        """
+        resolved = self.fs.set_base_path(new_root)
+        self.base_path = resolved
+        self._workspace_root = resolved
+        self.context_builder.base_path = resolved
+        self.tree_cache = ""
+        self.tree_cache_time = 0.0
+        if hasattr(self, "runtime_registry") and self.runtime_registry is not None:
+            try:
+                self.runtime_registry.workspace_root = resolved
+            except Exception as exc:
+                log.debug("Failed to update registry workspace root: %s", exc)
+        log.info("Workspace switched to %s", resolved)
+        return resolved
+
+    @property
+    def workspace_root(self) -> str:
+        """The currently active workspace folder for the agent."""
+        return self._workspace_root
 
     # ------------------------------------------------------------------
     # Routing
@@ -1020,6 +1055,77 @@ class Orchestrator:
         if self.ui_panel:
             return self.ui_panel.get_status()
         return {"ui_available": False}
+
+    async def _on_metrics_event(self, event):
+        """Record operational metrics from runtime events and publish snapshots.
+
+        Subscribes to the runtime EventBus. Maps runtime event types to
+        AgentMetricsTracker counters, then publishes an
+        ``agent_metrics_updated`` snapshot (rate-limited to ~1/sec) so the
+        web dashboard can render live per-agent metrics.
+        """
+        etype = getattr(event, "type", None)
+        payload = getattr(event, "payload", {}) or {}
+
+        try:
+            if etype == RuntimeEventType.BLACKBOARD_PUBLICATION:
+                self.agent_metrics.record_oracle_finding()
+            elif etype == RuntimeEventType.FINDING_CONSUMED:
+                self.agent_metrics.record_oracle_finding(consumed=True)
+            elif etype == RuntimeEventType.CHALLENGE_RAISED:
+                self.agent_metrics.record_sentinel_review(challenged=True)
+            elif etype == RuntimeEventType.CONSENSUS_FORMED:
+                raw = str(payload.get("outcome") or payload.get("event_name") or "agreed").upper()
+                outcome = {
+                    "APPROVED": "agreed",
+                    "APPROVED_WITH_RISK": "agreed",
+                    "REQUIRES_REVISION": "requires_revision",
+                    "REJECTED": "escalated",
+                    "ESCALATED": "escalated",
+                }.get(raw, "agreed")
+                self.agent_metrics.record_consensus_outcome(outcome=outcome)
+            elif etype == RuntimeEventType.ARCHITECT_DECISION:
+                outcome = str(payload.get("outcome") or "approve").lower()
+                self.agent_metrics.record_architect_decision(outcome=outcome)
+            elif etype in (
+                RuntimeEventType.RECOVERY_INITIATED,
+                RuntimeEventType.RECOVERY_COMPLETED,
+            ):
+                self.agent_metrics.record_recovery_attempt(
+                    success=etype == RuntimeEventType.RECOVERY_COMPLETED,
+                )
+            elif etype == RuntimeEventType.EXECUTION_COMPLETED:
+                exit_code = payload.get("exit_code", 0)
+                self.agent_metrics.record_forge_implementation(
+                    success=(exit_code == 0),
+                )
+            else:
+                return
+        except Exception as exc:
+            log.debug("Agent metrics recording failed: %s", exc)
+            return
+
+        await self._publish_agent_metrics()
+
+    async def _publish_agent_metrics(self) -> None:
+        """Publish the current metrics report to the runtime bus.
+
+        Rate-limited to one snapshot per second to keep the event stream
+        clean while still streaming live metrics to the web dashboard.
+        """
+        now = time.time()
+        if now - self._last_metrics_publish < 1.0:
+            return
+        self._last_metrics_publish = now
+        try:
+            report = self.agent_metrics.generate_report()
+            await self.runtime_bus.publish(BaseEvent(
+                id=f"metrics_{int(now * 1000)}",
+                type=RuntimeEventType.AGENT_METRICS_UPDATED,
+                payload=report,
+            ))
+        except Exception as exc:
+            log.debug("Agent metrics publish failed: %s", exc)
 
     async def on_bus_event(self, event):
         """Listen to event bus for NODE_TRANSITION events to auto-checkpoint graph."""

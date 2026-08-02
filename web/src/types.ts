@@ -400,6 +400,36 @@ export interface WSConfig {
   maxEvents: number;
 }
 
+/** ── CLI-style File Access Types ───────────────────────────── */
+
+export interface FsEntry {
+  name: string;
+  type: "dir" | "file";
+  size: number;
+  modified: number;
+}
+
+export interface FsListing {
+  cwd: string;
+  root: string;
+  entries: FsEntry[];
+}
+
+export interface FsReadResult {
+  path: string;
+  content: string;
+  truncated: boolean;
+  encoding: string;
+  size: number;
+}
+
+export interface FsWorkspaceResult {
+  success: boolean;
+  root?: string;
+  message?: string;
+  error?: string;
+}
+
 /** ── Provider Setup Types ──────────────────────────────────── */
 
 export interface ProviderInfo {

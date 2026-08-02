@@ -12,13 +12,8 @@ from config.settings import BASE_DIR
 from specialists.base import BaseSpecialist
 from memory import MEMORY_TYPE_USER_PREFERENCE
 
-# UI Integration (direct)
-try:
-    from ui.events import get_event_bus, create_specialist_event, EventType
-    UI_AVAILABLE = True
-except ImportError:
-    UI_AVAILABLE = False
-
+# UI Integration — the Python TUI was removed; events stream to the web
+# via the runtime EventBus instead of ui.events.
 log = logging.getLogger("aelvo.hermes")
 
 
@@ -38,22 +33,12 @@ class HermesSpecialist(BaseSpecialist):
     def __init__(self):
         self.workspace = str(BASE_DIR)
         
-        # UI Integration (direct)
+        # UI Integration (direct) — no Python TUI; events flow via runtime bus
         self.event_bus = None
-        if UI_AVAILABLE:
-            self.event_bus = get_event_bus()
     
     def _notify_ui_action(self, action: str):
-        """Direct UI notification when HERMES performs an action."""
-        if self.event_bus:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(self.event_bus.publish(
-                    create_specialist_event(EventType.SPECIALIST_ACTION, "HERMES", action)
-                ))
-            except RuntimeError as _ex:
-                log.warning("Silenced exception: %s", _ex)
+        """UI notification when HERMES performs an action (no-op without TUI)."""
+        log.debug("HERMES action: %s", action[:80])
     
 
 

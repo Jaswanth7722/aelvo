@@ -1320,82 +1320,32 @@ class RuntimePipeline:
     # UI Notifications
     # ==================================================================
 
-    @staticmethod
-    def _fire_and_forget(coro):
-        """Schedule a fire-and-forget task, logging any exception it raises.
-
-        Prevents "Task exception was never retrieved" warnings and surfaces
-        background pipeline failures instead of silently swallowing them.
-        """
-        task = asyncio.get_running_loop().create_task(coro)
-
-        def _on_done(t: asyncio.Task) -> None:
-            try:
-                t.result()
-            except asyncio.CancelledError:
-                pass
-            except Exception as exc:
-                log.warning("Background pipeline task failed: %s", exc)
-
-        task.add_done_callback(_on_done)
-        return task
-
     def _notify_pipeline_start(self, ctx: PipelineContext) -> None:
-        """Notify UI that the pipeline is starting."""
+        """Notify UI that the pipeline is starting.
+
+        The Python TUI was removed — runtime visibility now flows through
+        the orchestrator's runtime EventBus, which the web bridge streams.
+        """
         phases_str = " â†’ ".join(p.value for p in self._active_phases)
         log.info(
             "[PIPELINE] Starting: %s | Phases: %s",
             ctx.user_input[:60], phases_str,
         )
-        # Emit specialist activation events to UI event bus
-        event_bus = ctx.event_bus
-        if event_bus:
-            try:
-                from ui.events.event_factory import create_specialist_event
-                from ui.events import EventType as UIEventType
-                for phase in self._active_phases:
-                    contract = PIPELINE_HANDOFFS.get(phase)
-                    if contract:
-                        self._fire_and_forget(event_bus.publish(
-                            create_specialist_event(
-                                UIEventType.SPECIALIST_ACTIVATED,
-                                contract.specialist_name,
-                                f"Pipeline phase: {phase.value}",
-                            )
-                        ))
-            except Exception as _ex:
-                log.warning("Silenced exception: %s", _ex)
 
     def _notify_pipeline_complete(
         self, result: PipelineResult
     ) -> None:
-        """Notify UI that the pipeline completed."""
+        """Notify UI that the pipeline completed.
+
+        The Python TUI was removed — runtime visibility now flows through
+        the orchestrator's runtime EventBus, which the web bridge streams.
+        """
         log.info(
             "[PIPELINE] Completed: success=%s, duration=%.1fs, phases=%d",
             result.success,
             result.total_duration_ms / 1000,
             len(result.phases_executed),
         )
-        # Emit specialist completion events
-        if self.event_bus:
-            try:
-                from ui.events.event_factory import create_specialist_event
-                from ui.events import EventType as UIEventType
-                for phase in result.phases_executed:
-                    contract = PIPELINE_HANDOFFS.get(phase)
-                    if contract:
-                        phase_result = result.phase_results.get(phase)
-                        success = phase_result.success if phase_result else True
-                        self._fire_and_forget(self.event_bus.publish(
-                            create_specialist_event(
-                                UIEventType.SPECIALIST_ACTION if success else UIEventType.SPECIALIST_DEACTIVATED,
-                                contract.specialist_name,
-                                f"Pipeline {'completed' if success else 'failed'}: {phase.value}",
-                                {"success": success},
-                            )
-                        ))
-            except Exception as _ex:
-                log.warning("Silenced exception: %s", _ex)
 
     # ==================================================================
     # CONSOLIDATED PROMPT (Single LLM Call Per Turn)

@@ -31,7 +31,6 @@ or orchestrator code — we extend, never modify.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -249,81 +248,13 @@ class LongHorizonPlanningIntegration:
     # ------------------------------------------------------------------
 
     def _subscribe_to_event_bus(self) -> None:
-        """Subscribe to specialist and verification events for plan evolution triggers."""
-        try:
-            from ui.events import get_event_bus, EventType
-            bus = get_event_bus()
+        """Subscribe to specialist and verification events for plan evolution triggers.
 
-            async def on_verification_failed(event):
-                await self._handle_verification_event(event, success=False)
-
-            async def on_verification_passed(event):
-                await self._handle_verification_event(event, success=True)
-
-            async def on_specialist_action(event):
-                await self._handle_specialist_action_event(event)
-
-            bus.subscribe(EventType.VERIFICATION_FAILED, on_verification_failed)
-            bus.subscribe(EventType.VERIFICATION_PASSED, on_verification_passed)
-            bus.subscribe(EventType.SPECIALIST_ACTION, on_specialist_action)
-            self._event_bus_subscribed = True
-            log.info("✓ LHP: Subscribed to EventBus (VERIFICATION_FAILED/PASSED, SPECIALIST_ACTION)")
-        except Exception as exc:
-            log.debug("EventBus subscription skipped (not available): %s", exc)
-
-    async def _handle_verification_event(self, event, success: bool) -> None:
-        """Handle VERIFICATION_FAILED and VERIFICATION_PASSED events."""
-        if not self.hierarchy._nodes:
-            return
-        try:
-            payload = getattr(event, "data", {}) or {}
-            check_name = payload.get("check_name", "verification check")
-            summary = payload.get("summary", "") or payload.get("message", "")
-
-            active_milestones = self.hierarchy.get_active_milestones()
-            if not active_milestones:
-                return
-
-            target = max(active_milestones, key=lambda m: m.progress_pct)
-            if success:
-                new_conf = min(1.0, target.confidence + 0.02)
-                self.hierarchy.update_confidence(
-                    node_id=target.node_id,
-                    new_confidence=new_conf,
-                    rationale=f"Verification passed: {check_name}",
-                    trigger_type="capability_discovery",
-                )
-            else:
-                self.evolution.process_verification_failure(
-                    milestone_id=target.node_id,
-                    check_name=check_name,
-                    failure_summary=summary[:200],
-                )
-        except Exception as exc:
-            log.debug("Verification event handling error: %s", exc)
-
-    async def _handle_specialist_action_event(self, event) -> None:
-        """Handle SPECIALIST_ACTION events — modest confidence nudges on success."""
-        if not self.hierarchy._nodes:
-            return
-        try:
-            payload = getattr(event, "data", {}) or {}
-            specialist = payload.get("specialist", "") or getattr(event, "specialist", "")
-            status = payload.get("status", "")
-
-            if specialist in ("FORGE", "SENTINEL") and status == "success":
-                active_milestones = self.hierarchy.get_active_milestones()
-                for ms in active_milestones[:1]:
-                    await asyncio.sleep(0)  # yield to event loop
-                    new_conf = min(1.0, ms.confidence + 0.01)
-                    self.hierarchy.update_confidence(
-                        node_id=ms.node_id,
-                        new_confidence=new_conf,
-                        rationale=f"{specialist} action succeeded",
-                        trigger_type="capability_discovery",
-                    )
-        except Exception as exc:
-            log.debug("Specialist action event handling error: %s", exc)
+        The Python TUI was removed — ui.events no longer exists. Plan evolution
+        triggers are driven by the runtime EventBus / verification coordinator
+        instead of the removed TUI bus.
+        """
+        self._event_bus_subscribed = False
 
     # ------------------------------------------------------------------
     # Public plan creation API
