@@ -44,6 +44,12 @@ class EventType(str, Enum):
     EXECUTION_COMPLETED = "execution_completed"
     # Live per-agent operational metrics (AgentMetricsTracker snapshots)
     AGENT_METRICS_UPDATED = "agent_metrics_updated"
+    # Terminal tool-loop visibility events (consumed by the CLI's tui_session)
+    TOOL_STARTED = "tool_started"
+    TOOL_COMPLETED = "tool_completed"
+    TOOL_FAILED = "tool_failed"
+    MEMORY_STORED = "memory_stored"
+    MEMORY_RETRIEVED = "memory_retrieved"
 
 
 class BaseEvent(BaseModel):

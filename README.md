@@ -2,7 +2,7 @@
 
 **Automated Engineering & Logic-Verification OS**
 
-AELVO is a terminal-based multi-agent engineering system that plans and executes complex software engineering tasks using **seven specialized AI agents** coordinated through a canonical pipeline with cross-cutting verification, recovery, and memory.
+AELVO is a web + terminal multi-agent engineering system that plans and executes complex software engineering tasks using **seven specialized AI agents** coordinated through a canonical pipeline with cross-cutting verification, recovery, and memory.
 
 ```
 User → HERMES → ARCHITECT → ORACLE → FORGE → SENTINEL → TERMINUS → HERALD
@@ -41,7 +41,7 @@ AELVO solves this with **seven specialized agents** that collaborate through a s
 | **Event System** | Typed async event bus with replayable logging |
 | **Memory Systems** | Dual-sync (SQLite + ChromaDB vector), cross-specialist memory |
 | **Learning Engine** | Pattern extraction from execution deltas, confidence calibration |
-| **TUI Dashboard** | Real-time panels for specialists, execution, tools, memory, verification, safety |
+| **Web + Terminal UI** | Web dashboard with chat/Files/agent metrics, plus a CodeBuff-style terminal CLI |
 | **Multi-Provider** | OpenAI, Anthropic, Google, Groq, Together, Mistral, NVIDIA, 20+ providers |
 | **Long-Horizon Planning** | Session continuity, goal hierarchy, multi-session awareness |
 | **Plan Calibration** | Track outcomes vs plans, adjust future strategies automatically |
@@ -84,11 +84,14 @@ cp .env.example .env
 ### Launch
 
 ```bash
-# Launch with TUI (default — recommended)
+# Launch the web dashboard (default)
 python main.py
 
-# Launch with CLI (legacy REPL mode)
+# Launch the interactive terminal CLI (CodeBuff / Claude Code style)
 python main.py --cli
+
+# One-shot CLI — run a single prompt and exit
+python main.py --cli --ask "refactor the auth module to use async sessions"
 
 # Launch with a specific provider and model
 python main.py --provider openai --model gpt-4
@@ -96,61 +99,52 @@ python main.py --provider openai --model gpt-4
 
 ---
 
-## CLI Usage
+## Terminal CLI (`python main.py --cli`)
 
-Once in the REPL, type any natural language task:
-
-```text
-YOU > Refactor the authentication module to use async database sessions
-```
-
-Or use `@SPECIALIST` prefix to force-route directly to a specialist:
+A dedicated interactive terminal agent in the spirit of CodeBuff / Claude
+Code, reusing the exact same backend as the web dashboard. Type any natural
+language task — Enter submits, `Esc+Enter` inserts a newline, and tool calls
+(read/write/bash/scrape/memory) render live as the agent works.
 
 ```text
-YOU > @FORGE fix the race condition in worker.py
-YOU > @ORACLE research the latest changes to Python 3.13
-YOU > @ARCHITECT design a database schema for the new reporting feature
+❯ refactor the authentication module to use async database sessions
+  ✓ ✏️ write_file core/auth/session.py
+  ✓ ⚙️ bash_exec python -m pytest tests/test_auth.py
+  …
+  **Done.** Migrated the session store to an async engine and verified it.
 ```
 
-### Available Commands
+Force-route to specific specialists with `@SPECIALIST` prefixes:
+
+```text
+❯ @FORGE fix the race condition in worker.py
+❯ @ORACLE research the latest changes to Python 3.13
+❯ @ARCHITECT design a database schema for the new reporting feature
+```
+
+### Slash Commands
 
 | Command | Description |
 |---|---|
-| `#help` | Show all available commands |
-| `#providers list` | List all configured LLM providers |
-| `#providers health` | Show provider health status, latency, error rates |
-| `#providers models [name]` | List models for a provider |
-| `#doctor scan` | Run full provider diagnostic scan |
-| `#diagnostics auth` | Show auth configuration for all providers |
-| `#diagnostics capabilities` | Show capability matrix across providers |
-| `#diagnostics compare p1,p2` | Compare two providers side-by-side |
-| `#lock <key> <value>` | Lock a constraint in the anchor |
-| `#checkpoint <name>` | Save a system checkpoint |
-| `exit` or `quit` | Shut down AELVO |
+| `/help` | Show all commands |
+| `/exit` · `/quit` | Exit the CLI |
+| `/clear [history]` | Clear the screen; `/clear history` resets the conversation |
+| `/workspace <dir>` · `/open` · `/cd` | Point the agent at a folder (re-jails its tools) |
+| `/pwd` | Print the active workspace |
+| `/status` | Provider, model, workspace + live agent metrics |
+| `/projects` | List known workspaces |
+| `/models` | List available models |
+| `/retry` | Re-run the previous prompt |
+| `/ask <prompt>` | Run a prompt without the agent loop |
 
 ---
 
-## TUI Usage
+## Web Dashboard (default)
 
-The Textual-based TUI dashboard (launched by default) provides real-time visibility into:
-
-- **Specialist Activity** — which agents are active, thinking, or acting
-- **Execution Graph** — task queue with status tracking
-- **Tool Calls** — real-time tool execution stream
-- **Memory Operations** — retrievals, storage, injections
-- **Verification Results** — pass/fail with confidence scores
-- **Safety Events** — security checks, risk classification, approvals
-- **Timeline** — chronological event log across all subsystems
-
-Shortcuts in TUI:
-
-| Key | Action |
-|---|---|
-| `Ctrl+C` | Quit |
-| `Ctrl+D` | Toggle dark mode |
-| `Ctrl+L` | Clear timeline |
-| `Ctrl+P` | Focus input |
-| `Ctrl+O` | Focus output |
+`python main.py` serves the web dashboard (HTTP + WebSocket bridge): chat,
+a terminal-style **Files** page with an *Open as Workspace* action, agent
+metrics, and provider setup from the browser. Add `--no-browser` to run the
+server headless.
 
 ---
 
@@ -189,7 +183,8 @@ Shortcuts in TUI:
 
 | File | Purpose |
 |---|---|
-| `main.py` | Entry point, `AelvoAgent`, CLI/TUI loop |
+| `main.py` | Entry point, `AelvoAgent`, web/CLI boot |
+| `cli/app.py` | Terminal CLI — REPL, live tool rendering, slash commands |
 | `core/orchestration/orchestrator.py` | `Orchestrator` — central coordinator |
 | `core/orchestration/pipeline.py` | `RuntimePipeline` — canonical execution pipeline |
 | `specialists/*.py` | 7 specialist implementations |
@@ -202,23 +197,20 @@ Shortcuts in TUI:
 | `repo_intelligence/engine.py` | `RepoIntelligenceEngine` — symbol & dependency graphs |
 | `learning/engine.py` | `PatternExtractionEngine` — execution pattern learning |
 | `cognition/engine.py` | `CognitiveEngine` — goals, planning, research, consensus |
-| `ui/app.py` | `AelvoTUI` — Textual dashboard |
+| `web/` | Web dashboard (React frontend + WebSocket bridge) |
 
 ---
 
 ## Example Workflow
 
 ```text
-$ python main.py
-╔═══════════════════════════════════════════════════════════════╗
-║                      AELVO OMEGA                             ║
-║   Autonomous Engineering & Logic-Verification Operating System ║
-╠═══════════════════════════════════════════════════════════════╣
-║   Provider: nvidia  |  Model: nvidia/nemotron-3-super        ║
-║   Project: default  |  Memory: dual-sync (SQLite + Chroma)   ║
-╚═══════════════════════════════════════════════════════════════╝
+$ python main.py --cli
+AELVO — the automated engineering & logic-verification agent
+────────────────────────────────────────────────────────────────
+  project: default   provider: nvidia   model: nvidia/nemotron-3-super
+  workspace: D:/aelvo/workspace/default
 
-YOU > Fix the race condition in the worker pool module
+❯ Fix the race condition in the worker pool module
 
 [Thinking] ⠋
 ✓ Pipeline completed: SUCCESS in 12.3s with 7 phases (1 LLM call)
@@ -245,7 +237,7 @@ lifecycle management. The fix was verified with type checks and tests.
 
 ## Screenshots
 
-> _AELVO TUI dashboard showing specialist activity, execution graph, tool calls, memory, verification, and safety panels side-by-side._
+> _The AELVO web dashboard — chat, terminal-style Files browser, and live agent metrics._
 
 ---
 

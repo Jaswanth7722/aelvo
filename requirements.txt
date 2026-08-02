@@ -27,11 +27,7 @@ tqdm
 aiohttp
 rich
 
-# AELVO UI Dependencies
-# Terminal UI Framework
-textual>=0.44.0
-
-# Terminal Interaction
+# Terminal Interaction (AELVO CLI REPL)
 prompt_toolkit>=3.0.0
 
 # File Watching

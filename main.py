@@ -959,8 +959,19 @@ async def main_async():
     ANCHOR_PATH = os.path.join(WORKSPACE_PATH, "anchor.md")
     BACKUP_DIR = os.path.join(WORKSPACE_PATH, "backups")
 
-    # Ensure project folder exists
+    # Ensure project folder + anchor exist (fresh workspaces otherwise crash
+    # with "FATAL: Anchor file missing" inside AelvoKernel)
     os.makedirs(WORKSPACE_PATH, exist_ok=True)
+    if not os.path.exists(ANCHOR_PATH):
+        with open(ANCHOR_PATH, "w", encoding="utf-8") as _anchor_f:
+            _anchor_f.write(
+                "---\n"
+                "constraints:\n"
+                "  DEV_NAME: {value: AELVO User, locked: true}\n"
+                "---\n"
+                f"# AELVO Workspace Anchor — {_ws_name}\n"
+            )
+        log.info("Scaffolded new workspace anchor: %s", ANCHOR_PATH)
 
     # ---- Detect Provider & API Key ----
     try:
@@ -1198,6 +1209,40 @@ async def main_async():
     )
 
     # ------------------------------------------------------------------------
+    # CLI MODE — interactive terminal agent (CodeBuff / Claude Code style)
+    # ------------------------------------------------------------------------
+    _cli_mode = os.environ.get("AELVO_CLI", "").strip() in ("1", "true", "yes")
+    _one_shot = os.environ.get("AELVO_ASK", "").strip()
+    if _cli_mode or _one_shot:
+        log.info("Launching terminal CLI mode...")
+        from cli.app import run_cli
+        await run_cli(
+            agent=agent,
+            orchestrator=orchestrator,
+            memory_engine=memory_engine,
+            aelvo_kernel=aelvo_kernel,
+            db_path=DB_PATH,
+            workspace_path=WORKSPACE_PATH,
+            project=_ws_name,
+            mcp_cli=mcp_cli,
+            runtime_cli=runtime_cli,
+            provider_runtime=provider_runtime,
+            fs=fs,
+            workspace_switcher=set_active_workspace,
+            provider_name=provider_name,
+            model=model,
+            one_shot=_one_shot,
+        )
+        if lhp:
+            try:
+                await lhp.shutdown()
+            except Exception as _ex:
+                log.warning("Silenced exception: %s", _ex)
+        aelvo_kernel.conn.close()
+        memory_engine.db.close()
+        return
+
+    # ------------------------------------------------------------------------
     # ------------------------------------------------------------------------
     # WEB MODE (default) — serve the dashboard + WebSocket bridge
     # ------------------------------------------------------------------------
@@ -1248,6 +1293,8 @@ def main():
     parser.add_argument("--port", type=int, default=8000, help="Web dashboard HTTP port")
     parser.add_argument("--ws-port", type=int, default=8765, help="WebSocket bridge port")
     parser.add_argument("--no-browser", action="store_true", help="Do not auto-open the browser")
+    parser.add_argument("--cli", action="store_true", help="Run the interactive terminal CLI (CodeBuff/Claude Code style) instead of the web dashboard")
+    parser.add_argument("--ask", type=str, default=None, help="CLI one-shot: run a single prompt and exit (implies --cli)")
     args, _ = parser.parse_known_args()
     # Store parsed args in env for main_async to pick up
     if args.provider:
@@ -1266,6 +1313,10 @@ def main():
         os.environ["AELVO_WS_PORT"] = str(args.ws_port)
     if args.no_browser:
         os.environ["AELVO_NO_BROWSER"] = "1"
+    if args.cli or args.ask:
+        os.environ["AELVO_CLI"] = "1"
+    if args.ask:
+        os.environ["AELVO_ASK"] = args.ask
 
     try:
         asyncio.run(main_async())
