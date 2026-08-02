@@ -62,7 +62,7 @@ class PlanBuilder:
         plan = ExecutionPlan(id=plan_id, task_description=task_description)
 
         # Build the goal hierarchy
-        goal = self._build_goal(task_description, context)
+        goal = self._build_goal(task_description, context, plan_id)
         context["cognitive_goal"] = goal
 
         stage1_nodes = self._decompose_task(task_description, context, goal)
@@ -130,7 +130,7 @@ class PlanBuilder:
 
         return plan
 
-    def _build_goal(self, task: str, context: Dict[str, Any]) -> Goal:
+    def _build_goal(self, task: str, context: Dict[str, Any], plan_id: str) -> Goal:
         """Build a Goal hierarchy from the task description."""
         task_lower = task.lower()
 
@@ -145,12 +145,18 @@ class PlanBuilder:
         success_criteria = self._infer_success_criteria(task, is_refactor, is_fix, is_feature, has_security, has_test)
 
         # Build sub-goals
-        sub_goals = self._build_sub_goals(task, is_refactor, is_fix, is_feature, has_security, has_test)
+        goal_id = self._next_id("goal")
+        sub_goals = self._build_sub_goals(
+            task, is_refactor, is_fix, is_feature, has_security, has_test,
+            goal_id=goal_id, plan_id=plan_id,
+        )
 
         return Goal(
+            id=goal_id,
             description=task,
             success_criteria=success_criteria,
             sub_goals=sub_goals,
+            sub_goal_ids=[sg.id for sg in sub_goals],
         )
 
     def _infer_success_criteria(
@@ -188,26 +194,55 @@ class PlanBuilder:
 
         return criteria
 
+    def _make_step(
+        self,
+        description: str,
+        sub_goal: SubGoal,
+        plan_id: str,
+        goal_id: str,
+        specialist: Optional[SpecialistRole] = None,
+        preconditions: Optional[List[PlanPrecondition]] = None,
+        uncertainty: Optional[PlanUncertainty] = None,
+        estimated_effort: int = 1,
+    ) -> PlanStep:
+        """Construct a PlanStep with all identity fields populated."""
+        return PlanStep(
+            id=self._next_id(description.split()[0].lower() if description else "step"),
+            plan_id=plan_id,
+            goal_id=goal_id,
+            sub_goal_id=sub_goal.id,
+            description=description,
+            specialist=specialist.value if isinstance(specialist, SpecialistRole) else specialist,
+            preconditions=preconditions or [],
+            uncertainty=uncertainty,
+            estimated_effort=estimated_effort,
+        )
+
     def _build_sub_goals(
         self, task: str, is_refactor: bool, is_fix: bool,
         is_feature: bool, has_security: bool, has_test: bool,
+        goal_id: str, plan_id: str,
     ) -> List[SubGoal]:
         """Build sub-goals for the task."""
         sub_goals: List[SubGoal] = []
 
         # Phase 1: Understanding / Investigation
         investigate = SubGoal(
+            id=self._next_id("investigate"),
+            parent_goal_id=goal_id,
             description=f"Investigate and understand the current state of {self._extract_topic(task)}",
             success_criteria=["Current implementation is understood", "Relevant files are identified"],
         )
         investigate.steps = [
-            PlanStep(
-                description="Read relevant files and understand current implementation",
+            self._make_step(
+                "Read relevant files and understand current implementation",
+                sub_goal=investigate, plan_id=plan_id, goal_id=goal_id,
                 specialist=SpecialistRole.ARCHITECT,
                 preconditions=[PlanPrecondition(description="Files exist", check_type="automated")],
             ),
-            PlanStep(
-                description=f"Query memory for prior context about {self._extract_topic(task)}",
+            self._make_step(
+                f"Query memory for prior context about {self._extract_topic(task)}",
+                sub_goal=investigate, plan_id=plan_id, goal_id=goal_id,
                 specialist=SpecialistRole.ORACLE,
                 uncertainty=PlanUncertainty(level=ConfidenceLevel.LOW),
             ),
@@ -216,59 +251,69 @@ class PlanBuilder:
 
         # Phase 2: Implementation
         implement = SubGoal(
+            id=self._next_id("implement"),
+            parent_goal_id=goal_id,
             description=f"Implement the {self._extract_action(task)}",
             success_criteria=[f"Changes are correctly applied to {self._extract_topic(task)}"],
         )
 
         if is_refactor:
             implement.steps = [
-                PlanStep(
-                    description="Identify all callers and usages of the code being refactored",
+                self._make_step(
+                    "Identify all callers and usages of the code being refactored",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                 ),
-                PlanStep(
-                    description="Make the refactoring changes",
+                self._make_step(
+                    "Make the refactoring changes",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                     preconditions=[
                         PlanPrecondition(description="Current implementation is understood", check_type="verified"),
                     ],
                 ),
-                PlanStep(
-                    description="Update all callers of the changed code",
+                self._make_step(
+                    "Update all callers of the changed code",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                 ),
             ]
         elif is_fix:
             implement.steps = [
-                PlanStep(
-                    description="Diagnose the root cause of the issue",
+                self._make_step(
+                    "Diagnose the root cause of the issue",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.ARCHITECT,
                     preconditions=[
                         PlanPrecondition(description="Relevant code has been read", check_type="verified"),
                     ],
                 ),
-                PlanStep(
-                    description="Apply the fix",
+                self._make_step(
+                    "Apply the fix",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                     uncertainty=PlanUncertainty(level=ConfidenceLevel.MEDIUM),
                 ),
             ]
         elif is_feature:
             implement.steps = [
-                PlanStep(
-                    description="Design the implementation approach",
+                self._make_step(
+                    "Design the implementation approach",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.ARCHITECT,
                 ),
-                PlanStep(
-                    description="Implement the feature",
+                self._make_step(
+                    "Implement the feature",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                     estimated_effort=5,
                 ),
             ]
         else:
             implement.steps = [
-                PlanStep(
-                    description="Execute the required changes",
+                self._make_step(
+                    "Execute the required changes",
+                    sub_goal=implement, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                     estimated_effort=3,
                 ),
@@ -278,6 +323,8 @@ class PlanBuilder:
 
         # Phase 3: Verification
         verify = SubGoal(
+            id=self._next_id("verify"),
+            parent_goal_id=goal_id,
             description=f"Verify the {self._extract_action(task)} is correct",
             success_criteria=["Changes are verified", "No regressions"],
         )
@@ -285,16 +332,18 @@ class PlanBuilder:
 
         if has_security:
             verify.steps.append(
-                PlanStep(
-                    description="Security review of all changes",
+                self._make_step(
+                    "Security review of all changes",
+                    sub_goal=verify, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.SENTINEL,
                     preconditions=[PlanPrecondition(description="Implementation is complete", check_type="verified")],
                 ),
             )
 
         verify.steps.append(
-            PlanStep(
-                description="Verify correctness of the changes",
+            self._make_step(
+                "Verify correctness of the changes",
+                sub_goal=verify, plan_id=plan_id, goal_id=goal_id,
                 specialist=SpecialistRole.SENTINEL if has_security else SpecialistRole.FORGE,
                 preconditions=[PlanPrecondition(description="Implementation is complete", check_type="verified")],
             ),
@@ -302,13 +351,15 @@ class PlanBuilder:
 
         if has_test:
             verify.steps.extend([
-                PlanStep(
-                    description="Run type checker",
+                self._make_step(
+                    "Run type checker",
+                    sub_goal=verify, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                     estimated_effort=1,
                 ),
-                PlanStep(
-                    description="Run test suite",
+                self._make_step(
+                    "Run test suite",
+                    sub_goal=verify, plan_id=plan_id, goal_id=goal_id,
                     specialist=SpecialistRole.FORGE,
                     estimated_effort=2,
                 ),
@@ -318,12 +369,15 @@ class PlanBuilder:
 
         # Phase 4: Synthesis
         synthesize = SubGoal(
+            id=self._next_id("synthesize"),
+            parent_goal_id=goal_id,
             description="Synthesize and report results",
             success_criteria=["Results are clearly communicated"],
         )
         synthesize.steps = [
-            PlanStep(
-                description="Synthesize findings and produce final output",
+            self._make_step(
+                "Synthesize findings and produce final output",
+                sub_goal=synthesize, plan_id=plan_id, goal_id=goal_id,
                 specialist=SpecialistRole.HERMES,
             ),
         ]
@@ -339,14 +393,14 @@ class PlanBuilder:
 
             # Set criticality from step uncertainty
             criticality = Criticality.IMPORTANT
-            if step.uncertainty.is_high_uncertainty:
+            if step.uncertainty and step.uncertainty.is_high_uncertainty:
                 criticality = Criticality.CRITICAL
 
             node = ExecutionNode(
                 id=self._next_id(step.description.split()[0].lower() if step.description else "task"),
                 description=step.description,
                 node_type=node_type,
-                specialist=step.specialist.value,
+                specialist=step.specialist,
                 criticality=criticality,
                 estimated_steps=step.estimated_effort,
             )
@@ -356,7 +410,16 @@ class PlanBuilder:
         for child_sg in sg.sub_goals:
             self._subgoal_to_nodes(child_sg, plan)
 
-    def _specialist_to_node_type(self, specialist: SpecialistRole) -> NodeType:
+    def _specialist_to_node_type(self, specialist: Any) -> NodeType:
+        if isinstance(specialist, SpecialistRole):
+            role = specialist
+        elif isinstance(specialist, str):
+            try:
+                role = SpecialistRole(specialist.upper())
+            except ValueError:
+                return NodeType.TOOL_CALL
+        else:
+            return NodeType.TOOL_CALL
         mapping = {
             SpecialistRole.FORGE: NodeType.TOOL_CALL,
             SpecialistRole.ARCHITECT: NodeType.SPECIALIST_CALL,
@@ -366,7 +429,7 @@ class PlanBuilder:
             SpecialistRole.HERALD: NodeType.TOOL_CALL,
             SpecialistRole.TERMINUS: NodeType.DECISION,
         }
-        return mapping.get(specialist, NodeType.TOOL_CALL)
+        return mapping.get(role, NodeType.TOOL_CALL)
 
     def _extract_topic(self, task: str) -> str:
         """Extract the topic/area from a task description."""

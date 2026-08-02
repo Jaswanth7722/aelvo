@@ -163,6 +163,15 @@ class RecoveryStrategyEngine:
                 max_retries=0,
                 requires_user_approval=True,
             ),
+            FailureClassification.SANDBOX_ESCAPE: RecoveryStrategy(
+                id="strat_sandbox_escape",
+                name="Quarantine and notify",
+                failure_type=FailureClassification.SANDBOX_ESCAPE,
+                description="Sandbox escape detected - quarantine process and require human review",
+                danger_level="safe",
+                max_retries=0,
+                requires_user_approval=True,
+            ),
             FailureClassification.UNKNOWN_FAILURE: RecoveryStrategy(
                 id="strat_unknown",
                 name="Abort and notify",

@@ -178,10 +178,10 @@ class TechnicalDebtForecaster:
         for mem_type in self.DEBT_SIGNAL_TYPES:
             try:
                 results = self.collection.get(
-                    where={
-                        "type": mem_type,
-                        "project": self.project,
-                    },
+                    where={"$and": [
+                        {"type": mem_type},
+                        {"project": self.project},
+                    ]},
                     include=["documents", "metadatas", "ids"],
                     limit=200,
                 )

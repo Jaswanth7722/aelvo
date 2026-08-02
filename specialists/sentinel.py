@@ -90,7 +90,7 @@ SENTINEL EXECUTION RULES:
             res = memory_engine.memory_collection.query(
                 query_texts=[task],
                 n_results=5,
-                where={"type": MEMORY_TYPE_SECURITY_RULE, "project": project},
+                where={"$and": [{"type": MEMORY_TYPE_SECURITY_RULE}, {"project": project}]},
             )
             if res.get("ids") and res["ids"][0]:
                 for doc, dist in zip(res["documents"][0], res["distances"][0]):

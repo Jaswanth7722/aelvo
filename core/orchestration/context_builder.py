@@ -135,7 +135,7 @@ class ContextBuilder:
             try:
                 res = self.memory_engine.memory_collection.query(
                     query_texts=[task], n_results=5,
-                    where={"type": "security_rule", "project": project},
+                    where={"$and": [{"type": "security_rule"}, {"project": project}]},
                     include=["documents", "metadatas", "distances"],
                 )
                 if res.get("ids") and res["ids"][0]:
@@ -152,7 +152,7 @@ class ContextBuilder:
             try:
                 res = self.memory_engine.memory_collection.query(
                     query_texts=[task], n_results=5,
-                    where={"type": "system_decision", "project": project},
+                    where={"$and": [{"type": "system_decision"}, {"project": project}]},
                     include=["documents", "metadatas", "distances"],
                 )
                 if res.get("ids") and res["ids"][0]:

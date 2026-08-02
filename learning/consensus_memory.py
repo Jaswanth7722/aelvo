@@ -251,7 +251,7 @@ class ConsensusMemory:
                 results = self.collection.query(
                     query_texts=[content],
                     n_results=1,
-                    where={"type": MEMORY_TYPE_CONSENSUS_RECORD, "project": self.project},
+                    where={"$and": [{"type": MEMORY_TYPE_CONSENSUS_RECORD}, {"project": self.project}]},
                     include=["documents", "metadatas", "distances"],
                 )
                 if not (results.get("ids") and results["ids"][0]):

@@ -1,5 +1,7 @@
 """Tests for AELVO Cognitive Layer — all 10 phases."""
 
+import asyncio
+
 from datetime import datetime, timedelta, timezone
 
 from cognition.types import (
@@ -630,7 +632,7 @@ class TestSpecialistCoordinationRuntime:
     def test_delegate(self):
         coord = SpecialistCoordinationRuntime()
         node = ExecutionNode(id="n1", description="test task")
-        record = coord.delegate(node, "analyze code", mode=DelegationMode.GRAPH_AWARE)
+        record = asyncio.run(coord.delegate(node, "analyze code", mode=DelegationMode.GRAPH_AWARE))
         assert record.node_id == "n1"
         assert record.specialist_name is not None
         assert record.mode == DelegationMode.GRAPH_AWARE
@@ -638,7 +640,7 @@ class TestSpecialistCoordinationRuntime:
     def test_score_delegation(self):
         coord = SpecialistCoordinationRuntime()
         node = ExecutionNode(id="n1", description="test")
-        coord.delegate(node, "task")
+        asyncio.run(coord.delegate(node, "task"))
         coord.score_delegation("n1", True, 0.9)
         perf = coord.get_specialist_performance(list(coord._registry.keys())[0])
         if perf:
@@ -663,7 +665,7 @@ class TestSpecialistCoordinationRuntime:
     def test_delegation_confidence_aware(self):
         coord = SpecialistCoordinationRuntime()
         node = ExecutionNode(id="n2", description="confidence test")
-        record = coord.delegate(node, "test task", mode=DelegationMode.CONFIDENCE_AWARE)
+        record = asyncio.run(coord.delegate(node, "test task", mode=DelegationMode.CONFIDENCE_AWARE))
         assert record.mode == DelegationMode.CONFIDENCE_AWARE
 
 

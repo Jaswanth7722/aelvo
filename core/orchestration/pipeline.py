@@ -421,7 +421,7 @@ class PipelineContext:
                 res = self.memory_engine.memory_collection.query(
                     query_texts=[self.user_input],
                     n_results=5,
-                    where={"type": "system_decision", "project": self.project},
+                    where={"$and": [{"type": "system_decision"}, {"project": self.project}]},
                 )
                 if res.get("ids") and res["ids"][0]:
                     for doc, dist in zip(res["documents"][0], res["distances"][0]):
@@ -440,7 +440,7 @@ class PipelineContext:
                 res = self.memory_engine.memory_collection.query(
                     query_texts=[self.user_input],
                     n_results=5,
-                    where={"type": "code_pattern", "project": self.project},
+                    where={"$and": [{"type": "code_pattern"}, {"project": self.project}]},
                 )
                 if res.get("ids") and res["ids"][0]:
                     for doc, dist in zip(res["documents"][0], res["distances"][0]):

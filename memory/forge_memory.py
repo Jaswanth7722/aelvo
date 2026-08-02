@@ -66,7 +66,7 @@ class ForgeMemory:
                 res = self.collection.query(
                     query_texts=[task],
                     n_results=n,
-                    where={"type": mem_type, "project": self.project},
+                    where={"$and": [{"type": mem_type}, {"project": self.project}]},
                     include=["documents", "metadatas", "distances"],
                 )
             except Exception as e:
@@ -297,7 +297,7 @@ class ForgeMemory:
                 results = self.collection.query(
                     query_texts=[content],
                     n_results=1,
-                    where={"type": entry_type, "project": self.project},
+                    where={"$and": [{"type": entry_type}, {"project": self.project}]},
                     include=["documents", "metadatas", "distances"],
                 )
                 if not (results.get("ids") and results["ids"][0]):

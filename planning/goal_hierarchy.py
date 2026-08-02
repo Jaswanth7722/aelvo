@@ -97,7 +97,7 @@ class GoalHierarchyEngine:
         """
         try:
             results = self.collection.get(
-                where={"type": MEMORY_TYPE_STRATEGIC_PLAN, "project": self.project},
+                where={"$and": [{"type": MEMORY_TYPE_STRATEGIC_PLAN}, {"project": self.project}]},
                 include=["documents", "metadatas"],
             )
         except Exception as e:
@@ -602,11 +602,11 @@ class GoalHierarchyEngine:
             results = self.collection.query(
                 query_texts=[content],
                 n_results=1,
-                where={
-                    "type": MEMORY_TYPE_STRATEGIC_PLAN,
-                    "project": self.project,
-                    "level": level.value,
-                },
+                where={"$and": [
+                    {"type": MEMORY_TYPE_STRATEGIC_PLAN},
+                    {"project": self.project},
+                    {"level": level.value},
+                ]},
                 include=["documents", "metadatas", "distances"],
             )
             if not (results.get("ids") and results["ids"][0]):

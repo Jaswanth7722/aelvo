@@ -186,7 +186,7 @@ class HeraldSpecialist(BaseSpecialist):
         user_preferences = []
         try:
             res = memory_engine.memory_collection.get(
-                where={"type": "user_preference", "project": project},
+                where={"$and": [{"type": "user_preference"}, {"project": project}]},
                 limit=5
             )
             user_preferences = res.get("documents", []) or []

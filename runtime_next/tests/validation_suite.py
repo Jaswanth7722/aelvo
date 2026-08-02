@@ -73,7 +73,7 @@ class ValidationSuite:
                     await asyncio.sleep(random.uniform(0.001, 0.005))
                     counter["val"] = curr + 1
                 finally:
-                    self.mutex.release([shared_file])
+                    await self.mutex.release([shared_file])
         
         await asyncio.gather(*(worker(i) for i in range(10)))
         assert counter["val"] == 200

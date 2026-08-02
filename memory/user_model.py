@@ -198,7 +198,7 @@ class UserModelManager:
                 results = self.collection.query(
                     query_texts=[text],
                     n_results=1,
-                    where={"type": MEMORY_TYPE_USER_PREFERENCE, "project": project},
+                    where={"$and": [{"type": MEMORY_TYPE_USER_PREFERENCE}, {"project": project}]},
                     include=["documents", "metadatas", "distances"],
                 )
             except Exception:
@@ -273,7 +273,7 @@ class UserModelManager:
         with self._lock:
             try:
                 results = self.collection.get(
-                    where={"type": MEMORY_TYPE_USER_PREFERENCE, "project": project},
+                    where={"$and": [{"type": MEMORY_TYPE_USER_PREFERENCE}, {"project": project}]},
                     include=["documents"],
                     limit=20,
                 )

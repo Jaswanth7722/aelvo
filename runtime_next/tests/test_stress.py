@@ -64,7 +64,7 @@ async def test_file_mutex_stress(test_dir):
             curr = counter["val"]
             await asyncio.sleep(0.002)
             counter["val"] = curr + 1
-            mutex.release([f])
+            await mutex.release([f])
 
     start = time.time()
     await asyncio.gather(*(worker(i) for i in range(worker_count)))
@@ -87,7 +87,7 @@ async def test_concurrent_file_mutex_deadlock_free(test_dir):
             await mutex.acquire(subset)
             counter["val"] += 1
             await asyncio.sleep(0.001)
-            mutex.release(subset)
+            await mutex.release(subset)
 
     await asyncio.gather(*(worker(i) for i in range(8)))
     assert counter["val"] == 8 * 20

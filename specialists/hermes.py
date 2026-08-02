@@ -150,7 +150,7 @@ class HermesSpecialist(BaseSpecialist):
         preferences = []
         try:
             results = memory_engine.memory_collection.get(
-                where={"type": "user_preference", "project": project},
+                where={"$and": [{"type": "user_preference"}, {"project": project}]},
                 include=["documents", "metadatas"]
             )
             # Sort by timestamp_unix descending
@@ -213,7 +213,7 @@ class HermesSpecialist(BaseSpecialist):
             try:
                 # Check for architect system decision mappings
                 res = memory_engine.memory_collection.get(
-                    where={"type": "system_decision", "project": project},
+                    where={"$and": [{"type": "system_decision"}, {"project": project}]},
                     limit=1
                 )
                 if res and res.get("documents"):

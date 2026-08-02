@@ -377,10 +377,10 @@ class MultiSessionPlanningEngine:
             results = self.collection.query(
                 query_texts=[f"session boundary project {self.project}"],
                 n_results=1,
-                where={
-                    "type": MEMORY_TYPE_SESSION_BOUNDARY,
-                    "project": self.project,
-                },
+                where={"$and": [
+                    {"type": MEMORY_TYPE_SESSION_BOUNDARY},
+                    {"project": self.project},
+                ]},
                 include=["metadatas"],
             )
             if not (results.get("ids") and results["ids"][0]):

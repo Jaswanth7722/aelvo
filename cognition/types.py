@@ -109,6 +109,11 @@ class PlanUncertainty(BaseModel):
     level: ConfidenceLevel = ConfidenceLevel.MEDIUM
     notes: str = ""
 
+    @property
+    def is_high_uncertainty(self) -> bool:
+        """Whether this uncertainty level warrants elevated criticality."""
+        return self.level == ConfidenceLevel.HIGH
+
 
 class UncertaintyClass(str, Enum):
     EVIDENCE_GAP = "evidence_gap"
@@ -135,10 +140,12 @@ class Provenance(BaseModel):
 class Goal(BaseModel):
     id: str
     description: str
+    success_criteria: List[str] = Field(default_factory=list)
     priority: int = Field(default=5, ge=1, le=10)
     status: GoalStatus = GoalStatus.PENDING
     parent_goal_id: Optional[str] = None
     sub_goal_ids: List[str] = Field(default_factory=list)
+    sub_goals: List["SubGoal"] = Field(default_factory=list)
     constraints: List[str] = Field(default_factory=list)
     prerequisites: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -152,6 +159,9 @@ class SubGoal(BaseModel):
     id: str
     parent_goal_id: str
     description: str
+    success_criteria: List[str] = Field(default_factory=list)
+    steps: List["PlanStep"] = Field(default_factory=list)
+    sub_goals: List["SubGoal"] = Field(default_factory=list)
     status: GoalStatus = GoalStatus.PENDING
     order: int = 0
     dependencies: List[str] = Field(default_factory=list)
@@ -167,9 +177,12 @@ class PlanStep(BaseModel):
     execution_node_id: Optional[str] = None
     status: PlanStatus = PlanStatus.DRAFT
     dependencies: List[str] = Field(default_factory=list)
+    preconditions: List["PlanPrecondition"] = Field(default_factory=list)
+    uncertainty: Optional["PlanUncertainty"] = None
     specialist: Optional[str] = None
     tool_name: Optional[str] = None
     estimated_cost: int = 1
+    estimated_effort: int = 1
     actual_cost: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
