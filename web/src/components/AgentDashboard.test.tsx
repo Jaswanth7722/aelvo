@@ -145,7 +145,9 @@ describe("AgentDashboard", () => {
         mockEvent({ type: "execution_started", specialist: "TERMINUS", action: "start deploy", timestamp: NOW - 10 }),
       ];
       render(<AgentDashboard events={events} />);
-      expect(screen.getByText("deploy release v2.0")).toBeTruthy();
+      // The latest action appears both as the "Current Task" and as the
+      // first entry in "Recent Actions" — assert it shows in at least one.
+      expect(screen.getAllByText("deploy release v2.0").length).toBeGreaterThan(0);
     });
   });
 

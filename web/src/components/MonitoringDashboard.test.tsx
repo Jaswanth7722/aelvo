@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MonitoringDashboard } from "./MonitoringDashboard";
 import { mockEvent } from "../test-utils";
 
@@ -53,8 +53,9 @@ describe("MonitoringDashboard", () => {
         }),
       ];
       render(<MonitoringDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Alert Feed/ }));
       expect(screen.getByText(/Recovery operation failed/)).toBeTruthy();
-      expect(screen.getByText(/ERROR/)).toBeTruthy();
+      expect(screen.getAllByText(/ERROR/).length).toBeGreaterThan(0);
     });
 
     it("creates warning alert from verification_failed", () => {
@@ -67,8 +68,9 @@ describe("MonitoringDashboard", () => {
         }),
       ];
       render(<MonitoringDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Alert Feed/ }));
       expect(screen.getByText(/Verification check failed/)).toBeTruthy();
-      expect(screen.getByText(/WARNING/)).toBeTruthy();
+      expect(screen.getAllByText(/WARNING/).length).toBeGreaterThan(0);
     });
 
     it("creates error alert from task_failed", () => {
@@ -81,8 +83,9 @@ describe("MonitoringDashboard", () => {
         }),
       ];
       render(<MonitoringDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Alert Feed/ }));
       expect(screen.getByText(/Task execution failed/)).toBeTruthy();
-      expect(screen.getByText(/ERROR/)).toBeTruthy();
+      expect(screen.getAllByText(/ERROR/).length).toBeGreaterThan(0);
     });
 
     it("creates warning alert from execution_completed with non-zero exit code", () => {
@@ -95,8 +98,9 @@ describe("MonitoringDashboard", () => {
         }),
       ];
       render(<MonitoringDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Alert Feed/ }));
       expect(screen.getByText(/Execution completed with errors/)).toBeTruthy();
-      expect(screen.getByText(/WARNING/)).toBeTruthy();
+      expect(screen.getAllByText(/WARNING/).length).toBeGreaterThan(0);
     });
 
     it("counts alert severities correctly", () => {
@@ -107,6 +111,7 @@ describe("MonitoringDashboard", () => {
         mockEvent({ type: "execution_completed", data: { exit_code: 1 }, timestamp: NOW - 15 }),
       ];
       render(<MonitoringDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Alert Feed/ }));
       // 2 errors (recovery_failed + task_failed) + 2 warnings (verification_failed + execution_completed w/ exit_code != 0)
       expect(screen.getByText(/ERROR 2/)).toBeTruthy();
       expect(screen.getByText(/WARNING 2/)).toBeTruthy();
@@ -123,6 +128,7 @@ describe("MonitoringDashboard", () => {
         mockEvent({ type: "blackboard_publication", timestamp: NOW - 2 }),
       ];
       render(<MonitoringDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Metric Series/ }));
       expect(screen.getByText("recovery.attempt")).toBeTruthy();
       expect(screen.getByText("verification.total")).toBeTruthy();
       expect(screen.getByText("architect.decisions")).toBeTruthy();
@@ -133,7 +139,7 @@ describe("MonitoringDashboard", () => {
       expect(screen.getByText("reports.generated")).toBeTruthy();
     });
 
-    it("shows 3 active metric series", () => {
+    it("shows 4 active metric series", () => {
       const events = [
         mockEvent({ type: "recovery_initiated", timestamp: NOW - 50 }),
         mockEvent({ type: "recovery_completed", timestamp: NOW - 40 }),
@@ -142,9 +148,9 @@ describe("MonitoringDashboard", () => {
         mockEvent({ type: "consensus_formed", timestamp: NOW - 10 }),
       ];
       render(<MonitoringDashboard events={events} />);
-      // 3 active: recovery.* (2), verification.* (1), architect.decisions (1), consensus.sessions (1) = 4 active
-      // Actually: recovery.attempt (2), verification.total (1), architect.decisions (1), consensus.sessions (1) = 4 active
-      expect(screen.getByText(/active/)).toBeTruthy();
+      // Active series: recovery.attempt (2), verification.total (1),
+      // architect.decisions (1), consensus.sessions (1) = 4 active
+      expect(screen.getByText("4 active")).toBeTruthy();
     });
   });
 
@@ -154,6 +160,7 @@ describe("MonitoringDashboard", () => {
         mockEvent({ type: "recovery_completed", specialist: "ARCHITECT", timestamp: NOW - 10 }),
       ];
       render(<MonitoringDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Subsystem Health/ }));
       expect(screen.getByText("recovery")).toBeTruthy();
     });
 
@@ -162,8 +169,7 @@ describe("MonitoringDashboard", () => {
         mockEvent({ type: "recovery_failed", specialist: "ARCHITECT", timestamp: NOW - 10 }),
       ];
       render(<MonitoringDashboard events={events} />);
-      const healthBtn = screen.getByText(/Subsystem Health/);
-      healthBtn.click();
+      fireEvent.click(screen.getByRole("button", { name: /Subsystem Health/ }));
       expect(screen.getByText("DEGRADED")).toBeTruthy();
     });
   });
@@ -171,7 +177,9 @@ describe("MonitoringDashboard", () => {
   describe("alert rules", () => {
     it("renders 5 default alert rules in collapsible section", () => {
       render(<MonitoringDashboard events={[]} />);
-      expect(screen.getByText(/Alert Rules/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: /Alert Feed/ }));
+      // The rules section is a <details> — expand it so the rules render
+      fireEvent.click(screen.getByText(/Alert Rules/));
       expect(screen.getByText(/High recovery failure rate/)).toBeTruthy();
       expect(screen.getByText(/Verification failures/)).toBeTruthy();
       expect(screen.getByText(/Task failure rate/)).toBeTruthy();

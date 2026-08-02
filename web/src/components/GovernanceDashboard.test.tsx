@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { GovernanceDashboard } from "./GovernanceDashboard";
 import { mockEvent } from "../test-utils";
 
@@ -86,6 +86,7 @@ describe("GovernanceDashboard", () => {
         mockEvent({ type: "verification_passed", action: "Security scan OK", timestamp: NOW - 10 }),
       ];
       render(<GovernanceDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Security Audits/ }));
       expect(screen.getByText("PASSED")).toBeTruthy();
     });
 
@@ -94,6 +95,7 @@ describe("GovernanceDashboard", () => {
         mockEvent({ type: "verification_failed", action: "Vulnerability detected", timestamp: NOW - 10 }),
       ];
       render(<GovernanceDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Security Audits/ }));
       expect(screen.getByText("FAILED")).toBeTruthy();
     });
   });
@@ -102,9 +104,8 @@ describe("GovernanceDashboard", () => {
     it("shows pending bridge when no verification data", () => {
       render(<GovernanceDashboard events={[]} />);
       // Switch to sandbox tab
-      const sandboxBtn = screen.getByText(/Sandbox Integrity/);
-      sandboxBtn.click();
-      expect(screen.getByText(/pending bridge/i)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: /Sandbox Integrity/ }));
+      expect(screen.getAllByText(/pending bridge/i).length).toBeGreaterThan(0);
     });
 
     it("derives binary integrity from verification pass/fail ratio", () => {
@@ -114,8 +115,7 @@ describe("GovernanceDashboard", () => {
         mockEvent({ type: "verification_failed", timestamp: NOW - 6 }),
       ];
       render(<GovernanceDashboard events={events} />);
-      const sandboxBtn = screen.getByText(/Sandbox Integrity/);
-      sandboxBtn.click();
+      fireEvent.click(screen.getByRole("button", { name: /Sandbox Integrity/ }));
       // 2 passes > 1 fail → verified
       expect(screen.getByText("VERIFIED")).toBeTruthy();
     });
@@ -126,8 +126,7 @@ describe("GovernanceDashboard", () => {
         mockEvent({ type: "execution_completed", data: { exit_code: 0 }, timestamp: NOW - 8 }),
       ];
       render(<GovernanceDashboard events={events} />);
-      const sandboxBtn = screen.getByText(/Sandbox Integrity/);
-      sandboxBtn.click();
+      fireEvent.click(screen.getByRole("button", { name: /Sandbox Integrity/ }));
       expect(screen.getByText("HEALTHY")).toBeTruthy();
     });
 
@@ -136,8 +135,7 @@ describe("GovernanceDashboard", () => {
         mockEvent({ type: "execution_completed", data: { exit_code: 1 }, timestamp: NOW - 10 }),
       ];
       render(<GovernanceDashboard events={events} />);
-      const sandboxBtn = screen.getByText(/Sandbox Integrity/);
-      sandboxBtn.click();
+      fireEvent.click(screen.getByRole("button", { name: /Sandbox Integrity/ }));
       expect(screen.getByText("DEGRADED")).toBeTruthy();
     });
   });
@@ -150,17 +148,17 @@ describe("GovernanceDashboard", () => {
         mockEvent({ type: "consensus_formed", data: { consensus_id: "cs1" }, timestamp: NOW - 10 }),
       ];
       render(<GovernanceDashboard events={events} />);
-      const auditBtn = screen.getByText(/Audit Trail/);
-      auditBtn.click();
-      expect(screen.getByText("3")).toBeTruthy(); // auditRecords count in tab
+      fireEvent.click(screen.getByRole("button", { name: /Audit Trail/ }));
+      // Tab badge shows the 3 audit records; rows render the event types
+      expect(screen.getByText("(3)")).toBeTruthy();
+      expect(screen.getByText("challenge raised")).toBeTruthy();
     });
   });
 
   describe("active policies", () => {
     it("renders all 6 default policies", () => {
       render(<GovernanceDashboard events={[]} />);
-      const policiesBtn = screen.getByText(/Active Policies/);
-      policiesBtn.click();
+      fireEvent.click(screen.getByRole("button", { name: /Active Policies/ }));
       expect(screen.getByText(/Deny destructive consensus actions/)).toBeTruthy();
       expect(screen.getByText(/Log specialist failover events/)).toBeTruthy();
       expect(screen.getByText(/Deny silent task aborts/)).toBeTruthy();

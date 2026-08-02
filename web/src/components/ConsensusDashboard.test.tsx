@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ConsensusDashboard } from "./ConsensusDashboard";
 import { mockEvent } from "../test-utils";
 
@@ -85,6 +85,7 @@ describe("ConsensusDashboard", () => {
         }),
       ];
       render(<ConsensusDashboard events={events} />);
+      fireEvent.click(screen.getByRole("button", { name: /Consensus Sessions/ }));
       expect(screen.getByText(/Proceed with plan A/)).toBeTruthy();
       expect(screen.getByText(/majority/)).toBeTruthy();
       expect(screen.getByText(/85%/)).toBeTruthy(); // 0.85 → 85%
@@ -109,9 +110,10 @@ describe("ConsensusDashboard", () => {
         }),
       ];
       render(<ConsensusDashboard events={events} />);
-      expect(screen.getByText(/3 for/)).toBeTruthy();
-      expect(screen.getByText(/1 against/)).toBeTruthy();
-      expect(screen.getByText(/1 neutral/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: /Consensus Sessions/ }));
+      expect(screen.getAllByText(/3 for/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/1 against/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/1 neutral/).length).toBeGreaterThan(0);
     });
   });
 
@@ -131,9 +133,10 @@ describe("ConsensusDashboard", () => {
         }),
       ];
       render(<ConsensusDashboard events={events} />);
-      expect(screen.getByText(/CHALLENGE/)).toBeTruthy();
-      expect(screen.getByText(/by SENTINEL/)).toBeTruthy();
-      expect(screen.getByText(/Claimed 95% accuracy without sufficient evidence/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: /Challenges/ }));
+      expect(screen.getAllByText(/CHALLENGE/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/by SENTINEL/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Claimed 95% accuracy without sufficient evidence/).length).toBeGreaterThan(0);
     });
 
     it("counts total challenges in summary card", () => {

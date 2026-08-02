@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { SystemHealthDashboard } from "./SystemHealthDashboard";
 import { mockEvent } from "../test-utils";
 
@@ -10,8 +10,9 @@ vi.setSystemTime(NOW * 1000);
 describe("SystemHealthDashboard", () => {
   it("renders unknown status with zero events", () => {
     render(<SystemHealthDashboard events={[]} />);
-    expect(screen.getByText("UNKNOWN")).toBeTruthy();
-    expect(screen.getByText("0 events")).toBeTruthy();
+    // Header badge + each agent card shows UNKNOWN when no events exist
+    expect(screen.getAllByText("UNKNOWN").length).toBeGreaterThan(0);
+    expect(screen.getByText(/0 events/)).toBeTruthy();
   });
 
   it("renders healthy status with recent active events", () => {
@@ -101,14 +102,10 @@ describe("SystemHealthDashboard", () => {
       mockEvent({ type: "execution_completed", specialist: "TERMINUS", timestamp: NOW - 5 }),
     ];
     render(<SystemHealthDashboard events={events} />);
-    // All 7 specialists appear in the grid
-    expect(screen.getByText("ARCHITECT")).toBeTruthy();
-    expect(screen.getByText("ORACLE")).toBeTruthy();
-    expect(screen.getByText("FORGE")).toBeTruthy();
-    expect(screen.getByText("SENTINEL")).toBeTruthy();
-    expect(screen.getByText("TERMINUS")).toBeTruthy();
-    expect(screen.getByText("HERALD")).toBeTruthy();
-    expect(screen.getByText("CONSENSUS")).toBeTruthy();
+    // All 7 specialists appear in the grid (card name spans include the icon)
+    for (const name of ["ARCHITECT", "ORACLE", "FORGE", "SENTINEL", "TERMINUS", "HERALD", "CONSENSUS"]) {
+      expect(screen.getAllByText(new RegExp(name)).length).toBeGreaterThan(0);
+    }
   });
 
   it("shows correct event throughput (events in last 60s)", () => {
@@ -146,8 +143,7 @@ describe("SystemHealthDashboard", () => {
     );
     render(<SystemHealthDashboard events={events} />);
     // Switch to breakdown tab
-    const breakdownBtn = screen.getByText(/Event Breakdown/);
-    breakdownBtn.click();
+    fireEvent.click(screen.getByRole("button", { name: /Event Breakdown/ }));
     // task_created (5) should come before architect_decision (3) before consensus_formed (2)
     expect(screen.getByText(/task_created/)).toBeTruthy();
     expect(screen.getByText(/architect_decision/)).toBeTruthy();
