@@ -96,7 +96,7 @@ export function TaskBoard({ events }: TaskBoardProps) {
             className="flex items-center gap-2 min-w-[220px]"
           >
             <span style={{ color: col.color }}>{col.icon}</span>
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
               {col.label}
             </span>
             <span
@@ -122,7 +122,7 @@ export function TaskBoard({ events }: TaskBoardProps) {
             {/* Column body */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {(byColumn.get(col.key) || []).length === 0 && (
-                <div className="text-center text-gray-600 text-xs py-8">
+                <div className="text-center text-ink-muted text-xs py-8">
                   No tasks
                 </div>
               )}
@@ -165,7 +165,7 @@ function TaskCard({ task, expanded, onToggle }: TaskCardProps) {
       {/* Header */}
       <div className="px-3 py-2">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-xs font-mono text-gray-500 truncate">
+          <span className="text-xs font-mono text-ink-muted truncate">
             {task.taskId.length > 10
               ? task.taskId.slice(0, 10) + "…"
               : task.taskId}
@@ -184,7 +184,7 @@ function TaskCard({ task, expanded, onToggle }: TaskCardProps) {
         </div>
 
         {task.reason && (
-          <p className="text-xs text-gray-400 leading-tight line-clamp-2">
+          <p className="text-xs text-ink-soft leading-tight line-clamp-2">
             {task.reason}
           </p>
         )}
@@ -195,18 +195,18 @@ function TaskCard({ task, expanded, onToggle }: TaskCardProps) {
         <div className="px-3 pb-3 pt-1 border-t border-surface-border space-y-1.5">
           {task.specialist && (
             <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-gray-600">Agent:</span>
-              <span className="text-gray-300 font-medium">{task.specialist}</span>
+              <span className="text-ink-muted">Agent:</span>
+              <span className="text-ink-soft font-medium">{task.specialist}</span>
             </div>
           )}
           <div className="flex items-center gap-2 text-[11px]">
-            <span className="text-gray-600">Updated:</span>
-            <span className="text-gray-300">{formatTime(task.lastUpdated)}</span>
+            <span className="text-ink-muted">Updated:</span>
+            <span className="text-ink-soft">{formatTime(task.lastUpdated)}</span>
           </div>
           {task.sessionId && (
             <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-gray-600">Session:</span>
-              <span className="text-gray-300 font-mono">
+              <span className="text-ink-muted">Session:</span>
+              <span className="text-ink-soft font-mono">
                 {task.sessionId.slice(0, 8)}
               </span>
             </div>

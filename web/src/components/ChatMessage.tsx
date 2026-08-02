@@ -15,18 +15,18 @@ function fmtRel(ts: number): string {
 }
 
 const AGENT_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  HERMES:    { label: "Hermes",    color: "#39c8ff", icon: "◉" },
-  ARCHITECT: { label: "Architect", color: "#3b82f6", icon: "◈" },
-  ORACLE:    { label: "Oracle",    color: "#8c5cff", icon: "◆" },
-  FORGE:     { label: "Forge",     color: "#00e38c", icon: "⚙" },
-  SENTINEL:  { label: "Sentinel",  color: "#ff5c7a", icon: "🛡" },
-  TERMINUS:  { label: "Terminus",  color: "#f7b731", icon: "▶" },
-  HERALD:    { label: "Herald",    color: "#19f5a5", icon: "★" },
+  HERMES:    { label: "Hermes",    color: "#0891B2", icon: "◉" },
+  ARCHITECT: { label: "Architect", color: "#7C3AED", icon: "◈" },
+  ORACLE:    { label: "Oracle",    color: "#8B5CF6", icon: "◆" },
+  FORGE:     { label: "Forge",     color: "#16A34A", icon: "⚙" },
+  SENTINEL:  { label: "Sentinel",  color: "#E11D48", icon: "🛡" },
+  TERMINUS:  { label: "Terminus",  color: "#F59E0B", icon: "▶" },
+  HERALD:    { label: "Herald",    color: "#FF9F45", icon: "★" },
 };
 
 function getAgentCfg(name: string) {
   const key = name.toUpperCase();
-  return AGENT_CONFIG[key] || { label: name, color: "#52627f", icon: "●" };
+  return AGENT_CONFIG[key] || { label: name, color: "#7C3AED", icon: "●" };
 }
 
 function AgentStepRow({ step }: { step: AgentStep }) {
@@ -37,11 +37,11 @@ function AgentStepRow({ step }: { step: AgentStep }) {
     step.status === "active" ? "◌" : "○";
   const statusColor =
     step.status === "completed" ? cfg.color :
-    step.status === "failed" ? "#ff5c7a" :
-    step.status === "active" ? "#f7b731" : "#52627f";
+    step.status === "failed" ? "#E11D48" :
+    step.status === "active" ? "#F59E0B" : "#9CA3AF";
 
   return (
-    <div className="flex items-center gap-2 py-1.5">
+    <div className="flex items-center gap-2 py-1.5 fade-up">
       <span className="text-sm shrink-0" style={{ color: cfg.color }}>{cfg.icon}</span>
       <span className="text-xs font-semibold shrink-0" style={{ color: cfg.color }}>
         {cfg.label}
@@ -49,7 +49,7 @@ function AgentStepRow({ step }: { step: AgentStep }) {
       <span className="text-xs" style={{ color: statusColor }}>
         {statusIcon} {step.action}
       </span>
-      <span className="text-[10px] text-gray-600 ml-auto">
+      <span className="text-[10px] text-ink-muted ml-auto">
         {fmtRel(step.timestamp)}
       </span>
     </div>
@@ -58,9 +58,9 @@ function AgentStepRow({ step }: { step: AgentStep }) {
 
 function VerificationBadge({ check }: { check: VerificationStepStatus }) {
   const color =
-    check.status === "passed" ? "#00e38c" :
-    check.status === "failed" ? "#ff5c7a" :
-    check.status === "running" ? "#f7b731" : "#52627f";
+    check.status === "passed" ? "#16A34A" :
+    check.status === "failed" ? "#E11D48" :
+    check.status === "running" ? "#F59E0B" : "#9CA3AF";
   const icon =
     check.status === "passed" ? "✓" :
     check.status === "failed" ? "✗" :
@@ -68,12 +68,12 @@ function VerificationBadge({ check }: { check: VerificationStepStatus }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full"
-      style={{ color, backgroundColor: `${color}15`, borderColor: `${color}30` }}
+      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border"
+      style={{ color, backgroundColor: `${color}12`, borderColor: `${color}30` }}
     >
       <span>{icon}</span>
       <span>{check.check}</span>
-      {check.details && <span className="text-gray-600">— {check.details}</span>}
+      {check.details && <span className="text-ink-muted">— {check.details}</span>}
     </span>
   );
 }
@@ -82,17 +82,17 @@ function PhaseTimeline({ phases }: { phases: ChatMessage["phases"] }) {
   if (!phases || phases.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1 my-2">
+    <div className="flex items-center gap-1 my-2 flex-wrap">
       {phases.map((phase, i) => {
         const color =
-          phase.status === "completed" ? "#00e38c" :
-          phase.status === "failed" ? "#ff5c7a" :
-          phase.status === "active" ? "#f7b731" : "#52627f";
+          phase.status === "completed" ? "#16A34A" :
+          phase.status === "failed" ? "#E11D48" :
+          phase.status === "active" ? "#FF9F45" : "#9CA3AF";
         return (
           <span
             key={i}
-            className="text-[9px] px-1.5 py-0.5 rounded font-medium"
-            style={{ color, backgroundColor: `${color}15` }}
+            className="text-[9px] px-1.5 py-0.5 rounded border font-medium"
+            style={{ color, backgroundColor: `${color}12`, borderColor: `${color}25` }}
           >
             {phase.status === "completed" ? "✓ " : phase.status === "active" ? "◌ " : ""}
             {phase.name}
@@ -110,14 +110,14 @@ export function ChatMessageBubble({ message }: ChatMessageProps) {
   const isSystem = message.role === "system";
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 fade-up`}>
       <div
-        className={`max-w-[75%] min-w-0 rounded-2xl px-4 py-3 ${
+        className={`max-w-[75%] min-w-0 rounded-2xl px-4 py-3 shadow-soft ${
           isUser
-            ? "bg-accent-blue/15 border border-accent-blue/20"
+            ? "bg-gradient-to-br from-brand-orange to-brand-deep text-white"
             : isSystem
-              ? "bg-surface-border/30 border border-surface-border"
-              : "bg-surface-alt border border-surface-border"
+              ? "bg-surface-alt border border-surface-border text-ink"
+              : "bg-white border border-surface-border text-ink"
         }`}
       >
         {/* Header for assistant messages */}
@@ -126,28 +126,29 @@ export function ChatMessageBubble({ message }: ChatMessageProps) {
             {message.agentSteps && message.agentSteps.length > 0 && (
               <>
                 {/* Show first agent icon */}
-                <span className="text-sm" style={{ color: getAgentCfg(message.agentSteps[0].agent).color }}>
+                <span
+                  className="text-sm w-6 h-6 rounded-lg bg-brand-purple/10 flex items-center justify-center"
+                  style={{ color: getAgentCfg(message.agentSteps[0].agent).color }}
+                >
                   {getAgentCfg(message.agentSteps[0].agent).icon}
                 </span>
-                <span className="text-xs font-bold text-gray-300">
-                  AELVO
-                </span>
+                <span className="text-xs font-bold text-gradient">AELVO</span>
                 {message.streaming && (
                   <span className="flex gap-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-bounce" style={{ animationDelay: "300ms" }} />
                   </span>
                 )}
               </>
             )}
-            <span className="text-[10px] text-gray-600 ml-auto">{fmtRel(message.timestamp)}</span>
+            <span className="text-[10px] text-ink-muted ml-auto">{fmtRel(message.timestamp)}</span>
           </div>
         )}
 
         {/* System label */}
         {isSystem && (
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
+          <div className="text-[10px] text-ink-muted uppercase tracking-wider mb-1 font-semibold">
             System
           </div>
         )}
@@ -155,13 +156,13 @@ export function ChatMessageBubble({ message }: ChatMessageProps) {
         {/* User label */}
         {isUser && (
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider">You</span>
-            <span className="text-[10px] text-gray-600">{fmtRel(message.timestamp)}</span>
+            <span className="text-[10px] uppercase tracking-wider opacity-80 font-semibold">You</span>
+            <span className="text-[10px] opacity-70">{fmtRel(message.timestamp)}</span>
           </div>
         )}
 
         {/* Content */}
-        <div className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
+        <div className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${isUser ? "text-white" : "text-ink"}`}>
           {message.streamedContent || message.content}
         </div>
 
@@ -172,10 +173,10 @@ export function ChatMessageBubble({ message }: ChatMessageProps) {
 
         {/* Agent steps (collapsible) */}
         {!isUser && message.agentSteps && message.agentSteps.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-surface-border/50">
+          <div className="mt-2 pt-2 border-t border-surface-border/60">
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+              className="text-[10px] text-ink-muted hover:text-brand-deep transition-colors flex items-center gap-1 font-medium"
             >
               <span>{expanded ? "▼" : "▶"}</span>
               <span>{message.agentSteps.length} specialist steps</span>

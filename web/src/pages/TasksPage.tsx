@@ -10,8 +10,8 @@ export default function TasksPage() {
       {/* Top bar */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-200">Task Board</h2>
-          <span className="text-xs text-gray-600">{transitionCount} transitions recorded</span>
+          <h2 className="text-lg font-bold text-ink">Task Board</h2>
+          <span className="text-xs text-ink-muted">{transitionCount} transitions recorded</span>
         </div>
       </header>
 

@@ -201,8 +201,8 @@ export function AgentDashboard({ events }: AgentDashboardProps) {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Top bar */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
-        <h2 className="text-lg font-bold text-gray-200">Agent Dashboard</h2>
-        <span className="text-xs text-gray-500">
+        <h2 className="text-lg font-bold text-ink">Agent Dashboard</h2>
+        <span className="text-xs text-ink-muted">
           {agents.filter((a) => a.status !== "idle").length} active
         </span>
       </header>
@@ -246,27 +246,27 @@ function AgentCard({ agent }: { agent: AgentState }) {
             <h3 className="text-base font-bold" style={{ color: agent.color }}>
               {agent.label}
             </h3>
-            <span className="text-[10px] font-mono text-gray-600">{agent.name}</span>
+            <span className="text-[10px] font-mono text-ink-muted">{agent.name}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-          <span className="text-xs text-gray-500">{statusLabel}</span>
+          <span className="text-xs text-ink-muted">{statusLabel}</span>
         </div>
       </div>
 
       {/* Current task */}
       <div className="mb-4">
-        <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Current Task</div>
-        <p className="text-sm text-gray-300 leading-relaxed line-clamp-2">{agent.currentTask}</p>
+        <div className="text-[10px] text-ink-muted uppercase tracking-wider mb-1">Current Task</div>
+        <p className="text-sm text-ink-soft leading-relaxed line-clamp-2">{agent.currentTask}</p>
       </div>
 
       {/* Metrics grid */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {/* Confidence */}
         <div className="text-center">
-          <div className="text-lg font-bold text-gray-200">{agent.confidence}%</div>
-          <div className="text-[10px] text-gray-500">Confidence</div>
+          <div className="text-lg font-bold text-ink">{agent.confidence}%</div>
+          <div className="text-[10px] text-ink-muted">Confidence</div>
         </div>
         {/* Success Rate */}
         <div className="text-center">
@@ -281,12 +281,12 @@ function AgentCard({ agent }: { agent: AgentState }) {
           >
             {agent.successRate}%
           </div>
-          <div className="text-[10px] text-gray-500">Success</div>
+          <div className="text-[10px] text-ink-muted">Success</div>
         </div>
         {/* Contribution Score */}
         <div className="text-center">
           <div className="text-lg font-bold text-accent-purple">{agent.contributionScore}</div>
-          <div className="text-[10px] text-gray-500">Contrib</div>
+          <div className="text-[10px] text-ink-muted">Contrib</div>
         </div>
       </div>
 
@@ -304,35 +304,35 @@ function AgentCard({ agent }: { agent: AgentState }) {
       {/* Activity metrics */}
       <div className="grid grid-cols-4 gap-2 mb-3 text-center text-[10px]">
         <div>
-          <div className="text-gray-500">{agent.metrics.publications}</div>
-          <div className="text-gray-600">Pubs</div>
+          <div className="text-ink-muted">{agent.metrics.publications}</div>
+          <div className="text-ink-muted">Pubs</div>
         </div>
         <div>
-          <div className="text-gray-500">{agent.metrics.consumptions}</div>
-          <div className="text-gray-600">Consumed</div>
+          <div className="text-ink-muted">{agent.metrics.consumptions}</div>
+          <div className="text-ink-muted">Consumed</div>
         </div>
         <div>
-          <div className="text-gray-500">{agent.metrics.verifications}</div>
-          <div className="text-gray-600">Verifs</div>
+          <div className="text-ink-muted">{agent.metrics.verifications}</div>
+          <div className="text-ink-muted">Verifs</div>
         </div>
         <div>
-          <div className="text-gray-500">{agent.metrics.totalEvents}</div>
-          <div className="text-gray-600">Events</div>
+          <div className="text-ink-muted">{agent.metrics.totalEvents}</div>
+          <div className="text-ink-muted">Events</div>
         </div>
       </div>
 
       {/* Recent actions */}
       {agent.recentActions.length > 0 && (
         <div>
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Recent Actions</div>
+          <div className="text-[10px] text-ink-muted uppercase tracking-wider mb-1.5">Recent Actions</div>
           <div className="space-y-1">
             {agent.recentActions.map((action, i) => (
               <div key={i} className="flex items-start gap-2 text-xs">
                 <span style={{ color: action.color || agent.color }} className="shrink-0 mt-0.5">
                   {action.icon || "•"}
                 </span>
-                <span className="text-gray-400 truncate flex-1">{action.summary}</span>
-                <span className="text-gray-600 shrink-0">
+                <span className="text-ink-soft truncate flex-1">{action.summary}</span>
+                <span className="text-ink-muted shrink-0">
                   {formatRelative(action.timestamp)}
                 </span>
               </div>

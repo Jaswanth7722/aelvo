@@ -200,8 +200,8 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
       {/* Header */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-200">Governance Dashboard</h2>
-          <span className="text-xs text-gray-500">
+          <h2 className="text-lg font-bold text-ink">Governance Dashboard</h2>
+          <span className="text-xs text-ink-muted">
             {stats.totalEvaluations + stats.totalSecurity + stats.totalAudit} total events
           </span>
         </div>
@@ -255,7 +255,7 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
           {/* Row 2: Decision outcome stacked bar */}
           {stats.totalEvaluations > 0 && (
             <div className="panel">
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Decision Outcomes</div>
+              <div className="text-xs text-ink-muted uppercase tracking-wider mb-3">Decision Outcomes</div>
               <div className="w-full h-4 bg-surface-border rounded-full overflow-hidden flex">
                 {stats.approved > 0 && (
                   <div className="h-full bg-accent-green transition-all" style={{ width: `${(stats.approved / stats.totalEvaluations) * 100}%` }} title={`${stats.approved} approved`} />
@@ -273,7 +273,7 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
                   <div className="h-full bg-accent-purple transition-all" style={{ width: `${(stats.overridden / stats.totalEvaluations) * 100}%` }} title={`${stats.overridden} overridden`} />
                 )}
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] text-gray-500">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] text-ink-muted">
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-green mr-1" /> Approved ({stats.approved})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-red mr-1" /> Rejected ({stats.rejected})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-amber mr-1" /> Escalated ({stats.escalated})</span>
@@ -297,12 +297,12 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`text-xs font-medium pb-3 -mb-3 border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.key ? "text-gray-200" : "text-gray-600 hover:text-gray-400"
+                    activeTab === tab.key ? "text-ink" : "text-ink-muted hover:text-ink-soft"
                   }`}
                   style={{ borderColor: activeTab === tab.key ? tab.color : "transparent" }}
                 >
                   {tab.label}
-                  <span className="ml-1.5 text-gray-600">({tab.count})</span>
+                  <span className="ml-1.5 text-ink-muted">({tab.count})</span>
                 </button>
               ))}
             </div>
@@ -312,7 +312,7 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
               {activeTab === "evaluations" && (
                 <>
                   {evaluations.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No policy evaluations recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No policy evaluations recorded</div>
                   )}
                   {evaluations.map((ev, i) => (
                     <EvaluationRow key={ev.id || i} evaluation={ev} />
@@ -324,18 +324,18 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
               {activeTab === "security" && (
                 <>
                   {securityAudits.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No security audits recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No security audits recorded</div>
                   )}
                   <div className="space-y-1">
                     {/* Mini stats */}
                     <div className="flex gap-4 mb-3 px-1">
-                      <span className="text-xs text-gray-500">
-                        Total: <span className="text-gray-300 font-semibold">{stats.totalSecurity}</span>
+                      <span className="text-xs text-ink-muted">
+                        Total: <span className="text-ink-soft font-semibold">{stats.totalSecurity}</span>
                       </span>
                       <span className="text-xs text-accent-green">✓ {stats.securityPassed}</span>
                       <span className="text-xs text-accent-red">✗ {stats.securityFailed}</span>
                       {stats.securityRunning > 0 && <span className="text-xs text-accent-amber">◌ {stats.securityRunning} running</span>}
-                      <span className="text-xs text-gray-500">Pass rate: <span className={stats.securityPassRate >= 90 ? "text-accent-green" : "text-accent-amber"}>{stats.securityPassRate}%</span></span>
+                      <span className="text-xs text-ink-muted">Pass rate: <span className={stats.securityPassRate >= 90 ? "text-accent-green" : "text-accent-amber"}>{stats.securityPassRate}%</span></span>
                     </div>
                     {securityAudits.slice(0, 50).map((s, i) => (
                       <SecurityRow key={`${s.id}-${i}`} audit={s} />
@@ -348,23 +348,23 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
               {activeTab === "sandbox" && (
                 <>
                   {sandboxChecks.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No sandbox integrity data available</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No sandbox integrity data available</div>
                   )}
                   {sandboxChecks.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex gap-3 mb-2 px-1">
-                        <span className="text-xs text-gray-500">
-                          Checks: <span className="text-gray-300 font-semibold">{stats.totalSandbox}</span>
+                        <span className="text-xs text-ink-muted">
+                          Checks: <span className="text-ink-soft font-semibold">{stats.totalSandbox}</span>
                         </span>
                         <span className="text-xs text-accent-green">✓ {stats.sandboxPassed} passed</span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-ink-muted">
                           {stats.totalSandbox - stats.sandboxPassed} pending bridge
                         </span>
                       </div>
                       {sandboxChecks.map((check) => (
                         <SandboxCheckRow key={check.id} check={check} />
                       ))}
-                      <div className="text-[10px] text-gray-600 italic mt-2 px-1">
+                      <div className="text-[10px] text-ink-muted italic mt-2 px-1">
                         Sandbox integrity data requires backend→frontend bridging. Status shown is derived from available verification events.
                       </div>
                     </div>
@@ -376,7 +376,7 @@ export function GovernanceDashboard({ events }: GovernanceDashboardProps) {
               {activeTab === "audit" && (
                 <>
                   {auditTrail.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No audit entries recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No audit entries recorded</div>
                   )}
                   <div className="space-y-1">
                     {auditTrail.slice(0, 50).map((a, i) => (
@@ -411,12 +411,12 @@ function SummaryCard({ label, value, sub, isPercent, color, icon }: {
     <div className="panel">
       <div className="flex items-center gap-1.5 mb-1">
         <span className="text-xs" style={{ color }}>{icon}</span>
-        <div className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</div>
+        <div className="text-[10px] text-ink-muted uppercase tracking-wider">{label}</div>
       </div>
       <div className="text-xl font-bold" style={{ color }}>
         {value}{isPercent ? "%" : ""}
       </div>
-      {sub && <div className="text-[10px] text-gray-600 mt-0.5 truncate">{sub}</div>}
+      {sub && <div className="text-[10px] text-ink-muted mt-0.5 truncate">{sub}</div>}
     </div>
   );
 }
@@ -445,20 +445,20 @@ function EvaluationRow({ evaluation }: { evaluation: GovernanceEvaluation }) {
           {outcomeIcon} {evaluation.outcome.toUpperCase()}
         </span>
         {evaluation.assignedTo && (
-          <span className="text-xs text-gray-500">→ {evaluation.assignedTo}</span>
+          <span className="text-xs text-ink-muted">→ {evaluation.assignedTo}</span>
         )}
         {evaluation.targetType && (
-          <span className="text-[10px] text-gray-600 font-mono">
+          <span className="text-[10px] text-ink-muted font-mono">
             {evaluation.targetType}:{evaluation.targetId.slice(0, 8)}
           </span>
         )}
-        <span className="text-[10px] text-gray-600 ml-auto">{fmtRelative(evaluation.timestamp)}</span>
+        <span className="text-[10px] text-ink-muted ml-auto">{fmtRelative(evaluation.timestamp)}</span>
       </div>
-      {evaluation.reason && <p className="text-sm text-gray-400">{evaluation.reason}</p>}
+      {evaluation.reason && <p className="text-sm text-ink-soft">{evaluation.reason}</p>}
       {evaluation.conditions.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1">
           {evaluation.conditions.map((c, i) => (
-            <span key={i} className="text-[10px] text-gray-600 px-1.5 py-0.5 rounded bg-surface-border/50">
+            <span key={i} className="text-[10px] text-ink-muted px-1.5 py-0.5 rounded bg-surface-border/50">
               {c}
             </span>
           ))}
@@ -477,15 +477,15 @@ function SecurityRow({ audit }: { audit: SecurityAudit }) {
       <span className="text-sm" style={{ color: statusColor }}>{statusIcon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-300 truncate">{audit.action || audit.type.replace(/_/g, " ")}</span>
+          <span className="text-xs text-ink-soft truncate">{audit.action || audit.type.replace(/_/g, " ")}</span>
           <span className="text-[10px] font-semibold" style={{ color: statusColor }}>{audit.status.toUpperCase()}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-gray-600">{audit.specialist}</span>
-          <span className="text-[10px] text-gray-600">{audit.type}</span>
+          <span className="text-[10px] text-ink-muted">{audit.specialist}</span>
+          <span className="text-[10px] text-ink-muted">{audit.type}</span>
         </div>
       </div>
-      <span className="text-[10px] text-gray-600 shrink-0">{fmtRelative(audit.timestamp)}</span>
+      <span className="text-[10px] text-ink-muted shrink-0">{fmtRelative(audit.timestamp)}</span>
     </div>
   );
 }
@@ -506,14 +506,14 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
         {entry.subsystem.slice(0, 4).toUpperCase()}
       </span>
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-gray-300 truncate">{entry.action}</div>
+        <div className="text-xs text-ink-soft truncate">{entry.action}</div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-gray-600">{entry.actor}</span>
-          <span className="text-[10px] text-gray-600">{entry.type.replace(/_/g, " ")}</span>
+          <span className="text-[10px] text-ink-muted">{entry.actor}</span>
+          <span className="text-[10px] text-ink-muted">{entry.type.replace(/_/g, " ")}</span>
         </div>
       </div>
       <span className="text-[10px] font-semibold" style={{ color: outcomeColor }}>{entry.outcome.toUpperCase()}</span>
-      <span className="text-[10px] text-gray-600 shrink-0">{fmtRelative(entry.timestamp)}</span>
+      <span className="text-[10px] text-ink-muted shrink-0">{fmtRelative(entry.timestamp)}</span>
     </div>
   );
 }
@@ -526,13 +526,13 @@ function SandboxCheckRow({ check }: { check: SandboxCheck }) {
     <div className="border border-surface-border rounded-lg px-3 py-2.5 hover:bg-surface-alt/50 transition-colors">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-sm" style={{ color: statusColor }}>{statusIcon}</span>
-        <span className="text-xs font-semibold text-gray-300">{check.name}</span>
+        <span className="text-xs font-semibold text-ink-soft">{check.name}</span>
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ color: statusColor, backgroundColor: `${statusColor}15` }}>
           {check.status.replace(/_/g, " ").toUpperCase()}
         </span>
       </div>
-      <p className="text-[11px] text-gray-500 mb-1">{check.details}</p>
-      <div className="text-[10px] text-gray-600 font-mono">{check.source}</div>
+      <p className="text-[11px] text-ink-muted mb-1">{check.details}</p>
+      <div className="text-[10px] text-ink-muted font-mono">{check.source}</div>
     </div>
   );
 }
@@ -551,17 +551,17 @@ function PolicyRow({ policy }: { policy: PolicyDefinition }) {
     <div className="border border-surface-border rounded-lg px-3 py-2.5 hover:bg-surface-alt/50 transition-colors">
       <div className="flex items-center gap-2 mb-1">
         <span className={`w-1.5 h-1.5 rounded-full ${policy.enabled ? "bg-accent-green" : "bg-gray-600"}`} />
-        <span className="text-xs font-semibold text-gray-300">{policy.name}</span>
+        <span className="text-xs font-semibold text-ink-soft">{policy.name}</span>
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ color: effectColor, backgroundColor: `${effectColor}15` }}>
           {effectLabel}
         </span>
-        {!policy.enabled && <span className="text-[10px] text-gray-600">DISABLED</span>}
+        {!policy.enabled && <span className="text-[10px] text-ink-muted">DISABLED</span>}
       </div>
-      <p className="text-[11px] text-gray-500 mb-1">{policy.description}</p>
-      <div className="flex items-center gap-3 text-[10px] text-gray-600">
-        <span>Scope: <span className="text-gray-500">{policy.scope}</span></span>
+      <p className="text-[11px] text-ink-muted mb-1">{policy.description}</p>
+      <div className="flex items-center gap-3 text-[10px] text-ink-muted">
+        <span>Scope: <span className="text-ink-muted">{policy.scope}</span></span>
         {policy.specialists.length > 0 && (
-          <span>Specialists: <span className="text-gray-500">{policy.specialists.join(", ")}</span>
+          <span>Specialists: <span className="text-ink-muted">{policy.specialists.join(", ")}</span>
           </span>
         )}
         <span>Priority: {policy.priority}</span>

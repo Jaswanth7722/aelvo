@@ -191,7 +191,7 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
       {/* Header */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-200">System Health</h2>
+          <h2 className="text-lg font-bold text-ink">System Health</h2>
           <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border ${
             overallStatus === "healthy"
               ? "text-accent-green border-accent-green/40 bg-accent-green/8"
@@ -199,7 +199,7 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                 ? "text-accent-amber border-accent-amber/40 bg-accent-amber/8"
                 : overallStatus === "unhealthy"
                   ? "text-accent-red border-accent-red/40 bg-accent-red/8"
-                  : "text-gray-500 border-gray-600/40 bg-gray-700/20"
+                  : "text-ink-muted border-surface-border/40 bg-gray-300/20"
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${
               overallStatus === "healthy" ? "bg-accent-green"
@@ -210,7 +210,7 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
             {overallStatus.toUpperCase()}
           </span>
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-ink-muted">
           {events.length} events · {eventThroughput}/min throughput
         </div>
       </header>
@@ -252,9 +252,9 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
           {/* Row 2: Uptime + system info */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="panel lg:col-span-2">
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">System Uptime</div>
+              <div className="text-xs text-ink-muted uppercase tracking-wider mb-3">System Uptime</div>
               <div className="flex items-end gap-3">
-                <div className="text-3xl font-bold text-gray-200 font-mono">
+                <div className="text-3xl font-bold text-ink font-mono">
                   {formatUptime(uptime)}
                 </div>
               </div>
@@ -264,30 +264,30 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                   style={{ width: `${Math.min((uptime / 86400) * 100, 100)}%` }}
                 />
               </div>
-              <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+              <div className="flex justify-between text-[10px] text-ink-muted mt-1">
                 <span>startup</span>
                 <span>24h</span>
               </div>
             </div>
 
             <div className="panel">
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Event Summary</div>
+              <div className="text-xs text-ink-muted uppercase tracking-wider mb-3">Event Summary</div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Total events</span>
-                  <span className="text-gray-200 font-semibold">{events.length}</span>
+                  <span className="text-ink-soft">Total events</span>
+                  <span className="text-ink font-semibold">{events.length}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Unique types</span>
-                  <span className="text-gray-200 font-semibold">{breakdown.length}</span>
+                  <span className="text-ink-soft">Unique types</span>
+                  <span className="text-ink font-semibold">{breakdown.length}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Errors</span>
+                  <span className="text-ink-soft">Errors</span>
                   <span className="text-accent-red font-semibold">{errorCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Recoveries</span>
-                  <span className="text-gray-200 font-semibold">{recoveryStats.total}</span>
+                  <span className="text-ink-soft">Recoveries</span>
+                  <span className="text-ink font-semibold">{recoveryStats.total}</span>
                 </div>
               </div>
             </div>
@@ -306,12 +306,12 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`text-xs font-medium pb-3 -mb-3 border-b-2 transition-colors ${
-                    activeTab === tab.key ? "text-gray-200" : "text-gray-600 hover:text-gray-400"
+                    activeTab === tab.key ? "text-ink" : "text-ink-muted hover:text-ink-soft"
                   }`}
                   style={{ borderColor: activeTab === tab.key ? tab.color : "transparent" }}
                 >
                   {tab.label}
-                  <span className="ml-1.5 text-gray-600">({tab.count})</span>
+                  <span className="ml-1.5 text-ink-muted">({tab.count})</span>
                 </button>
               ))}
             </div>
@@ -339,16 +339,16 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                         <span className={`text-[10px] ml-auto ${
                           agent.status === "active" ? "text-accent-green"
                           : agent.status === "idle" ? "text-accent-amber"
-                          : "text-gray-500"
+                          : "text-ink-muted"
                         }`}>
                           {agent.status.toUpperCase()}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        <div>Events: <span className="text-gray-300">{agent.eventCount}</span></div>
+                      <div className="text-xs text-ink-muted space-y-0.5">
+                        <div>Events: <span className="text-ink-soft">{agent.eventCount}</span></div>
                         <div>
                           Last seen:{" "}
-                          <span className={agent.lastSeen > 0 ? "text-gray-300" : "text-gray-600"}>
+                          <span className={agent.lastSeen > 0 ? "text-ink-soft" : "text-ink-muted"}>
                             {agent.lastSeen > 0 ? fmtRelative(agent.lastSeen) : "never"}
                           </span>
                         </div>
@@ -356,7 +356,7 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                       {agent.recentActions.length > 0 && (
                         <div className="mt-2 space-y-0.5">
                           {agent.recentActions.map((action, i) => (
-                            <div key={i} className="text-[10px] text-gray-600 truncate">
+                            <div key={i} className="text-[10px] text-ink-muted truncate">
                               {action}
                             </div>
                           ))}
@@ -371,14 +371,14 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
               {activeTab === "recovery" && (
                 <>
                   {recoveryEvents.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No recovery events recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No recovery events recorded</div>
                   )}
                   {recoveryEvents.length > 0 && (
                     <div className="space-y-1.5">
                       {/* Mini stats */}
                       <div className="flex gap-4 mb-3 px-1">
-                        <span className="text-xs text-gray-500">
-                          Total: <span className="text-gray-300 font-semibold">{recoveryStats.total}</span>
+                        <span className="text-xs text-ink-muted">
+                          Total: <span className="text-ink-soft font-semibold">{recoveryStats.total}</span>
                         </span>
                         <span className="text-xs text-accent-green">
                           ✓ {recoveryStats.succeeded}
@@ -386,10 +386,10 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                         <span className="text-xs text-accent-red">
                           ✗ {recoveryStats.failed}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-ink-muted">
                           ↻ {recoveryStats.initiated}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-ink-muted">
                           Rate: <span className={recoveryStats.successRate >= 90 ? "text-accent-green" : "text-accent-amber"}>
                             {recoveryStats.successRate}%
                           </span>
@@ -408,12 +408,12 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                             {r.outcome === "completed" ? "✅" : r.outcome === "failed" ? "❌" : "🔄"}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs text-gray-300 truncate">{r.action}</div>
+                            <div className="text-xs text-ink-soft truncate">{r.action}</div>
                             {r.specialist && (
-                              <div className="text-[10px] text-gray-600">{r.specialist}</div>
+                              <div className="text-[10px] text-ink-muted">{r.specialist}</div>
                             )}
                           </div>
-                          <span className="text-[10px] text-gray-600 shrink-0">
+                          <span className="text-[10px] text-ink-muted shrink-0">
                             {fmtRelative(r.timestamp)}
                           </span>
                         </div>
@@ -427,7 +427,7 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
               {activeTab === "nodes" && (
                 <>
                   {nodeStates.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No node transitions recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No node transitions recorded</div>
                   )}
                   {nodeStates.length > 0 && (
                     <div className="space-y-1.5">
@@ -438,18 +438,18 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                         >
                           <span className="text-sm text-accent-purple">◈</span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs text-gray-300 font-mono truncate">{n.nodeId}</div>
+                            <div className="text-xs text-ink-soft font-mono truncate">{n.nodeId}</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {n.previousState && (
                                 <>
-                                  <span className="text-[10px] text-gray-600">{n.previousState}</span>
-                                  <span className="text-[10px] text-gray-600">→</span>
+                                  <span className="text-[10px] text-ink-muted">{n.previousState}</span>
+                                  <span className="text-[10px] text-ink-muted">→</span>
                                 </>
                               )}
                               <span className="text-[10px] text-accent-blue font-medium">{n.state}</span>
                             </div>
                           </div>
-                          <span className="text-[10px] text-gray-600 shrink-0">{fmtRelative(n.timestamp)}</span>
+                          <span className="text-[10px] text-ink-muted shrink-0">{fmtRelative(n.timestamp)}</span>
                         </div>
                       ))}
                     </div>
@@ -461,7 +461,7 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
               {activeTab === "breakdown" && (
                 <>
                   {breakdown.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No events recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No events recorded</div>
                   )}
                   {breakdown.length > 0 && (
                     <div className="space-y-1">
@@ -470,15 +470,15 @@ export function SystemHealthDashboard({ events }: SystemHealthDashboardProps) {
                         return (
                           <div key={b.type} className="flex items-center gap-3 px-1 py-1.5">
                             <span className="text-xs" style={{ color: b.color }}>{b.icon}</span>
-                            <span className="text-xs text-gray-400 w-40 truncate" title={b.type}>{b.type}</span>
+                            <span className="text-xs text-ink-soft w-40 truncate" title={b.type}>{b.type}</span>
                             <div className="flex-1 h-3 bg-surface-border rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full transition-all duration-500"
                                 style={{ width: `${pct}%`, backgroundColor: b.color }}
                               />
                             </div>
-                            <span className="text-xs text-gray-500 w-12 text-right font-mono">{b.count}</span>
-                            <span className="text-[10px] text-gray-600 w-10 text-right">{pct}%</span>
+                            <span className="text-xs text-ink-muted w-12 text-right font-mono">{b.count}</span>
+                            <span className="text-[10px] text-ink-muted w-10 text-right">{pct}%</span>
                           </div>
                         );
                       })}
@@ -503,12 +503,12 @@ function SummaryCard({ label, value, unit, sub, isPercent, color, icon }: {
     <div className="panel">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xs" style={{ color }}>{icon}</span>
-        <div className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</div>
+        <div className="text-[10px] text-ink-muted uppercase tracking-wider">{label}</div>
       </div>
       <div className="text-2xl font-bold" style={{ color }}>
         {value}{unit || ""}{isPercent ? "%" : ""}
       </div>
-      {sub && <div className="text-[10px] text-gray-600 mt-0.5 truncate">{sub}</div>}
+      {sub && <div className="text-[10px] text-ink-muted mt-0.5 truncate">{sub}</div>}
     </div>
   );
 }

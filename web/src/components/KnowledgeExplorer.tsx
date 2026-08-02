@@ -188,8 +188,8 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
       <div className="border-b border-surface-border px-6 py-3 space-y-3 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold text-gray-200">Knowledge Explorer</h2>
-            <span className="text-xs text-gray-500">{filtered.length} of {items.length} items</span>
+            <h2 className="text-lg font-bold text-ink">Knowledge Explorer</h2>
+            <span className="text-xs text-ink-muted">{filtered.length} of {items.length} items</span>
           </div>
         </div>
 
@@ -197,13 +197,13 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm">🔍</span>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search knowledge..."
-              className="w-full bg-surface border border-surface-border rounded-lg pl-9 pr-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors"
+              className="w-full bg-surface border border-surface-border rounded-lg pl-9 pr-3 py-1.5 text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-accent-blue/50 transition-colors"
             />
           </div>
 
@@ -211,7 +211,7 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
           <select
             value={typeFilter || ""}
             onChange={(e) => setTypeFilter(e.target.value || null)}
-            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-accent-blue/50"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-ink-soft focus:outline-none focus:border-accent-blue/50"
           >
             <option value="">All types</option>
             {allTypes.map((t) => (
@@ -223,7 +223,7 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
           <select
             value={specFilter || ""}
             onChange={(e) => setSpecFilter(e.target.value || null)}
-            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-accent-blue/50"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-ink-soft focus:outline-none focus:border-accent-blue/50"
           >
             <option value="">All specialists</option>
             {allSpecialists.map((s) => (
@@ -235,7 +235,7 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
           <select
             value={statusFilter || ""}
             onChange={(e) => setStatusFilter(e.target.value || null)}
-            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-accent-blue/50"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-ink-soft focus:outline-none focus:border-accent-blue/50"
           >
             <option value="">All statuses</option>
             {allStatuses.map((s) => (
@@ -248,7 +248,7 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as KnowledgeSortKey)}
-              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-accent-blue/50"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-ink-soft focus:outline-none focus:border-accent-blue/50"
             >
               <option value="timestamp">Time</option>
               <option value="confidence">Confidence</option>
@@ -259,7 +259,7 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
             </select>
             <button
               onClick={() => setSortDir(sortDir === "desc" ? "asc" : "desc")}
-              className="bg-surface border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+              className="bg-surface border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-ink-soft hover:text-ink transition-colors"
               title={sortDir === "desc" ? "Sort descending" : "Sort ascending"}
             >
               {sortDir === "desc" ? "↓" : "↑"}
@@ -273,7 +273,7 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
         {/* Evidence list */}
         <div className={`${selected ? "w-1/2" : "flex-1"} overflow-y-auto border-r border-surface-border`}>
           {filtered.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-600 text-sm">
+            <div className="flex items-center justify-center h-full text-ink-muted text-sm">
               {search || typeFilter || specFilter || statusFilter
                 ? "No knowledge matches your filters"
                 : "No knowledge yet — waiting for blackboard publications"}
@@ -296,10 +296,10 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
         {selected && lineage && (
           <div className="w-1/2 overflow-y-auto p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-200">Knowledge Lineage</h3>
+              <h3 className="text-sm font-bold text-ink">Knowledge Lineage</h3>
               <button
                 onClick={() => setSelectedId(null)}
-                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                className="text-xs text-ink-muted hover:text-ink-soft transition-colors"
               >
                 Close
               </button>
@@ -308,40 +308,40 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
             {/* Summary */}
             <div className="panel">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                <div className="text-gray-500">ID</div>
-                <div className="text-gray-300 font-mono">{selected.id.slice(0, 16)}…</div>
-                <div className="text-gray-500">Agent</div>
-                <div className="text-gray-300 font-semibold">{selected.specialist}</div>
-                <div className="text-gray-500">Type</div>
-                <div className="text-gray-300">{selected.entryType}</div>
-                <div className="text-gray-500">Source</div>
-                <div className="text-gray-300">{selected.source || "—"}</div>
-                <div className="text-gray-500">Confidence</div>
-                <div className="text-gray-300">{Math.round(selected.confidence * 100)}%</div>
-                <div className="text-gray-500">Status</div>
+                <div className="text-ink-muted">ID</div>
+                <div className="text-ink-soft font-mono">{selected.id.slice(0, 16)}…</div>
+                <div className="text-ink-muted">Agent</div>
+                <div className="text-ink-soft font-semibold">{selected.specialist}</div>
+                <div className="text-ink-muted">Type</div>
+                <div className="text-ink-soft">{selected.entryType}</div>
+                <div className="text-ink-muted">Source</div>
+                <div className="text-ink-soft">{selected.source || "—"}</div>
+                <div className="text-ink-muted">Confidence</div>
+                <div className="text-ink-soft">{Math.round(selected.confidence * 100)}%</div>
+                <div className="text-ink-muted">Status</div>
                 <VerifyBadge status={selected.verificationStatus} />
-                <div className="text-gray-500">Lifecycle</div>
-                <div className="text-gray-300">{selected.lifecycleStatus}</div>
-                <div className="text-gray-500">Challenges</div>
-                <div className="text-gray-300">{selected.challengeCount}</div>
-                <div className="text-gray-500">Tags</div>
+                <div className="text-ink-muted">Lifecycle</div>
+                <div className="text-ink-soft">{selected.lifecycleStatus}</div>
+                <div className="text-ink-muted">Challenges</div>
+                <div className="text-ink-soft">{selected.challengeCount}</div>
+                <div className="text-ink-muted">Tags</div>
                 <div className="flex flex-wrap gap-1">
                   {selected.tags.length > 0
                     ? selected.tags.map((t, i) => (
-                        <span key={i} className="text-[10px] text-gray-500 bg-surface-border/50 px-1.5 py-0.5 rounded">
+                        <span key={i} className="text-[10px] text-ink-muted bg-surface-border/50 px-1.5 py-0.5 rounded">
                           {t}
                         </span>
                       ))
-                    : <span className="text-gray-600">—</span>}
+                    : <span className="text-ink-muted">—</span>}
                 </div>
-                <div className="text-gray-500">Published</div>
-                <div className="text-gray-300">{fmt(selected.timestamp)}</div>
+                <div className="text-ink-muted">Published</div>
+                <div className="text-ink-soft">{fmt(selected.timestamp)}</div>
                 {selected.affectedFiles && selected.affectedFiles.length > 0 && (
                   <>
-                    <div className="text-gray-500">Files</div>
+                    <div className="text-ink-muted">Files</div>
                     <div className="flex flex-wrap gap-1">
                       {selected.affectedFiles.map((f, i) => (
-                        <span key={i} className="text-[10px] text-gray-400 bg-surface-border/50 px-1.5 py-0.5 rounded font-mono">
+                        <span key={i} className="text-[10px] text-ink-soft bg-surface-border/50 px-1.5 py-0.5 rounded font-mono">
                           {f}
                         </span>
                       ))}
@@ -351,26 +351,26 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
               </div>
               {selected.summary && (
                 <div className="mt-3 pt-3 border-t border-surface-border">
-                  <div className="text-xs text-gray-500 mb-1">Summary</div>
-                  <p className="text-sm text-gray-300 leading-relaxed">{selected.summary}</p>
+                  <div className="text-xs text-ink-muted mb-1">Summary</div>
+                  <p className="text-sm text-ink-soft leading-relaxed">{selected.summary}</p>
                 </div>
               )}
             </div>
 
             {/* Consumption trail */}
             <div>
-              <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+              <h4 className="text-xs text-ink-muted uppercase tracking-wider mb-2">
                 Consumption Trail ({lineage.consumed.length})
               </h4>
               {lineage.consumed.length === 0 ? (
-                <p className="text-xs text-gray-600">No consumers yet</p>
+                <p className="text-xs text-ink-muted">No consumers yet</p>
               ) : (
                 <div className="space-y-1.5">
                   {lineage.consumed.map((link, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs bg-surface-alt/50 px-3 py-2 rounded-lg border border-surface-border">
                       <span className="text-accent-blue font-semibold">{link.consumer}</span>
-                      <span className="text-gray-600">consumed</span>
-                      <span className="text-gray-500 font-mono">{fmt(link.timestamp)}</span>
+                      <span className="text-ink-muted">consumed</span>
+                      <span className="text-ink-muted font-mono">{fmt(link.timestamp)}</span>
                     </div>
                   ))}
                 </div>
@@ -379,20 +379,20 @@ export function KnowledgeExplorer({ events }: KnowledgeExplorerProps) {
 
             {/* Challenges */}
             <div>
-              <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+              <h4 className="text-xs text-ink-muted uppercase tracking-wider mb-2">
                 Challenges ({lineage.challengedBy.length})
               </h4>
               {lineage.challengedBy.length === 0 ? (
-                <p className="text-xs text-gray-600">No challenges raised</p>
+                <p className="text-xs text-ink-muted">No challenges raised</p>
               ) : (
                 <div className="space-y-1.5">
                   {lineage.challengedBy.map((ev, i) => (
                     <div key={i} className="text-xs bg-accent-red/5 px-3 py-2 rounded-lg border border-accent-red/20">
                       <div className="flex items-center gap-2">
                         <span className="text-accent-red font-semibold">{ev.specialist}</span>
-                        <span className="text-gray-500">{fmt(ev.timestamp)}</span>
+                        <span className="text-ink-muted">{fmt(ev.timestamp)}</span>
                       </div>
-                      <p className="text-gray-400 mt-1">{ev.action}</p>
+                      <p className="text-ink-soft mt-1">{ev.action}</p>
                     </div>
                   ))}
                 </div>
@@ -435,7 +435,7 @@ function KnowledgeCard({ item, isSelected, onSelect }: KnowledgeCardProps) {
     >
       {/* Top row: specialist + type + status + ID */}
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[10px] font-mono text-gray-600">{item.id.slice(0, 10)}</span>
+        <span className="text-[10px] font-mono text-ink-muted">{item.id.slice(0, 10)}</span>
         <span className="text-xs font-bold" style={{ color: specColor }}>
           {item.specialist}
         </span>
@@ -449,15 +449,15 @@ function KnowledgeCard({ item, isSelected, onSelect }: KnowledgeCardProps) {
         {item.challenged && (
           <span className="text-[10px] text-accent-red font-semibold">⚠ CHALLENGED</span>
         )}
-        <span className="text-[10px] text-gray-600 ml-auto">{fmt(item.timestamp)}</span>
+        <span className="text-[10px] text-ink-muted ml-auto">{fmt(item.timestamp)}</span>
       </div>
 
       {/* Summary */}
-      <p className="text-sm text-gray-300 leading-relaxed line-clamp-2">{item.summary}</p>
+      <p className="text-sm text-ink-soft leading-relaxed line-clamp-2">{item.summary}</p>
 
       {/* Bottom row: metadata */}
       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-        <span className="text-[10px] text-gray-600">
+        <span className="text-[10px] text-ink-muted">
           Confidence: {Math.round(item.confidence * 100)}%
         </span>
         {item.challengeCount > 0 && (
@@ -469,12 +469,12 @@ function KnowledgeCard({ item, isSelected, onSelect }: KnowledgeCardProps) {
           </span>
         )}
         {item.affectedFiles && item.affectedFiles.length > 0 && (
-          <span className="text-[10px] text-gray-500">
+          <span className="text-[10px] text-ink-muted">
             Files: {item.affectedFiles.slice(0, 3).join(", ")}{item.affectedFiles.length > 3 ? ` +${item.affectedFiles.length - 3}` : ""}
           </span>
         )}
         {item.source && (
-          <span className="text-[10px] text-gray-600">via {item.source}</span>
+          <span className="text-[10px] text-ink-muted">via {item.source}</span>
         )}
       </div>
     </div>
@@ -491,5 +491,5 @@ function VerifyBadge({ status }: { status: string }) {
   if (s === "challenged" || s === "failed") {
     return <span className="text-[10px] text-accent-red font-semibold">❌ {status}</span>;
   }
-  return <span className="text-[10px] text-gray-500">◌ {status}</span>;
+  return <span className="text-[10px] text-ink-muted">◌ {status}</span>;
 }

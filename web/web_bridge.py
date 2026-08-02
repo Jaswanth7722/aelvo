@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 import time
+import traceback
 from typing import Any, Dict, Optional, Set
 
 import websockets
@@ -30,6 +31,71 @@ from websockets.server import WebSocketServerProtocol
 from runtime_next.models.events import BaseEvent
 
 log = logging.getLogger("aelvo.web.bridge")
+
+
+class _SessionRecorder:
+    """Minimal session tracker matching the interface the orchestrator uses.
+
+    Mirrors the fields the old REPL's SessionTracker exposed so
+    ``orchestrator.execute_turn`` can record tools/files without needing a
+    terminal session object.
+    """
+
+    def __init__(self):
+        self.user_query = ""
+        self.tools_used: list = []
+        self.files_touched: list = []
+        self.final_answer = ""
+        self.status = "success"
+
+    def record_tool(self, tool_name: str, args: dict, outcome_status: str):
+        self.tools_used.append(tool_name)
+        if args.get("path"):
+            self.files_touched.append(args["path"])
+        if args.get("url"):
+            self.files_touched.append(args["url"][:80])
+        if outcome_status == "error":
+            self.status = "partial"
+
+    def record_answer(self, answer: str):
+        self.final_answer = answer[:500]
+
+    def save(self, db_path: str):
+        # Persist the condensed session record, mirroring the old SessionTracker.
+        import sqlite3
+
+        if not self.user_query:
+            return
+        try:
+            from datetime import datetime
+
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with sqlite3.connect(db_path) as db:
+                db.execute(
+                    """CREATE TABLE IF NOT EXISTS sessions (
+                        session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        user_query TEXT,
+                        tools_used TEXT,
+                        files_touched TEXT,
+                        final_answer TEXT,
+                        status TEXT DEFAULT 'success'
+                    )"""
+                )
+                db.execute(
+                    "INSERT INTO sessions (timestamp, user_query, tools_used, files_touched, final_answer, status)"
+                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        timestamp,
+                        self.user_query[:200],
+                        ", ".join(self.tools_used) if self.tools_used else "respond",
+                        ", ".join(self.files_touched) if self.files_touched else "",
+                        self.final_answer,
+                        self.status,
+                    ),
+                )
+        except Exception as exc:
+            log.debug("Session save failed: %s", exc)
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -79,6 +145,12 @@ class WebBridge:
         self._connections: Set[WebSocketServerProtocol] = set()
         self._runtime_bus = None
         self._running = False
+        self._agent = None
+        self._orchestrator = None
+        self._db_path = ""
+        self._kernel = None
+        self._mcp_cli = None
+        self._runtime_cli = None
 
     @property
     def url(self) -> str:
@@ -93,6 +165,23 @@ class WebBridge:
         if hasattr(runtime_bus, "subscribe_all"):
             runtime_bus.subscribe_all(self._on_runtime_event)
             log.info("WebBridge subscribed to runtime EventBus")
+
+    def bind_agent(
+        self,
+        agent,
+        orchestrator=None,
+        db_path: str = "",
+        kernel=None,
+        mcp_cli=None,
+        runtime_cli=None,
+    ) -> None:
+        """Bind the agent + orchestrator so user chat messages execute real turns."""
+        self._agent = agent
+        self._orchestrator = orchestrator
+        self._db_path = db_path
+        self._kernel = kernel
+        self._mcp_cli = mcp_cli
+        self._runtime_cli = runtime_cli
 
     async def start(self) -> None:
         """Start the WebSocket server."""
@@ -167,6 +256,12 @@ class WebBridge:
                                 "timestamp": time.time(),
                             })
                         )
+                    elif msg_type == "user_message":
+                        user_msg = message.get("message", "")
+                        if user_msg:
+                            asyncio.ensure_future(
+                                self._run_user_turn(user_msg, websocket)
+                            )
                 except json.JSONDecodeError:
                     log.debug("WebBridge invalid JSON from %s", client_info)
 
@@ -225,6 +320,96 @@ class WebBridge:
             await websocket.send(json.dumps(payload, default=str))
         except Exception as exc:
             log.warning("WebBridge send error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # User chat -> agent turn execution
+    # ------------------------------------------------------------------
+
+    async def _run_user_turn(self, user_msg: str, websocket) -> None:
+        """Execute a user chat message through the orchestrator and reply."""
+        await self._send_raw(websocket, {
+            "type": "user_message_received",
+            "source": "web_bridge",
+            "specialist": "HERMES",
+            "action": user_msg[:120],
+            "data": {"message": user_msg},
+            "timestamp": time.time(),
+        })
+
+        if self._agent is None or self._orchestrator is None:
+            await self._send_raw(websocket, {
+                "type": "agent_response",
+                "source": "system",
+                "specialist": "",
+                "action": "Agent backend is not initialized.",
+                "data": {},
+                "timestamp": time.time(),
+            })
+            return
+
+        # Route #kernel / #mcp / #status commands (web parity with the old CLI)
+        if user_msg.lstrip().startswith("#"):
+            await self._run_kernel_command(user_msg, websocket)
+            return
+
+        try:
+            # execute_turn is async and publishes to the runtime EventBus (the
+            # same loop the bridge runs on), so await it directly here.
+            session_tracker = _SessionRecorder()
+            session_tracker.user_query = user_msg
+            turn_result = await self._orchestrator.execute_turn(
+                self._agent,
+                user_msg,
+                session_tracker=session_tracker,
+                db_path=self._db_path,
+            )
+            session_tracker.save(self._db_path)
+            answer = turn_result.get("output") or "(no output)"
+            await self._send_raw(websocket, {
+                "type": "agent_response",
+                "source": "orchestrator",
+                "specialist": "HERALD",
+                "action": answer,
+                "data": {"tools_used": turn_result.get("specialists_active", [])},
+                "timestamp": time.time(),
+            })
+        except Exception as exc:
+            log.error("Agent turn failed: %s", exc)
+            log.debug(traceback.format_exc())
+            await self._send_raw(websocket, {
+                "type": "agent_error",
+                "source": "orchestrator",
+                "specialist": "",
+                "action": str(exc)[:300],
+                "data": {},
+                "timestamp": time.time(),
+            })
+
+    async def _run_kernel_command(self, cmd: str, websocket) -> None:
+        """Execute a #kernel / #mcp / #status command and reply with its output."""
+        lower = cmd.lower().strip()
+        try:
+            if lower.startswith("#status") and self._runtime_cli is not None:
+                result = await asyncio.to_thread(self._runtime_cli.execute, cmd)
+                text = json.dumps(result, default=str)[:2000]
+            elif lower.startswith("#mcp") and self._mcp_cli is not None:
+                result = await self._mcp_cli.execute(cmd)
+                text = json.dumps(result, default=str)[:2000]
+            elif self._kernel is not None:
+                result = await asyncio.to_thread(self._kernel.parse_and_execute, cmd)
+                text = json.dumps(result, default=str)[:2000]
+            else:
+                text = f"Unknown command: {cmd}"
+        except Exception as exc:
+            text = f"Command error: {exc}"
+        await self._send_raw(websocket, {
+            "type": "agent_response",
+            "source": "kernel",
+            "specialist": "",
+            "action": text,
+            "data": {},
+            "timestamp": time.time(),
+        })
 
     @staticmethod
     def _event_to_payload(event: BaseEvent) -> Optional[Dict[str, Any]]:

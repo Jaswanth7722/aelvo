@@ -284,7 +284,7 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
       {/* Header */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-200">Security Dashboard</h2>
+          <h2 className="text-lg font-bold text-ink">Security Dashboard</h2>
           <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border ${
             posture.overallStatus === "healthy"
               ? "text-accent-green border-accent-green/40 bg-accent-green/8"
@@ -292,7 +292,7 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
                 ? "text-accent-amber border-accent-amber/40 bg-accent-amber/8"
                 : posture.overallStatus === "critical"
                   ? "text-accent-red border-accent-red/40 bg-accent-red/8"
-                  : "text-gray-500 border-gray-600/40 bg-gray-700/20"
+                  : "text-ink-muted border-surface-border/40 bg-gray-300/20"
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${
               posture.overallStatus === "healthy" ? "bg-accent-green"
@@ -349,12 +349,12 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
           {/* Row 2: Posture recommendations */}
           {posture.recommendations.length > 0 && (
             <div className="panel">
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Recommendations</div>
+              <div className="text-xs text-ink-muted uppercase tracking-wider mb-2">Recommendations</div>
               <div className="space-y-1">
                 {posture.recommendations.map((r, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
                     <span className="text-accent-amber">→</span>
-                    <span className="text-gray-400">{r}</span>
+                    <span className="text-ink-soft">{r}</span>
                   </div>
                 ))}
               </div>
@@ -364,7 +364,7 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
           {/* Row 3: Finding severity breakdown */}
           {posture.totalFindings > 0 && (
             <div className="panel">
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Finding Severity Breakdown</div>
+              <div className="text-xs text-ink-muted uppercase tracking-wider mb-3">Finding Severity Breakdown</div>
               <div className="flex items-center gap-2 h-5">
                 {(["critical", "high", "medium", "low", "info"] as SecuritySeverity[]).map((sev) => {
                   const count = sev === "critical" ? posture.criticalFindings
@@ -384,7 +384,7 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
                   );
                 })}
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] text-gray-500">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] text-ink-muted">
                 {(["critical", "high", "medium", "low"] as SecuritySeverity[]).map((sev) => {
                   const count = sev === "critical" ? posture.criticalFindings
                     : sev === "high" ? posture.highFindings
@@ -416,12 +416,12 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`text-xs font-medium pb-3 -mb-3 border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.key ? "text-gray-200" : "text-gray-600 hover:text-gray-400"
+                    activeTab === tab.key ? "text-ink" : "text-ink-muted hover:text-ink-soft"
                   }`}
                   style={{ borderColor: activeTab === tab.key ? tab.color : "transparent" }}
                 >
                   {tab.label}
-                  <span className="ml-1.5 text-gray-600">({tab.count})</span>
+                  <span className="ml-1.5 text-ink-muted">({tab.count})</span>
                 </button>
               ))}
             </div>
@@ -431,7 +431,7 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
               {activeTab === "findings" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {findings.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8 col-span-full">No security findings recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8 col-span-full">No security findings recorded</div>
                   )}
                   {findings.map((f, i) => (
                     <FindingCard
@@ -455,13 +455,13 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
                           <span className={`text-sm ${s.passed ? "text-accent-green" : "text-accent-red"}`}>
                             {s.passed ? "✓" : "✗"}
                           </span>
-                          <span className="text-xs font-semibold text-gray-300">Scan: {s.id}</span>
+                          <span className="text-xs font-semibold text-ink-soft">Scan: {s.id}</span>
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${s.passed ? "text-accent-green bg-accent-green/15" : "text-accent-red bg-accent-red/15"}`}>
                             {s.passed ? "PASSED" : "FAILED"}
                           </span>
-                          <span className="text-[10px] text-gray-600 ml-auto">{fmtRelative(s.timestamp)}</span>
+                          <span className="text-[10px] text-ink-muted ml-auto">{fmtRelative(s.timestamp)}</span>
                         </div>
-                        <div className="flex items-center gap-3 text-[10px] text-gray-600">
+                        <div className="flex items-center gap-3 text-[10px] text-ink-muted">
                           <span>Findings: {s.totalFindings}</span>
                           {s.criticalCount > 0 && <span className="text-accent-red">CRITICAL {s.criticalCount}</span>}
                           {s.highCount > 0 && <span className="text-accent-amber">HIGH {s.highCount}</span>}
@@ -492,13 +492,13 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
               {activeTab === "audit" && (
                 <>
                   {auditRecords.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8">No audit records recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-8">No audit records recorded</div>
                   )}
                   <div className="space-y-1">
                     <div className="flex gap-2 mb-2 px-1 text-xs">
                       <span className="text-accent-green">Chain: intact</span>
-                      <span className="text-gray-600">·</span>
-                      <span className="text-gray-500">{auditRecords.length} records</span>
+                      <span className="text-ink-muted">·</span>
+                      <span className="text-ink-muted">{auditRecords.length} records</span>
                     </div>
                     {auditRecords.slice(0, 50).map((r, i) => (
                       <AuditRow key={`${r.id}-${i}`} record={r} />
@@ -517,12 +517,12 @@ export function SecurityDashboard({ events }: SecurityDashboardProps) {
                       <div key={c.id} className="border border-surface-border rounded-lg p-3 hover:bg-surface-alt/50 transition-colors">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm" style={{ color: statusColor }}>{statusIcon}</span>
-                          <span className="text-xs font-semibold text-gray-300">{c.name}</span>
+                          <span className="text-xs font-semibold text-ink-soft">{c.name}</span>
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ color: statusColor, backgroundColor: `${statusColor}15` }}>
                             {c.status.toUpperCase().replace(/_/g, " ")}
                           </span>
                         </div>
-                        <p className="text-[11px] text-gray-500">{c.message}</p>
+                        <p className="text-[11px] text-ink-muted">{c.message}</p>
                       </div>
                     );
                   })}
@@ -545,12 +545,12 @@ function SummaryCard({ label, value, unit, sub, color, icon }: {
     <div className="panel">
       <div className="flex items-center gap-1.5 mb-1">
         <span className="text-xs">{icon}</span>
-        <div className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</div>
+        <div className="text-[10px] text-ink-muted uppercase tracking-wider">{label}</div>
       </div>
       <div className="text-xl font-bold" style={{ color }}>
         {value}{unit || ""}
       </div>
-      {sub && <div className="text-[10px] text-gray-600 mt-0.5 truncate">{sub}</div>}
+      {sub && <div className="text-[10px] text-ink-muted mt-0.5 truncate">{sub}</div>}
     </div>
   );
 }
@@ -573,13 +573,13 @@ function FindingCard({ finding, selected, onSelect }: {
         <span className="text-[10px] font-semibold px-1 py-0.5 rounded" style={{ color: sColor, backgroundColor: `${sColor}15` }}>
           {finding.severity.toUpperCase()}
         </span>
-        <span className="text-xs text-gray-300 truncate">{finding.title}</span>
-        <span className="text-[10px] text-gray-600 ml-auto">{fmtRelative(finding.timestamp)}</span>
+        <span className="text-xs text-ink-soft truncate">{finding.title}</span>
+        <span className="text-[10px] text-ink-muted ml-auto">{fmtRelative(finding.timestamp)}</span>
       </div>
-      <p className="text-[11px] text-gray-500 mb-1">{finding.message}</p>
-      <div className="flex items-center gap-3 text-[10px] text-gray-600">
-        <span>Category: <span className="text-gray-500">{catInfo?.label || finding.category}</span></span>
-        {finding.location && <span>Source: <span className="text-gray-500 font-mono">{finding.location}</span></span>}
+      <p className="text-[11px] text-ink-muted mb-1">{finding.message}</p>
+      <div className="flex items-center gap-3 text-[10px] text-ink-muted">
+        <span>Category: <span className="text-ink-muted">{catInfo?.label || finding.category}</span></span>
+        {finding.location && <span>Source: <span className="text-ink-muted font-mono">{finding.location}</span></span>}
       </div>
       {selected && finding.recommendation && (
         <div className="mt-2 text-[10px] text-accent-amber border-t border-surface-border pt-2">
@@ -597,16 +597,16 @@ function AuditRow({ record }: { record: AuditRecord }) {
 
   return (
     <div className="border border-surface-border rounded-lg px-3 py-2 hover:bg-surface-alt/50 transition-colors flex items-center gap-3">
-      <span className="text-xs font-mono text-gray-600 w-12 shrink-0">{record.subsystem.slice(0, 4).toUpperCase()}</span>
+      <span className="text-xs font-mono text-ink-muted w-12 shrink-0">{record.subsystem.slice(0, 4).toUpperCase()}</span>
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-gray-300 truncate">{record.action.replace(/_/g, " ")}</div>
+        <div className="text-xs text-ink-soft truncate">{record.action.replace(/_/g, " ")}</div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-gray-600">{record.actor}</span>
-          <span className="text-[10px] text-gray-600">{record.resource}</span>
+          <span className="text-[10px] text-ink-muted">{record.actor}</span>
+          <span className="text-[10px] text-ink-muted">{record.resource}</span>
         </div>
       </div>
       <span className="text-[10px] font-semibold" style={{ color: decisionColor }}>{record.decision.toUpperCase()}</span>
-      <span className="text-[10px] text-gray-600 shrink-0">{fmtRelative(record.timestamp)}</span>
+      <span className="text-[10px] text-ink-muted shrink-0">{fmtRelative(record.timestamp)}</span>
     </div>
   );
 }

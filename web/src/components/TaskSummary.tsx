@@ -74,12 +74,12 @@ export function TaskSummaryCard({ events }: TaskSummaryCardProps) {
 
   return (
     <div className="panel">
-      <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-4">Task Summary</h3>
+      <h3 className="text-xs text-ink-muted uppercase tracking-wider mb-4">Task Summary</h3>
 
       {/* Total */}
       <div className="text-center mb-4">
-        <div className="text-3xl font-bold text-gray-200">{summary.total}</div>
-        <div className="text-xs text-gray-500">Total Tasks</div>
+        <div className="text-3xl font-bold text-ink">{summary.total}</div>
+        <div className="text-xs text-ink-muted">Total Tasks</div>
       </div>
 
       {/* Horizontal stacked bar */}
@@ -125,28 +125,28 @@ export function TaskSummaryCard({ events }: TaskSummaryCardProps) {
       <div className="grid grid-cols-5 gap-1 text-center text-[10px]">
         <div>
           <div className="w-2 h-2 rounded-full bg-accent-green mx-auto mb-0.5" />
-          <div className="text-gray-500">{summary.completed}</div>
-          <div className="text-gray-600">Done</div>
+          <div className="text-ink-muted">{summary.completed}</div>
+          <div className="text-ink-muted">Done</div>
         </div>
         <div>
           <div className="w-2 h-2 rounded-full bg-accent-blue mx-auto mb-0.5" />
-          <div className="text-gray-500">{summary.active}</div>
-          <div className="text-gray-600">Active</div>
+          <div className="text-ink-muted">{summary.active}</div>
+          <div className="text-ink-muted">Active</div>
         </div>
         <div>
           <div className="w-2 h-2 rounded-full bg-gray-500 mx-auto mb-0.5" />
-          <div className="text-gray-500">{summary.pending}</div>
-          <div className="text-gray-600">Pending</div>
+          <div className="text-ink-muted">{summary.pending}</div>
+          <div className="text-ink-muted">Pending</div>
         </div>
         <div>
           <div className="w-2 h-2 rounded-full bg-accent-red mx-auto mb-0.5" />
-          <div className="text-gray-500">{summary.failed}</div>
-          <div className="text-gray-600">Failed</div>
+          <div className="text-ink-muted">{summary.failed}</div>
+          <div className="text-ink-muted">Failed</div>
         </div>
         <div>
           <div className="w-2 h-2 rounded-full bg-accent-amber mx-auto mb-0.5" />
-          <div className="text-gray-500">{summary.blocked}</div>
-          <div className="text-gray-600">Blocked</div>
+          <div className="text-ink-muted">{summary.blocked}</div>
+          <div className="text-ink-muted">Blocked</div>
         </div>
       </div>
     </div>

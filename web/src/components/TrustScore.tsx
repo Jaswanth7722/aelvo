@@ -77,10 +77,10 @@ export function TrustScore({ events }: TrustScoreProps) {
   return (
     <div className="panel">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs text-gray-500 uppercase tracking-wider">Trust Score</h3>
+        <h3 className="text-xs text-ink-muted uppercase tracking-wider">Trust Score</h3>
         <span className={`text-2xl font-bold ${scoreColor}`}>
           {state.recentScore}
-          <span className="text-xs text-gray-600">%</span>
+          <span className="text-xs text-ink-muted">%</span>
         </span>
       </div>
 
@@ -94,20 +94,20 @@ export function TrustScore({ events }: TrustScoreProps) {
 
       {/* Metrics grid */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-        <div className="text-gray-500">Avg Confidence</div>
-        <div className="text-gray-200 text-right font-medium">{state.averageConfidence}%</div>
+        <div className="text-ink-muted">Avg Confidence</div>
+        <div className="text-ink text-right font-medium">{state.averageConfidence}%</div>
 
-        <div className="text-gray-500">Total Findings</div>
-        <div className="text-gray-200 text-right font-medium">{state.totalFindings}</div>
+        <div className="text-ink-muted">Total Findings</div>
+        <div className="text-ink text-right font-medium">{state.totalFindings}</div>
 
         <div className="text-accent-green">Verified</div>
-        <div className="text-gray-200 text-right font-medium">{state.verifiedCount}</div>
+        <div className="text-ink text-right font-medium">{state.verifiedCount}</div>
 
         <div className="text-accent-red">Challenged</div>
-        <div className="text-gray-200 text-right font-medium">{state.challengedCount}</div>
+        <div className="text-ink text-right font-medium">{state.challengedCount}</div>
 
-        <div className="text-gray-500">Pending</div>
-        <div className="text-gray-200 text-right font-medium">{state.pendingCount}</div>
+        <div className="text-ink-muted">Pending</div>
+        <div className="text-ink text-right font-medium">{state.pendingCount}</div>
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ export function EventFeed({ events, filter, maxVisible = 100 }: EventFeedProps) 
 
   if (visible.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-600 text-sm">
+      <div className="flex items-center justify-center h-full text-ink-muted text-sm">
         Waiting for events…
       </div>
     );
@@ -28,9 +28,13 @@ export function EventFeed({ events, filter, maxVisible = 100 }: EventFeedProps) 
   return (
     <div className="event-feed h-full">
       {visible.map((event, i) => (
-        <div key={`${event.timestamp}-${i}`} className="event-entry flex items-start gap-2">
+        <div
+          key={`${event.timestamp}-${i}`}
+          className="event-entry flex items-start gap-2 animate-fade-up"
+          style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+        >
           {/* Timestamp */}
-          <span className="text-gray-600 text-xs shrink-0 w-12 pt-0.5 font-medium">
+          <span className="text-ink-muted text-xs shrink-0 w-12 pt-0.5 font-medium">
             {formatTime(event.timestamp)}
           </span>
 
@@ -45,10 +49,11 @@ export function EventFeed({ events, filter, maxVisible = 100 }: EventFeedProps) 
           {/* Specialist badge */}
           {event.specialist && (
             <span
-              className="shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded"
+              className="shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded border"
               style={{
                 color: event.color,
                 backgroundColor: `${event.color}15`,
+                borderColor: `${event.color}30`,
               }}
             >
               {event.specialist}
@@ -56,7 +61,7 @@ export function EventFeed({ events, filter, maxVisible = 100 }: EventFeedProps) 
           )}
 
           {/* Action text */}
-          <span className="text-gray-300 text-sm leading-5 truncate">
+          <span className="text-ink text-sm leading-5 truncate">
             {event.action}
           </span>
         </div>

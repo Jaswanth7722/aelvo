@@ -8,6 +8,7 @@ interface UseWebSocketReturn {
   lastEvent: UIEvent | null;
   clearEvents: () => void;
   reconnect: () => void;
+  sendMessage: (message: string) => boolean;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -88,6 +89,17 @@ export function useWebSocket(): UseWebSocketReturn {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.url, config.reconnectDelay, config.maxEvents]);
 
+  const sendMessage = useCallback((message: string): boolean => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify({ type: "user_message", message }));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const clearEvents = useCallback(() => {
     setEvents([]);
     setLastEvent(null);
@@ -123,5 +135,5 @@ export function useWebSocket(): UseWebSocketReturn {
     };
   }, [connect]);
 
-  return { status, events, lastEvent, clearEvents, reconnect };
+  return { status, events, lastEvent, clearEvents, reconnect, sendMessage };
 }

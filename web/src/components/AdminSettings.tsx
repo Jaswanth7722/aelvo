@@ -73,7 +73,7 @@ export function AdminSettings({
     connecting: { label: "Connecting…", className: "bg-amber-600/20 text-amber-400 border-amber-600/30" },
     disconnected: { label: "Disconnected", className: "bg-red-600/20 text-red-400 border-red-600/30" },
     error: { label: "Error", className: "bg-red-600/20 text-red-400 border-red-600/30" },
-  }[connectionStatus] || { label: "Unknown", className: "bg-gray-600/20 text-gray-400 border-gray-600/30" };
+  }[connectionStatus] || { label: "Unknown", className: "bg-gray-600/20 text-ink-soft border-surface-border/30" };
 
   // ── Raw Event Log Tab ───────────────────────────────────────
 
@@ -145,8 +145,8 @@ export function AdminSettings({
     <div className="flex-1 flex flex-col overflow-hidden p-6">
       {/* Page header */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-100">Admin Settings</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="text-xl font-extrabold text-ink">Admin Settings</h2>
+        <p className="text-sm text-ink-muted mt-1">
           Configure WebSocket connection parameters and inspect raw event data
         </p>
       </div>
@@ -160,7 +160,7 @@ export function AdminSettings({
             className={`px-4 py-2.5 text-sm font-medium transition-colors duration-150 border-b-2 -mb-px ${
               activeTab === tab.key
                 ? "border-accent-blue text-accent-blue"
-                : "border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600"
+                : "border-transparent text-ink-muted hover:text-ink-soft hover:border-surface-border"
             }`}
           >
             {tab.label}
@@ -178,7 +178,7 @@ export function AdminSettings({
         <div className="flex-1 overflow-y-auto space-y-6 pr-2">
           {/* Status indicator */}
           <div className="bg-surface-alt border border-surface-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
+            <h3 className="text-sm font-semibold text-ink-soft uppercase tracking-wider mb-4">
               Connection Status
             </h3>
             <div className="flex items-center gap-4">
@@ -187,10 +187,10 @@ export function AdminSettings({
               >
                 {statusBadge.label}
               </span>
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-ink-soft">
                 {config.url}
               </span>
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-ink-muted">
                 {connectionStatus === "connected"
                   ? "Receiving events"
                   : "Not connected"}
@@ -208,14 +208,14 @@ export function AdminSettings({
 
           {/* Connection parameters form */}
           <div className="bg-surface-alt border border-surface-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
+            <h3 className="text-sm font-semibold text-ink-soft uppercase tracking-wider mb-4">
               Connection Parameters
             </h3>
 
             <div className="space-y-4">
               {/* WebSocket URL */}
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
+                <label className="block text-sm text-ink-soft mb-1.5">
                   WebSocket URL
                 </label>
                 <input
@@ -223,9 +223,9 @@ export function AdminSettings({
                   value={editUrl}
                   onChange={(e) => setEditUrl(e.target.value)}
                   placeholder="ws://127.0.0.1:8765"
-                  className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors"
+                  className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-accent-blue/50 transition-colors"
                 />
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-ink-muted mt-1">
                   The WebSocket endpoint the backend bridge listens on. Change
                   requires a reconnection to take effect.
                 </p>
@@ -233,7 +233,7 @@ export function AdminSettings({
 
               {/* Reconnect delay */}
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
+                <label className="block text-sm text-ink-soft mb-1.5">
                   Reconnect Delay (ms)
                 </label>
                 <input
@@ -242,9 +242,9 @@ export function AdminSettings({
                   onChange={(e) => setEditReconnectDelay(e.target.value)}
                   min={500}
                   step={100}
-                  className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors"
+                  className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-accent-blue/50 transition-colors"
                 />
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-ink-muted mt-1">
                   Time to wait before attempting to reconnect after a
                   disconnection. Minimum 500ms.
                 </p>
@@ -252,7 +252,7 @@ export function AdminSettings({
 
               {/* Max events */}
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
+                <label className="block text-sm text-ink-soft mb-1.5">
                   Max Events in Memory
                 </label>
                 <input
@@ -261,9 +261,9 @@ export function AdminSettings({
                   onChange={(e) => setEditMaxEvents(e.target.value)}
                   min={10}
                   step={50}
-                  className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors"
+                  className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-accent-blue/50 transition-colors"
                 />
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-ink-muted mt-1">
                   Maximum number of events kept in memory across all pages.
                   Older events are dropped when this limit is exceeded. Minimum
                   10.
@@ -281,7 +281,7 @@ export function AdminSettings({
               </button>
               <button
                 onClick={handleReset}
-                className="px-4 py-2 text-sm text-gray-500 hover:text-gray-300 transition-colors"
+                className="px-4 py-2 text-sm text-ink-muted hover:text-ink-soft transition-colors"
               >
                 Reset to Defaults
               </button>
@@ -300,18 +300,18 @@ export function AdminSettings({
           {/* Last event preview */}
           {lastEvent && (
             <div className="bg-surface-alt border border-surface-border rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">
+              <h3 className="text-sm font-semibold text-ink-soft uppercase tracking-wider mb-3">
                 Last Event Received
               </h3>
               <div className="bg-surface rounded-lg p-3 overflow-x-auto">
-                <pre className="text-xs text-gray-400 leading-relaxed">
-                  <span className="text-gray-500">
+                <pre className="text-xs text-ink-soft leading-relaxed">
+                  <span className="text-ink-muted">
                     {formatTimestamp(lastEvent.timestamp)}
                   </span>{" "}
                   <span style={{ color: lastEvent.color || "#6b7280" }}>
                     {lastEvent.icon || "●"}
                   </span>{" "}
-                  <span className="text-gray-200">{lastEvent.type}</span>
+                  <span className="text-ink">{lastEvent.type}</span>
                   {"\n"}
                   {JSON.stringify(lastEvent, null, 2)}
                 </pre>
@@ -332,14 +332,14 @@ export function AdminSettings({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search events by type, source, specialist, action, or data…"
-                className="w-full bg-surface border border-surface-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors"
+                className="w-full bg-surface border border-surface-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-accent-blue/50 transition-colors"
               />
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600 text-xs">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted text-xs">
                 ◐
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-ink-muted">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -360,7 +360,7 @@ export function AdminSettings({
               </label>
             </div>
 
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-ink-muted">
               {filteredEvents.length} / {events.length}
             </span>
 
@@ -375,7 +375,7 @@ export function AdminSettings({
           {/* Event log */}
           <div className="flex-1 overflow-y-auto bg-surface-alt border border-surface-border rounded-xl">
             {filteredEvents.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-600 text-sm">
+              <div className="flex items-center justify-center h-full text-ink-muted text-sm">
                 {searchQuery
                   ? "No events match your search"
                   : "No events received yet. Connect to the backend bridge to see events."}
@@ -398,7 +398,7 @@ export function AdminSettings({
                             backgroundColor: e.color || "#6b7280",
                           }}
                         />
-                        <span className="text-xs text-gray-500 tabular-nums w-24 shrink-0 font-mono">
+                        <span className="text-xs text-ink-muted tabular-nums w-24 shrink-0 font-mono">
                           {formatTimestamp(e.timestamp)}
                         </span>
                         <span
@@ -407,16 +407,16 @@ export function AdminSettings({
                         >
                           {e.icon || "●"}
                         </span>
-                        <span className="text-xs font-medium text-gray-200 shrink-0">
+                        <span className="text-xs font-medium text-ink shrink-0">
                           {e.type}
                         </span>
-                        <span className="text-xs text-gray-600 hidden sm:inline shrink-0">
+                        <span className="text-xs text-ink-muted hidden sm:inline shrink-0">
                           {e.specialist}
                         </span>
-                        <span className="text-xs text-gray-600 truncate flex-1 min-w-0">
+                        <span className="text-xs text-ink-muted truncate flex-1 min-w-0">
                           {e.action}
                         </span>
-                        <span className="text-xs text-gray-700 shrink-0 tabular-nums">
+                        <span className="text-xs text-ink-muted shrink-0 tabular-nums">
                           {formatRelative(e.timestamp)}
                         </span>
                         <button
@@ -424,7 +424,7 @@ export function AdminSettings({
                             ev.stopPropagation();
                             handleCopyRaw(e);
                           }}
-                          className="opacity-0 group-hover:opacity-100 text-xs px-1.5 py-0.5 rounded text-gray-500 hover:text-gray-300 transition-all shrink-0"
+                          className="opacity-0 group-hover:opacity-100 text-xs px-1.5 py-0.5 rounded text-ink-muted hover:text-ink-soft transition-all shrink-0"
                           title="Copy raw JSON"
                         >
                           {isCopied ? "✓" : "⎘"}
@@ -434,10 +434,10 @@ export function AdminSettings({
                       {/* Expandable raw data */}
                       {showRaw && (
                         <div className="px-4 pb-2 pl-14">
-                          <pre className="text-xs text-gray-500 leading-relaxed bg-surface/50 rounded-md p-2 overflow-x-auto max-h-48 overflow-y-auto">
+                          <pre className="text-xs text-ink-muted leading-relaxed bg-surface/50 rounded-md p-2 overflow-x-auto max-h-48 overflow-y-auto">
                             {JSON.stringify(e.data, null, 2) || "{}"}
                           </pre>
-                          <div className="text-[10px] text-gray-700 mt-1 font-mono">
+                          <div className="text-[10px] text-ink-muted mt-1 font-mono">
                             source: {e.source} | specialist: {e.specialist} |
                             action: {e.action}
                           </div>

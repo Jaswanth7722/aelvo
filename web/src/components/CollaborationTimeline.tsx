@@ -140,10 +140,10 @@ export function CollaborationTimeline({ events }: CollaborationTimelineProps) {
         {/* Top row: title + count */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold text-gray-200">Collaboration Timeline</h2>
-            <span className="text-xs text-gray-500">{timelineEvents.length} events</span>
+            <h2 className="text-lg font-bold text-ink">Collaboration Timeline</h2>
+            <span className="text-xs text-ink-muted">{timelineEvents.length} events</span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center gap-2 text-xs text-ink-muted">
             <span>Auto-scroll</span>
             <button
               onClick={() => setAutoScroll(!autoScroll)}
@@ -163,13 +163,13 @@ export function CollaborationTimeline({ events }: CollaborationTimelineProps) {
         {/* Search + filters */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm">🔍</span>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search events..."
-              className="w-full bg-surface border border-surface-border rounded-lg pl-9 pr-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors"
+              className="w-full bg-surface border border-surface-border rounded-lg pl-9 pr-3 py-1.5 text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-accent-blue/50 transition-colors"
             />
           </div>
 
@@ -180,7 +180,7 @@ export function CollaborationTimeline({ events }: CollaborationTimelineProps) {
               className={`text-xs px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
                 specialistFilter === null
                   ? "bg-accent-blue/10 text-accent-blue border-accent-blue/30"
-                  : "text-gray-500 border-surface-border hover:border-gray-600"
+                  : "text-ink-muted border-surface-border hover:border-surface-border"
               }`}
             >
               All
@@ -197,7 +197,7 @@ export function CollaborationTimeline({ events }: CollaborationTimelineProps) {
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
                     specialistFilter === spec
                       ? "text-white border-transparent"
-                      : "text-gray-400 border-surface-border hover:border-gray-600"
+                      : "text-ink-soft border-surface-border hover:border-surface-border"
                   }`}
                   style={
                     specialistFilter === spec
@@ -222,8 +222,8 @@ export function CollaborationTimeline({ events }: CollaborationTimelineProps) {
         {timelineEvents.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="text-3xl mb-2 text-gray-600">◈</div>
-              <p className="text-gray-600 text-sm">
+              <div className="text-3xl mb-2 text-ink-muted">◈</div>
+              <p className="text-ink-muted text-sm">
                 {search || specialistFilter
                   ? "No events match your filters"
                   : "Waiting for collaboration events…"}
@@ -294,7 +294,7 @@ function TimelineEntry({ event, isSelected, onToggle }: TimelineEntryProps) {
       {/* Timeline dot + connector */}
       <div className="relative shrink-0 flex flex-col items-center w-[72px]">
         {/* Timestamp */}
-        <span className="text-[10px] text-gray-600 font-mono whitespace-nowrap mb-2">
+        <span className="text-[10px] text-ink-muted font-mono whitespace-nowrap mb-2">
           {formatTimestamp(event.timestamp)}
         </span>
         {/* Dot */}
@@ -340,18 +340,18 @@ function TimelineEntry({ event, isSelected, onToggle }: TimelineEntryProps) {
             )}
 
             {/* Event type */}
-            <span className="text-[10px] text-gray-600 font-mono shrink-0">
+            <span className="text-[10px] text-ink-muted font-mono shrink-0">
               {event.type.replace(/_/g, " ")}
             </span>
 
             {/* Relative time */}
-            <span className="text-[10px] text-gray-600 ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-[10px] text-ink-muted ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {formatRelative(event.timestamp)}
             </span>
           </div>
 
           {/* Action text */}
-          <p className="text-sm text-gray-300 leading-relaxed">
+          <p className="text-sm text-ink-soft leading-relaxed">
             {event.action}
           </p>
 
@@ -372,10 +372,10 @@ function TimelineEntry({ event, isSelected, onToggle }: TimelineEntryProps) {
                         : String(val);
                   return (
                     <div key={key} className="flex items-start gap-2">
-                      <span className="text-gray-600 font-mono shrink-0">
+                      <span className="text-ink-muted font-mono shrink-0">
                         {key}:
                       </span>
-                      <span className="text-gray-400 truncate">{display}</span>
+                      <span className="text-ink-soft truncate">{display}</span>
                     </div>
                   );
                 })}

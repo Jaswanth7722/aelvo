@@ -22,51 +22,54 @@ const NAV_ITEMS = [
   { path: "/admin", label: "Admin", icon: "⚙" },
 ];
 
+const STATUS_STYLES: Record<string, { color: string; label: string; dot: string }> = {
+  connected: { color: "text-emerald-600", label: "Connected", dot: "bg-emerald-500" },
+  connecting: { color: "text-amber-600", label: "Connecting…", dot: "bg-amber-500 animate-pulse" },
+  disconnected: { color: "text-rose-600", label: "Disconnected", dot: "bg-rose-500" },
+  error: { color: "text-rose-600", label: "Error", dot: "bg-rose-500" },
+};
+
 export function Layout({ children, connectionStatus, eventCount }: LayoutProps) {
   const location = useLocation();
-
-  const statusColor = {
-    connected: "text-accent-green",
-    connecting: "text-accent-amber",
-    disconnected: "text-accent-red",
-    error: "text-accent-red",
-  }[connectionStatus] || "text-gray-400";
-
-  const statusLabel = {
-    connected: "Connected",
-    connecting: "Connecting…",
-    disconnected: "Disconnected",
-    error: "Error",
-  }[connectionStatus] || "Unknown";
+  const status = STATUS_STYLES[connectionStatus] || STATUS_STYLES.disconnected;
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#FFF7EC]">
       {/* Sidebar */}
-      <aside className="w-56 border-r border-surface-border bg-surface-alt flex flex-col shrink-0">
+      <aside className="w-56 border-r border-surface-border bg-white/80 backdrop-blur-md flex flex-col shrink-0">
         {/* Logo / Brand */}
         <div className="px-5 py-4 border-b border-surface-border">
-          <h1 className="text-lg font-bold tracking-wide">
-            <span className="text-accent-purple">AELVO</span>
+          <h1 className="text-xl font-extrabold tracking-tight">
+            <span className="text-gradient">AELVO</span>
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Multi-Agent OS</p>
+          <p className="text-[11px] text-ink-muted mt-0.5 font-medium">Multi-Agent OS</p>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const active = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 ${
+                className={`group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
                   active
-                    ? "bg-accent-blue/10 text-accent-blue border border-accent-blue/20"
-                    : "text-gray-400 hover:text-gray-200 hover:bg-surface-border/40"
+                    ? "bg-gradient-to-r from-brand-orange/20 to-brand-purple/15 text-brand-deep border border-brand-orange/30 shadow-soft"
+                    : "text-ink-soft hover:text-brand-deep hover:bg-brand-orange/10 hover:translate-x-0.5 border border-transparent"
                 }`}
               >
-                <span>{item.icon}</span>
+                <span
+                  className={`w-5 text-center transition-transform duration-200 ${
+                    active ? "text-brand-orange group-hover:scale-110" : ""
+                  }`}
+                >
+                  {item.icon}
+                </span>
                 <span>{item.label}</span>
+                {active && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse-glow" />
+                )}
               </Link>
             );
           })}
@@ -75,13 +78,11 @@ export function Layout({ children, connectionStatus, eventCount }: LayoutProps) 
         {/* Connection status footer */}
         <div className="px-5 py-3 border-t border-surface-border">
           <div className="flex items-center gap-2 text-xs">
-            <span className={`w-2 h-2 rounded-full ${statusColor} ${
-              connectionStatus === "connecting" ? "animate-pulse" : ""
-            }`} />
-            <span className="text-gray-500">{statusLabel}</span>
+            <span className={`w-2 h-2 rounded-full ${status.dot}`} />
+            <span className={`font-semibold ${status.color}`}>{status.label}</span>
           </div>
-          <div className="text-xs text-gray-600 mt-1">
-            {eventCount} events
+          <div className="text-[11px] text-ink-muted mt-1">
+            {eventCount} events streamed
           </div>
         </div>
       </aside>

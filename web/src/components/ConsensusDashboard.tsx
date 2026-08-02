@@ -91,8 +91,8 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
       {/* Header */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-200">Consensus Dashboard</h2>
-          <span className="text-xs text-gray-500">{stats.totalDecisions + stats.totalConsensus + stats.totalChallenges} total events</span>
+          <h2 className="text-lg font-bold text-ink">Consensus Dashboard</h2>
+          <span className="text-xs text-ink-muted">{stats.totalDecisions + stats.totalConsensus + stats.totalChallenges} total events</span>
         </div>
       </header>
 
@@ -130,7 +130,7 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
           {/* Row 2: Stacked outcome bar */}
           {stats.totalDecisions > 0 && (
             <div className="panel">
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Decision Outcomes</div>
+              <div className="text-xs text-ink-muted uppercase tracking-wider mb-3">Decision Outcomes</div>
               <div className="w-full h-4 bg-surface-border rounded-full overflow-hidden flex">
                 {stats.approved > 0 && <div className="h-full bg-accent-green transition-all" style={{ width: `${(stats.approved / stats.totalDecisions) * 100}%` }} title={`${stats.approved} approved`} />}
                 {stats.rejected > 0 && <div className="h-full bg-accent-red transition-all" style={{ width: `${(stats.rejected / stats.totalDecisions) * 100}%` }} title={`${stats.rejected} rejected`} />}
@@ -138,7 +138,7 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
                 {stats.revision > 0 && <div className="h-full transition-all" style={{ width: `${(stats.revision / stats.totalDecisions) * 100}%`, backgroundColor: "#39c8ff" }} title={`${stats.revision} revision`} />}
                 {stats.replanned > 0 && <div className="h-full bg-accent-purple transition-all" style={{ width: `${(stats.replanned / stats.totalDecisions) * 100}%` }} title={`${stats.replanned} replanned`} />}
               </div>
-              <div className="flex gap-4 mt-2 text-[10px] text-gray-500">
+              <div className="flex gap-4 mt-2 text-[10px] text-ink-muted">
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-green mr-1" /> Approved ({stats.approved})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-red mr-1" /> Rejected ({stats.rejected})</span>
                 <span><span className="w-2 h-2 inline-block rounded-full bg-accent-amber mr-1" /> Escalated ({stats.escalated})</span>
@@ -162,13 +162,13 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
                   onClick={() => setActiveTab(tab.key)}
                   className={`text-xs font-medium pb-3 -mb-3 border-b-2 transition-colors ${
                     activeTab === tab.key
-                      ? "text-gray-200"
-                      : "text-gray-600 hover:text-gray-400"
+                      ? "text-ink"
+                      : "text-ink-muted hover:text-ink-soft"
                   }`}
                   style={{ borderColor: activeTab === tab.key ? tab.color : "transparent" }}
                 >
                   {tab.label}
-                  <span className="ml-1.5 text-gray-600">({tab.count})</span>
+                  <span className="ml-1.5 text-ink-muted">({tab.count})</span>
                 </button>
               ))}
             </div>
@@ -176,21 +176,21 @@ export function ConsensusDashboard({ events }: ConsensusDashboardProps) {
             {/* Tab content */}
             <div className="max-h-[400px] overflow-y-auto space-y-2">
               {activeTab === "decisions" && decisions.length === 0 && (
-                <div className="text-center text-gray-600 text-sm py-8">No architect decisions yet</div>
+                <div className="text-center text-ink-muted text-sm py-8">No architect decisions yet</div>
               )}
               {activeTab === "decisions" && decisions.map((d, i) => (
                 <DecisionRow key={d.id || i} decision={d} />
               ))}
 
               {activeTab === "consensus" && consensusItems.length === 0 && (
-                <div className="text-center text-gray-600 text-sm py-8">No consensus sessions yet</div>
+                <div className="text-center text-ink-muted text-sm py-8">No consensus sessions yet</div>
               )}
               {activeTab === "consensus" && consensusItems.map((c, i) => (
                 <ConsensusRow key={c.id || i} item={c} />
               ))}
 
               {activeTab === "challenges" && challenges.length === 0 && (
-                <div className="text-center text-gray-600 text-sm py-8">No challenges raised yet</div>
+                <div className="text-center text-ink-muted text-sm py-8">No challenges raised yet</div>
               )}
               {activeTab === "challenges" && challenges.map((c, i) => (
                 <ChallengeRow key={c.id || i} item={c} />
@@ -210,9 +210,9 @@ function SummaryCard({ label, value, sub, color, isPercent }: {
 }) {
   return (
     <div className="panel">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</div>
+      <div className="text-xs text-ink-muted uppercase tracking-wider mb-1">{label}</div>
       <div className="text-2xl font-bold" style={{ color }}>{value}{isPercent ? "%" : ""}</div>
-      <div className="text-[10px] text-gray-600 mt-1 truncate">{sub}</div>
+      <div className="text-[10px] text-ink-muted mt-1 truncate">{sub}</div>
     </div>
   );
 }
@@ -230,10 +230,10 @@ function DecisionRow({ decision }: { decision: DecisionRecord }) {
         <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: outcomeColor, backgroundColor: `${outcomeColor}15` }}>
           {decision.outcome.toUpperCase()}
         </span>
-        {decision.assignedTo && <span className="text-xs text-gray-500">→ {decision.assignedTo}</span>}
-        <span className="text-[10px] text-gray-600 ml-auto">{fmt(decision.timestamp)}</span>
+        {decision.assignedTo && <span className="text-xs text-ink-muted">→ {decision.assignedTo}</span>}
+        <span className="text-[10px] text-ink-muted ml-auto">{fmt(decision.timestamp)}</span>
       </div>
-      {decision.reason && <p className="text-sm text-gray-400">{decision.reason}</p>}
+      {decision.reason && <p className="text-sm text-ink-soft">{decision.reason}</p>}
       {decision.overriddenRec && (
         <div className="mt-1 text-[10px] text-accent-purple">Override: {decision.overriddenRec}</div>
       )}
@@ -250,20 +250,20 @@ function ConsensusRow({ item }: { item: ConsensusRecord }) {
     <div className="border border-surface-border rounded-lg px-4 py-2.5 hover:bg-surface-alt/50 transition-colors">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xs font-semibold" style={{ color: "#19f5a5" }}>CONSENSUS</span>
-        <span className="text-xs text-gray-500">{item.method}</span>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-ink-muted">{item.method}</span>
+        <span className="text-xs text-ink-muted">
           {item.confidence >= 0.7 ? "✅" : item.confidence >= 0.4 ? "◌" : "⚠"} {Math.round(item.confidence * 100)}%
         </span>
-        <span className="text-[10px] text-gray-600 ml-auto">{fmt(item.timestamp)}</span>
+        <span className="text-[10px] text-ink-muted ml-auto">{fmt(item.timestamp)}</span>
       </div>
-      <p className="text-sm text-gray-300">{item.recommendation}</p>
+      <p className="text-sm text-ink-soft">{item.recommendation}</p>
       {positions.length > 0 && (
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-xs text-accent-green">{forP} for</span>
-          <span className="text-xs text-gray-600">·</span>
+          <span className="text-xs text-ink-muted">·</span>
           <span className="text-xs text-accent-red">{againstP} against</span>
-          <span className="text-xs text-gray-600">·</span>
-          <span className="text-xs text-gray-500">{positions.length - forP - againstP} neutral</span>
+          <span className="text-xs text-ink-muted">·</span>
+          <span className="text-xs text-ink-muted">{positions.length - forP - againstP} neutral</span>
         </div>
       )}
       {positions.length > 0 && (
@@ -287,12 +287,12 @@ function ChallengeRow({ item }: { item: ChallengeRecord }) {
     <div className="border border-surface-border rounded-lg px-4 py-2.5 hover:bg-surface-alt/50 transition-colors">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xs font-semibold text-accent-red">⚠ CHALLENGE</span>
-        <span className="text-xs text-gray-400">by {item.challenger}</span>
-        {item.entryId && <span className="text-[10px] font-mono text-gray-600">entry: {item.entryId.slice(0, 10)}</span>}
-        <span className="text-[10px] text-gray-600 ml-auto">{fmt(item.timestamp)}</span>
+        <span className="text-xs text-ink-soft">by {item.challenger}</span>
+        {item.entryId && <span className="text-[10px] font-mono text-ink-muted">entry: {item.entryId.slice(0, 10)}</span>}
+        <span className="text-[10px] text-ink-muted ml-auto">{fmt(item.timestamp)}</span>
       </div>
-      <p className="text-sm text-gray-400">{item.claim}</p>
-      {item.evidence && <p className="text-xs text-gray-600 mt-1 italic">{item.evidence}</p>}
+      <p className="text-sm text-ink-soft">{item.claim}</p>
+      {item.evidence && <p className="text-xs text-ink-muted mt-1 italic">{item.evidence}</p>}
     </div>
   );
 }

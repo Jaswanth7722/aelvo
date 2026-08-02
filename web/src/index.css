@@ -2,14 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: #21262d transparent;
+    scrollbar-color: #e8d5b8 transparent;
   }
 
   ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -17,14 +38,30 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: #21262d;
+    background-color: #e8d5b8;
     border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #ff9f45;
+  }
+
+  body {
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(255, 159, 69, 0.14), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(139, 92, 246, 0.10), transparent 55%),
+      #FFF7EC;
+    background-attachment: fixed;
   }
 }
 
 @layer components {
   .panel {
-    @apply border border-surface-border rounded-lg bg-surface-alt p-4;
+    @apply border border-surface-border rounded-xl bg-white p-4 shadow-soft transition-all duration-200;
+  }
+
+  .panel:hover {
+    @apply shadow-card border-brand-orange/30;
   }
 
   .event-feed {
@@ -32,6 +69,55 @@
   }
 
   .event-entry {
-    @apply px-3 py-1.5 rounded text-sm hover:bg-surface-border/30 transition-colors duration-150;
+    @apply px-3 py-1.5 rounded-lg text-sm text-ink-soft hover:bg-brand-orange/10 transition-colors duration-150;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-surface-border bg-white text-ink-soft shadow-soft;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white
+      bg-gradient-to-r from-brand-orange to-brand-deep shadow-card
+      hover:shadow-glow hover:-translate-y-0.5 active:translate-y-0
+      transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-card disabled:hover:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-ink-soft
+      border border-surface-border bg-white hover:border-brand-orange/50 hover:text-brand-deep
+      transition-colors duration-150;
+  }
+
+  .input-field {
+    @apply w-full bg-white border border-surface-border rounded-xl px-4 py-3 text-sm text-ink
+      placeholder-ink-muted focus:outline-none focus:border-brand-purple/60 focus:ring-2 focus:ring-brand-purple/15
+      transition-all duration-150 resize-none;
+  }
+
+  /* Gradient shimmer used for skeleton / loading bars */
+  .shimmer {
+    background: linear-gradient(90deg, #f3e7d3 25%, #fff3de 50%, #f3e7d3 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(90deg, #ff9f45, #7c3aed);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .card-glass {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(244, 226, 201, 0.9);
+  }
+
+  .fade-up {
+    animation: fade-up 0.4s ease-out both;
   }
 }

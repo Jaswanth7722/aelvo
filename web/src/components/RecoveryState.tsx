@@ -55,7 +55,7 @@ export function RecoveryStateCard({ events }: RecoveryStateCardProps) {
 
   return (
     <div className="panel">
-      <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-4">Recovery State</h3>
+      <h3 className="text-xs text-ink-muted uppercase tracking-wider mb-4">Recovery State</h3>
 
       {/* Rate circle */}
       <div className="flex items-center justify-center mb-4">
@@ -78,7 +78,7 @@ export function RecoveryStateCard({ events }: RecoveryStateCardProps) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span              className={`text-sm font-bold ${state.totalEvents === 0 ? "text-gray-500" : barColor.replace("bg-", "text-")}`}>
+            <span              className={`text-sm font-bold ${state.totalEvents === 0 ? "text-ink-muted" : barColor.replace("bg-", "text-")}`}>
               {state.successRate}%
             </span>
           </div>
@@ -88,26 +88,26 @@ export function RecoveryStateCard({ events }: RecoveryStateCardProps) {
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3 text-center mb-3">
         <div>
-          <div className="text-lg font-bold text-gray-200">{state.totalEvents}</div>
-          <div className="text-[10px] text-gray-500">Total</div>
+          <div className="text-lg font-bold text-ink">{state.totalEvents}</div>
+          <div className="text-[10px] text-ink-muted">Total</div>
         </div>
         <div>
           <div className="text-lg font-bold text-accent-green">{state.succeeded}</div>
-          <div className="text-[10px] text-gray-500">Success</div>
+          <div className="text-[10px] text-ink-muted">Success</div>
         </div>
         <div>
           <div className="text-lg font-bold text-accent-red">{state.failed}</div>
-          <div className="text-[10px] text-gray-500">Failed</div>
+          <div className="text-[10px] text-ink-muted">Failed</div>
         </div>
       </div>
 
       {/* Recent actions */}
       {state.recentActions.length > 0 && (
         <div>
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Recent Actions</div>
+          <div className="text-[10px] text-ink-muted uppercase tracking-wider mb-1">Recent Actions</div>
           <div className="space-y-0.5">
             {state.recentActions.map((action, i) => (
-              <div key={i} className="text-xs text-gray-400 truncate">
+              <div key={i} className="text-xs text-ink-soft truncate">
                 {action}
               </div>
             ))}

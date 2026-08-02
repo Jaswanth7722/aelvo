@@ -144,12 +144,12 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
       {/* Header */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-200">Monitoring Dashboard</h2>
-          <span className="text-xs text-gray-500">{events.length} total events</span>
+          <h2 className="text-lg font-bold text-ink">Monitoring Dashboard</h2>
+          <span className="text-xs text-ink-muted">{events.length} total events</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <span className="text-accent-cyan">{stats.eventRate1m}/min current</span>
-          <span className="text-gray-500">
+          <span className="text-ink-muted">
             {stats.healthySubsystems}/{stats.totalSubsystems} subsystems healthy
           </span>
         </div>
@@ -193,13 +193,13 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
 
           {/* Row 2: Event rate bar chart */}
           <div className="panel">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Event Rate (events/min)</div>
+            <div className="text-xs text-ink-muted uppercase tracking-wider mb-3">Event Rate (events/min)</div>
             <div className="flex items-end gap-3 h-32 px-1">
               {rateBuckets.map((bucket) => {
                 const pct = (bucket.count / maxBucketCount) * 100;
                 return (
                   <div key={bucket.label} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                    <span className="text-[10px] text-gray-500 font-mono">{bucket.count}</span>
+                    <span className="text-[10px] text-ink-muted font-mono">{bucket.count}</span>
                     <div
                       className="w-full rounded-t transition-all duration-500"
                       style={{
@@ -207,7 +207,7 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
                         backgroundColor: bucket.count === 0 ? "#21262d" : bucket.count >= maxBucketCount * 0.8 ? "#ff5c7a" : bucket.count >= maxBucketCount * 0.5 ? "#f7b731" : "#3b82f6",
                       }}
                     />
-                    <span className="text-[10px] text-gray-600">{bucket.label}</span>
+                    <span className="text-[10px] text-ink-muted">{bucket.label}</span>
                   </div>
                 );
               })}
@@ -227,12 +227,12 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`text-xs font-medium pb-3 -mb-3 border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.key ? "text-gray-200" : "text-gray-600 hover:text-gray-400"
+                    activeTab === tab.key ? "text-ink" : "text-ink-muted hover:text-ink-soft"
                   }`}
                   style={{ borderColor: activeTab === tab.key ? tab.color : "transparent" }}
                 >
                   {tab.label}
-                  <span className="ml-1.5 text-gray-600">({tab.count})</span>
+                  <span className="ml-1.5 text-ink-muted">({tab.count})</span>
                 </button>
               ))}
             </div>
@@ -243,13 +243,13 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {metricSeries.filter((m) => m.count > 0).map((m) => (
                     <div key={m.name} className="border border-surface-border rounded-lg p-3 hover:bg-surface-alt/50 transition-colors">
-                      <div className="text-xs text-gray-300 font-semibold mb-1">{m.name}</div>
-                      <div className="text-lg font-bold text-gray-200">{m.count}</div>
-                      <div className="text-[10px] text-gray-500">{m.avg} /min average</div>
+                      <div className="text-xs text-ink-soft font-semibold mb-1">{m.name}</div>
+                      <div className="text-lg font-bold text-ink">{m.count}</div>
+                      <div className="text-[10px] text-ink-muted">{m.avg} /min average</div>
                     </div>
                   ))}
                   {metricSeries.filter((m) => m.count > 0).length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-8 col-span-full">No active metric series</div>
+                    <div className="text-center text-ink-muted text-sm py-8 col-span-full">No active metric series</div>
                   )}
                 </div>
               )}
@@ -259,7 +259,7 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
                 <>
                   {/* Configured Rules Section */}
                   <details className="mb-3 group">
-                    <summary className="text-xs text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-400 select-none">
+                    <summary className="text-xs text-ink-muted uppercase tracking-wider cursor-pointer hover:text-ink-soft select-none">
                       Alert Rules ({DEFAULT_RULES.length})
                     </summary>
                     <div className="mt-2 space-y-1.5">
@@ -269,13 +269,13 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
                     </div>
                   </details>
 
-                  <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Alert History</div>
+                  <div className="text-xs text-ink-muted uppercase tracking-wider mb-2">Alert History</div>
                   {alerts.length === 0 && (
-                    <div className="text-center text-gray-600 text-sm py-4">No alerts recorded</div>
+                    <div className="text-center text-ink-muted text-sm py-4">No alerts recorded</div>
                   )}
                   <div className="space-y-1">
                     <div className="flex gap-4 mb-3 px-1">
-                      <span className="text-xs text-gray-500">Total: <span className="text-gray-300 font-semibold">{stats.totalAlerts}</span></span>
+                      <span className="text-xs text-ink-muted">Total: <span className="text-ink-soft font-semibold">{stats.totalAlerts}</span></span>
                       <span className="text-xs text-accent-red">CRITICAL {stats.criticalCount}</span>
                       <span className="text-xs text-accent-red/70">ERROR {stats.errorCount}</span>
                       <span className="text-xs text-accent-amber">WARNING {stats.warningCount}</span>
@@ -295,16 +295,16 @@ export function MonitoringDashboard({ events }: MonitoringDashboardProps) {
                     const pct = (m.count / maxCount) * 100;
                     return (
                       <div key={m.name} className="flex items-center gap-3 px-1 py-1.5">
-                        <span className="text-xs text-gray-400 w-40 truncate" title={m.name}>{m.name}</span>
+                        <span className="text-xs text-ink-soft w-40 truncate" title={m.name}>{m.name}</span>
                         <div className="flex-1 h-3 bg-surface-border rounded-full overflow-hidden">
                           <div className="h-full rounded-full bg-accent-purple transition-all duration-500" style={{ width: `${pct}%` }} />
                         </div>
-                        <span className="text-xs text-gray-500 w-12 text-right font-mono">{m.count}</span>
-                        <span className="text-[10px] text-gray-600 w-14 text-right">{m.avg}/min</span>
+                        <span className="text-xs text-ink-muted w-12 text-right font-mono">{m.count}</span>
+                        <span className="text-[10px] text-ink-muted w-14 text-right">{m.avg}/min</span>
                       </div>
                     );
                   })}
-                  <div className="text-[10px] text-gray-600 italic pt-2 px-1">
+                  <div className="text-[10px] text-ink-muted italic pt-2 px-1">
                     Per-minute averages computed over {Math.max(Math.round((events.length > 0 ? (Date.now() / 1000 - events[0].timestamp) / 60 : 1)), 1)} min window
                   </div>
                 </div>
@@ -335,12 +335,12 @@ function SummaryCard({ label, value, unit, sub, color, icon }: {
     <div className="panel">
       <div className="flex items-center gap-1.5 mb-1">
         <span className="text-xs" style={{ color }}>{icon}</span>
-        <div className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</div>
+        <div className="text-[10px] text-ink-muted uppercase tracking-wider">{label}</div>
       </div>
       <div className="text-xl font-bold" style={{ color }}>
         {value}{unit || ""}
       </div>
-      {sub && <div className="text-[10px] text-gray-600 mt-0.5 truncate">{sub}</div>}
+      {sub && <div className="text-[10px] text-ink-muted mt-0.5 truncate">{sub}</div>}
     </div>
   );
 }
@@ -355,19 +355,19 @@ function RuleRow({ rule }: { rule: MonitorRule }) {
     <div className="border border-surface-border rounded-lg px-3 py-2 hover:bg-surface-alt/50 transition-colors">
       <div className="flex items-center gap-2 mb-1">
         <span className={`w-1.5 h-1.5 rounded-full ${rule.enabled ? "bg-accent-green" : "bg-gray-600"}`} />
-        <span className="text-xs font-semibold text-gray-300">{rule.name}</span>
+        <span className="text-xs font-semibold text-ink-soft">{rule.name}</span>
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ color: sevColor, backgroundColor: `${sevColor}15` }}>
           {rule.severity.toUpperCase()}
         </span>
-        <span className="text-[10px] text-gray-600">{rule.subsystem}</span>
-        {!rule.enabled && <span className="text-[10px] text-gray-600">DISABLED</span>}
+        <span className="text-[10px] text-ink-muted">{rule.subsystem}</span>
+        {!rule.enabled && <span className="text-[10px] text-ink-muted">DISABLED</span>}
       </div>
-      <p className="text-[11px] text-gray-500 mb-1">{rule.description}</p>
-      <div className="flex items-center gap-3 text-[10px] text-gray-600">
-        <span>Metric: <span className="text-gray-500">{rule.metricName}</span></span>
-        {rule.thresholdMax !== null && <span>Max: <span className="text-gray-500">{rule.thresholdMax}</span></span>}
-        {rule.thresholdMin !== null && <span>Min: <span className="text-gray-500">{rule.thresholdMin}</span></span>}
-        <span>Cooldown: <span className="text-gray-500">{rule.cooldownSeconds}s</span></span>
+      <p className="text-[11px] text-ink-muted mb-1">{rule.description}</p>
+      <div className="flex items-center gap-3 text-[10px] text-ink-muted">
+        <span>Metric: <span className="text-ink-muted">{rule.metricName}</span></span>
+        {rule.thresholdMax !== null && <span>Max: <span className="text-ink-muted">{rule.thresholdMax}</span></span>}
+        {rule.thresholdMin !== null && <span>Min: <span className="text-ink-muted">{rule.thresholdMin}</span></span>}
+        <span>Cooldown: <span className="text-ink-muted">{rule.cooldownSeconds}s</span></span>
       </div>
     </div>
   );
@@ -390,15 +390,15 @@ function AlertRow({ alert }: { alert: MonitorAlert }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold" style={{ color: sevColor }}>{alert.severity.toUpperCase()}</span>
-          <span className="text-xs text-gray-300 truncate">{alert.title}</span>
+          <span className="text-xs text-ink-soft truncate">{alert.title}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-gray-600">{alert.subsystem}</span>
-          {alert.source && <span className="text-[10px] text-gray-600">· {alert.source}</span>}
-          {alert.message && <span className="text-[10px] text-gray-600">· {alert.message.slice(0, 60)}</span>}
+          <span className="text-[10px] text-ink-muted">{alert.subsystem}</span>
+          {alert.source && <span className="text-[10px] text-ink-muted">· {alert.source}</span>}
+          {alert.message && <span className="text-[10px] text-ink-muted">· {alert.message.slice(0, 60)}</span>}
         </div>
       </div>
-      <span className="text-[10px] text-gray-600 shrink-0">{fmtRelative(alert.timestamp)}</span>
+      <span className="text-[10px] text-ink-muted shrink-0">{fmtRelative(alert.timestamp)}</span>
     </div>
   );
 }
@@ -421,7 +421,7 @@ function SubsystemRow({ summary }: { summary: SubsystemHealthSummary }) {
     <div className="border border-surface-border rounded-lg px-4 py-3 hover:bg-surface-alt/50 transition-colors">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm" style={{ color: statusColor }}>{statusIcon}</span>
-        <span className="text-xs font-semibold text-gray-300 uppercase">{summary.name}</span>
+        <span className="text-xs font-semibold text-ink-soft uppercase">{summary.name}</span>
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ color: statusColor, backgroundColor: `${statusColor}15` }}>
           {summary.status.toUpperCase()}
         </span>
@@ -429,9 +429,9 @@ function SubsystemRow({ summary }: { summary: SubsystemHealthSummary }) {
           <span className="text-[10px] text-accent-red ml-auto">{summary.activeAlerts} active alert{summary.activeAlerts > 1 ? "s" : ""}</span>
         )}
       </div>
-      <p className="text-[11px] text-gray-500 mb-2">{summary.description}</p>
-      <div className="flex items-center gap-3 text-[10px] text-gray-600">
-        <span>Checks: <span className="text-accent-green">{summary.checksPassing}</span> / <span className={summary.checksFailing > 0 ? "text-accent-red" : "text-gray-500"}>{summary.totalChecks}</span></span>
+      <p className="text-[11px] text-ink-muted mb-2">{summary.description}</p>
+      <div className="flex items-center gap-3 text-[10px] text-ink-muted">
+        <span>Checks: <span className="text-accent-green">{summary.checksPassing}</span> / <span className={summary.checksFailing > 0 ? "text-accent-red" : "text-ink-muted"}>{summary.totalChecks}</span></span>
         <span>Pass rate: <span className={passPct >= 90 ? "text-accent-green" : passPct >= 70 ? "text-accent-amber" : "text-accent-red"}>{passPct}%</span></span>
       </div>
       {totalChecks > 0 && (

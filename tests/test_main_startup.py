@@ -72,18 +72,18 @@ def test_default_cli_args_parsing():
 
 @patch("sys.argv", ["main.py", "--config"])
 def test_cli_config_flag():
-    """Verify `--config` triggers provider configuration flow instead of direct run."""
+    """Verify `--config` starts the boot flow instead of direct run."""
     # Since main_async is called within main(), we patch main_async to not be run.
     mock_async = AsyncMock()
     with patch("main.main_async", mock_async), \
-         patch("ui.detect_provider") as mock_detect, \
-         patch("ui.select_project_interactive", return_value="test_project"):
-        mock_detect.return_value = ("openai", MagicMock())
+         patch("core.startup.select_project", return_value="test_project"), \
+         patch("core.startup.detect_provider") as mock_detect:
+        mock_detect.return_value = ("openai", MagicMock(), "key", "gpt-4o")
         try:
             main.main()
         except SystemExit as _ex:
             log.warning("Silenced exception: %s", _ex)
-        # Should call main_async which then invokes detect_provider
+        # Should call main_async which then invokes select_project/detect_provider
         assert mock_async.called
 
 

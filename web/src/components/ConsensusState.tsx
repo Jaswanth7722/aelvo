@@ -51,28 +51,28 @@ export function ConsensusStateCard({ events }: ConsensusStateCardProps) {
 
   return (
     <div className="panel">
-      <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-4">Consensus State</h3>
+      <h3 className="text-xs text-ink-muted uppercase tracking-wider mb-4">Consensus State</h3>
 
       {/* Summary row */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="text-center">
           <div className="text-xl font-bold text-accent-blue">{state.activeTopics}</div>
-          <div className="text-xs text-gray-500">Active</div>
+          <div className="text-xs text-ink-muted">Active</div>
         </div>
         <div className="text-center">
           <div className="text-xl font-bold text-accent-green">{state.resolvedTopics}</div>
-          <div className="text-xs text-gray-500">Resolved</div>
+          <div className="text-xs text-ink-muted">Resolved</div>
         </div>
         <div className="text-center">
           <div className="text-xl font-bold text-accent-purple">{state.participants.length}</div>
-          <div className="text-xs text-gray-500">Participants</div>
+          <div className="text-xs text-ink-muted">Participants</div>
         </div>
       </div>
 
       {/* For/Against bar */}
       {posEntries.length > 0 && (
         <div className="mb-3">
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+          <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
             <span>{forCount} For</span>
             <span>{againstCount} Against</span>
           </div>
@@ -95,9 +95,9 @@ export function ConsensusStateCard({ events }: ConsensusStateCardProps) {
 
       {/* Latest outcome */}
       <div className="text-xs">
-        <div className="text-gray-500 mb-1">Latest Outcome</div>
+        <div className="text-ink-muted mb-1">Latest Outcome</div>
         <div className="flex items-center gap-2">
-          <span className="text-gray-200 font-medium truncate">
+          <span className="text-ink font-medium truncate">
             {state.lastOutcome}
           </span>
           {state.lastConfidence > 0 && (
@@ -127,7 +127,7 @@ export function ConsensusStateCard({ events }: ConsensusStateCardProps) {
                   ? "text-accent-green bg-accent-green/10"
                   : position.toLowerCase() === "against" || position.toLowerCase() === "reject"
                     ? "text-accent-red bg-accent-red/10"
-                    : "text-gray-400 bg-surface-border/50"
+                    : "text-ink-soft bg-surface-border/50"
               }`}
             >
               {specialist}: {position}
@@ -137,7 +137,7 @@ export function ConsensusStateCard({ events }: ConsensusStateCardProps) {
       )}
 
       {posEntries.length === 0 && (
-        <div className="text-xs text-gray-600 text-center py-2">No consensus activity yet</div>
+        <div className="text-xs text-ink-muted text-center py-2">No consensus activity yet</div>
       )}
     </div>
   );

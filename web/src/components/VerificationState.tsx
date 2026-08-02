@@ -46,7 +46,7 @@ export function VerificationStateCard({ events }: VerificationStateCardProps) {
 
   return (
     <div className="panel">
-      <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-4">Verification State</h3>
+      <h3 className="text-xs text-ink-muted uppercase tracking-wider mb-4">Verification State</h3>
 
       {/* Main rate display */}
       <div className="flex items-baseline gap-1 mb-4">
@@ -61,7 +61,7 @@ export function VerificationStateCard({ events }: VerificationStateCardProps) {
         >
           {state.passRate}
         </span>
-        <span className="text-sm text-gray-500">% pass rate</span>
+        <span className="text-sm text-ink-muted">% pass rate</span>
       </div>
 
       {/* Stacked bar */}
@@ -89,20 +89,20 @@ export function VerificationStateCard({ events }: VerificationStateCardProps) {
       {/* Counts grid */}
       <div className="grid grid-cols-4 gap-2 text-center">
         <div>
-          <div className="text-lg font-bold text-gray-200">{state.totalChecks}</div>
-          <div className="text-[10px] text-gray-500">Total</div>
+          <div className="text-lg font-bold text-ink">{state.totalChecks}</div>
+          <div className="text-[10px] text-ink-muted">Total</div>
         </div>
         <div>
           <div className="text-lg font-bold text-accent-green">{state.passed}</div>
-          <div className="text-[10px] text-gray-500">Passed</div>
+          <div className="text-[10px] text-ink-muted">Passed</div>
         </div>
         <div>
           <div className="text-lg font-bold text-accent-red">{state.failed}</div>
-          <div className="text-[10px] text-gray-500">Failed</div>
+          <div className="text-[10px] text-ink-muted">Failed</div>
         </div>
         <div>
           <div className="text-lg font-bold text-accent-amber">{state.running}</div>
-          <div className="text-[10px] text-gray-500">Running</div>
+          <div className="text-[10px] text-ink-muted">Running</div>
         </div>
       </div>
     </div>

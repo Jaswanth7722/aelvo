@@ -7,18 +7,19 @@ import { AgentActivityPanel } from "./AgentActivityPanel";
 interface ChatWorkspaceProps {
   events: UIEvent[];
   connectionStatus: string;
+  sendMessage?: (message: string) => boolean;
 }
 
 const AGENT_NAMES = ["HERMES", "ARCHITECT", "ORACLE", "FORGE", "SENTINEL", "TERMINUS", "HERALD"];
 
 const AGENT_DISPLAY: Record<string, { label: string; color: string; icon: string }> = {
-  HERMES:    { label: "Hermes",    color: "#39c8ff", icon: "◉" },
-  ARCHITECT: { label: "Architect", color: "#3b82f6", icon: "◈" },
-  ORACLE:    { label: "Oracle",    color: "#8c5cff", icon: "◆" },
-  FORGE:     { label: "Forge",     color: "#00e38c", icon: "⚙" },
-  SENTINEL:  { label: "Sentinel",  color: "#ff5c7a", icon: "🛡" },
-  TERMINUS:  { label: "Terminus",  color: "#f7b731", icon: "▶" },
-  HERALD:    { label: "Herald",    color: "#19f5a5", icon: "★" },
+  HERMES:    { label: "Hermes",    color: "#0891B2", icon: "◉" },
+  ARCHITECT: { label: "Architect", color: "#7C3AED", icon: "◈" },
+  ORACLE:    { label: "Oracle",    color: "#8B5CF6", icon: "◆" },
+  FORGE:     { label: "Forge",     color: "#16A34A", icon: "⚙" },
+  SENTINEL:  { label: "Sentinel",  color: "#E11D48", icon: "🛡" },
+  TERMINUS:  { label: "Terminus",  color: "#F59E0B", icon: "▶" },
+  HERALD:    { label: "Herald",    color: "#FF9F45", icon: "★" },
 };
 
 let sessionCounter = 0;
@@ -28,7 +29,7 @@ function genId(prefix: string): string {
   return `${prefix}_${Date.now()}_${++msgCounter}`;
 }
 
-export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) {
+export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWorkspaceProps) {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const id = `session_${Date.now()}`;
     sessionCounter = 1;
@@ -54,6 +55,13 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Track the assistant message currently waiting on a real agent_response
+  const pendingAssistantRef = useRef<{ sessionId: string; messageId: string } | null>(null);
+  // Track the last event count we processed for the real-response watcher
+  const lastEventCountRef = useRef(0);
+  // Timeout guard so a missing agent_response can never wedge the input
+  const pendingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Active session's messages
   const activeMessages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
@@ -186,24 +194,57 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
     });
   }, [activeSessionId]);
 
-  // Simulate processing a message through the AELVO pipeline
-  const processMessage = useCallback(async (userMsg: string) => {
-    if (!activeSessionId || isProcessing) return;
-    setIsProcessing(true);
+  // Update a specific message by id in a session
+  const patchMessage = useCallback((sessionId: string, messageId: string, patch: Partial<ChatMessage>) => {
+    setMessagesBySession((prev) => {
+      const list = prev[sessionId];
+      if (!list) return prev;
+      return {
+        ...prev,
+        [sessionId]: list.map((m) => (m.id === messageId ? { ...m, ...patch } : m)),
+      };
+    });
+  }, []);
 
+  // ── Watch for real agent_response events and render them ──────────────
+  useEffect(() => {
+    const pending = pendingAssistantRef.current;
+    if (!pending) return;
+    if (events.length <= lastEventCountRef.current) return;
+
+    const fresh = events.slice(lastEventCountRef.current);
+    lastEventCountRef.current = events.length;
+
+    for (const ev of fresh) {
+      if (ev.type === "agent_response" || ev.type === "agent_error") {
+        if (ev.type === "agent_response") {
+          patchMessage(pending.sessionId, pending.messageId, {
+            content: ev.action || "(no output)",
+            streamedContent: undefined,
+            streaming: false,
+          });
+        } else {
+          patchMessage(pending.sessionId, pending.messageId, {
+            content: `⚠️ ${ev.action || "Agent error"}`,
+            streamedContent: undefined,
+            streaming: false,
+          });
+        }
+        pendingAssistantRef.current = null;
+        if (pendingTimeoutRef.current) {
+          clearTimeout(pendingTimeoutRef.current);
+          pendingTimeoutRef.current = null;
+        }
+        setIsProcessing(false);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, patchMessage]);
+
+  // ── Simulate processing a message through the AELVO pipeline ───────────
+  const simulatePipeline = useCallback(async (userMsg: string, assistantId: string) => {
     const now = Date.now() / 1000;
 
-    // Add user message
-    const userChatMsg: ChatMessage = {
-      id: genId("user"),
-      role: "user",
-      content: userMsg,
-      timestamp: now,
-    };
-    addMessage(userChatMsg);
-    updateSessionTitle(activeSessionId, userMsg);
-
-    // Build the pipeline phases
     const pipeline: Array<{ agent: string; name: string; action: string }> = [
       { agent: "HERMES",    name: "Calibration",     action: "Calibrating request..." },
       { agent: "ARCHITECT", name: "Planning",        action: "Creating execution plan..." },
@@ -228,22 +269,6 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
       { check: "Security Scan", status: "pending" },
     ];
 
-    // Create the streaming assistant message placeholder
-    const assistantId = genId("assistant");
-    const assistantMsg: ChatMessage = {
-      id: assistantId,
-      role: "assistant",
-      content: "",
-      timestamp: now + 0.5,
-      agentSteps: steps,
-      verificationSummary: verifications,
-      phases,
-      streaming: true,
-      streamedContent: "",
-    };
-    addMessage(assistantMsg);
-
-    // Simulate the pipeline with delays
     const responseTexts = [
       `I've analyzed your request. Let me work through this systematically using the AELVO multi-agent pipeline.`,
       `\n\n**Hermes** has calibrated the request and identified the key requirements.`,
@@ -261,7 +286,6 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
       const p = pipeline[i];
       const stepStart = now + 1 + i * 1.5;
 
-      // Update phase status
       phases[i] = { ...phases[i], status: "active" };
       steps.push({
         agent: p.agent,
@@ -270,92 +294,108 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
         timestamp: stepStart,
       });
 
-      // Update the assistant message with this step active
-      setMessagesBySession((prev) => {
-        const sid = activeSessionId;
-        if (!sid || !prev[sid]) return prev;
-        return {
-          ...prev,
-          [sid]: prev[sid].map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  agentSteps: [...steps],
-                  phases: [...phases],
-                  streamedContent: responseTexts.slice(0, i + 2).join(""),
-                  verificationSummary: i >= 4
-                    ? verifications.map((v, vi) =>
-                        vi <= i - 4
-                          ? { ...v, status: "passed" as const, details: vi === 2 ? "No vulnerabilities" : "Clean" }
-                          : { ...v, status: vi === i - 4 ? "running" as const : "pending" as const }
-                      )
-                    : verifications,
-                }
-              : m
-          ),
-        };
+      patchMessage(activeSessionId!, assistantId, {
+        agentSteps: [...steps],
+        phases: [...phases],
+        streamedContent: responseTexts.slice(0, i + 2).join(""),
+        verificationSummary: i >= 4
+          ? verifications.map((v, vi) =>
+              vi <= i - 4
+                ? { ...v, status: "passed" as const, details: vi === 2 ? "No vulnerabilities" : "Clean" }
+                : { ...v, status: vi === i - 4 ? "running" as const : "pending" as const }
+            )
+          : verifications,
       });
 
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 600));
 
-      // Mark step as completed
       steps[steps.length - 1] = { ...steps[steps.length - 1], status: "completed" };
       phases[i] = { ...phases[i], status: "completed" };
 
-      setMessagesBySession((prev) => {
-        const sid = activeSessionId;
-        if (!sid || !prev[sid]) return prev;
-        return {
-          ...prev,
-          [sid]: prev[sid].map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  agentSteps: [...steps],
-                  phases: [...phases],
-                  streamedContent: responseTexts.slice(0, i + 2).join(""),
-                }
-              : m
-          ),
-        };
+      patchMessage(activeSessionId!, assistantId, {
+        agentSteps: [...steps],
+        phases: [...phases],
+        streamedContent: responseTexts.slice(0, i + 2).join(""),
       });
     }
 
-    // Finalize message
     const finalVerifications: VerificationStepStatus[] = [
       { check: "Lint", status: "passed", details: "Clean" },
       { check: "Typecheck", status: "passed", details: "Clean" },
       { check: "Security Scan", status: "passed", details: "No vulnerabilities" },
     ];
 
-    setMessagesBySession((prev) => {
-      const sid = activeSessionId;
-      if (!sid || !prev[sid]) return prev;
-      return {
-        ...prev,
-        [sid]: prev[sid].map((m) =>
-          m.id === assistantId
-            ? {
-                ...m,
-                content: responseTexts.join(""),
-                streamedContent: undefined,
-                streaming: false,
-                verificationSummary: finalVerifications,
-              }
-            : m
-        ),
-      };
+    patchMessage(activeSessionId!, assistantId, {
+      content: responseTexts.join(""),
+      streamedContent: undefined,
+      streaming: false,
+      verificationSummary: finalVerifications,
     });
-
-    setIsProcessing(false);
-  }, [activeSessionId, isProcessing, addMessage, updateSessionTitle]);
+  }, [activeSessionId, patchMessage]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || isProcessing) return;
+    if (!activeSessionId) return;
     setInput("");
-    await processMessage(text);
-  }, [input, isProcessing, processMessage]);
+
+    const now = Date.now() / 1000;
+
+    // Add user message
+    const userChatMsg: ChatMessage = {
+      id: genId("user"),
+      role: "user",
+      content: text,
+      timestamp: now,
+    };
+    addMessage(userChatMsg);
+    updateSessionTitle(activeSessionId, text);
+
+    const assistantId = genId("assistant");
+    const assistantMsg: ChatMessage = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      timestamp: now + 0.5,
+      agentSteps: [],
+      verificationSummary: [],
+      phases: [],
+      streaming: true,
+      streamedContent: "Thinking…",
+    };
+    addMessage(assistantMsg);
+    setIsProcessing(true);
+
+    // Real agent path — send over the WebSocket bridge
+    if (sendMessage && sendMessage(text)) {
+      lastEventCountRef.current = events.length;
+      pendingAssistantRef.current = { sessionId: activeSessionId, messageId: assistantId };
+      // Safety net: if the backend never replies, drop the pending state
+      // so the user can send again (message stays as "Thinking…").
+      if (pendingTimeoutRef.current) clearTimeout(pendingTimeoutRef.current);
+      pendingTimeoutRef.current = setTimeout(() => {
+        if (pendingAssistantRef.current) {
+          pendingAssistantRef.current = null;
+          setIsProcessing(false);
+        }
+      }, 120000);
+      return; // the events watcher completes the message
+    }
+
+    // Offline fallback — simulate the pipeline
+    await simulatePipeline(text, assistantId);
+    setIsProcessing(false);
+  }, [input, isProcessing, activeSessionId, addMessage, updateSessionTitle, sendMessage, simulatePipeline, events.length]);
+
+  // Clear any pending real-response timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingTimeoutRef.current) {
+        clearTimeout(pendingTimeoutRef.current);
+        pendingTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -380,12 +420,12 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
       />
 
       {/* Center — Chat */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#FFFBF4]">
         {/* Top bar */}
-        <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
+        <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0 bg-white/70 backdrop-blur-md">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold text-gray-200">Chat</h2>
-            <span className="text-xs text-gray-600">
+            <h2 className="text-lg font-extrabold text-ink">Chat</h2>
+            <span className="text-xs text-ink-muted">
               {sessions.find((s) => s.id === activeSessionId)?.title || "Conversation"}
             </span>
           </div>
@@ -393,13 +433,16 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
             <span
               className={`w-2 h-2 rounded-full ${
                 connectionStatus === "connected"
-                  ? "bg-accent-green"
+                  ? "bg-accent-green animate-pulse-glow"
                   : connectionStatus === "connecting"
                     ? "bg-accent-amber animate-pulse"
                     : "bg-accent-red"
               }`}
             />
-            <span className="text-gray-500">{connectionStatus}</span>
+            <span className="text-ink-soft font-medium capitalize">{connectionStatus}</span>
+            {connectionStatus !== "connected" && (
+              <span className="text-[10px] text-ink-muted">(demo mode)</span>
+            )}
           </div>
         </header>
 
@@ -408,11 +451,11 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
           {activeMessages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center max-w-lg">
-                <div className="text-4xl mb-4 text-gray-700">◈</div>
-                <h3 className="text-lg font-bold text-gray-300 mb-2">AELVO Chat Workspace</h3>
-                <p className="text-sm text-gray-500 leading-relaxed mb-6">
-                  This is the primary interface for interacting with AELVO's multi-agent engineering system.
-                  Type a task below to begin — the 7 specialists will collaborate to complete it.
+                <div className="text-5xl mb-4 animate-float">◈</div>
+                <h3 className="text-xl font-extrabold text-gradient mb-2">AELVO Chat Workspace</h3>
+                <p className="text-sm text-ink-soft leading-relaxed mb-6">
+                  The primary interface for the AELVO multi-agent engineering system.
+                  Type a task below — the 7 specialists collaborate to complete it.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {AGENT_NAMES.map((name) => {
@@ -420,7 +463,8 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
                     return (
                       <span
                         key={name}
-                        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border border-surface-border"
+                        className="chip"
+                        style={{ borderColor: `${cfg.color}30` }}
                       >
                         <span style={{ color: cfg.color }}>{cfg.icon}</span>
                         <span style={{ color: cfg.color }}>{cfg.label}</span>
@@ -437,10 +481,8 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
                   ].map((suggestion) => (
                     <button
                       key={suggestion}
-                      onClick={() => {
-                        setInput(suggestion);
-                      }}
-                      className="text-[10px] text-gray-500 hover:text-gray-300 hover:border-gray-600 bg-surface border border-surface-border rounded-lg px-2.5 py-2 text-left transition-colors leading-relaxed"
+                      onClick={() => { setInput(suggestion); }}
+                      className="text-[10px] text-ink-soft hover:text-brand-deep hover:border-brand-orange/50 bg-white border border-surface-border rounded-lg px-2.5 py-2 text-left transition-all duration-150 shadow-soft hover:shadow-card hover:-translate-y-0.5 leading-relaxed"
                     >
                       {suggestion}
                     </button>
@@ -459,7 +501,7 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
         </div>
 
         {/* Input area */}
-        <div className="border-t border-surface-border px-6 py-4 shrink-0">
+        <div className="border-t border-surface-border px-6 py-4 shrink-0 bg-white/70 backdrop-blur-md">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-end gap-3">
               <div className="flex-1 relative">
@@ -474,11 +516,11 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
                   }
                   disabled={isProcessing}
                   rows={2}
-                  className="w-full bg-surface border border-surface-border rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors resize-none disabled:opacity-50"
+                  className="input-field"
                 />
                 {/* Attachment button */}
                 <button
-                  className="absolute right-3 bottom-3 text-gray-600 hover:text-gray-400 transition-colors text-sm"
+                  className="absolute right-3 bottom-3 text-ink-muted hover:text-brand-orange transition-colors text-sm"
                   title="Attach context"
                 >
                   📎
@@ -487,11 +529,11 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
               <button
                 onClick={handleSend}
                 disabled={isProcessing || !input.trim()}
-                className="bg-accent-blue hover:bg-accent-blue/80 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-xl px-5 py-3 text-sm font-medium transition-colors duration-150 flex items-center gap-2 shrink-0"
+                className="btn-primary"
               >
                 {isProcessing ? (
                   <>
-                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                     Working...
                   </>
                 ) : (
@@ -502,8 +544,10 @@ export function ChatWorkspace({ events, connectionStatus }: ChatWorkspaceProps) 
                 )}
               </button>
             </div>
-            <p className="text-[10px] text-gray-700 mt-2">
-              AELVO uses 7 specialists (Hermes → Architect → Oracle → Forge → Sentinel → Terminus → Herald) to complete your request collaboratively.
+            <p className="text-[10px] text-ink-muted mt-2">
+              {connectionStatus === "connected"
+                ? "Live agent mode — messages execute through the AELVO orchestrator."
+                : "Demo mode — connect the AELVO backend to run real agent turns."}
             </p>
           </div>
         </div>

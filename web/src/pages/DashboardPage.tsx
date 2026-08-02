@@ -15,13 +15,13 @@ export default function DashboardPage() {
       {/* ── Top bar ───────────────────────────────────────────────── */}
       <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-200">System Dashboard</h2>
-          <span className="text-xs text-gray-600">{events.length} events captured</span>
+          <h2 className="text-lg font-bold text-ink">System Dashboard</h2>
+          <span className="text-xs text-ink-muted">{events.length} events captured</span>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={clearEvents}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors px-3 py-1.5 rounded border border-surface-border hover:border-gray-600"
+            className="text-xs text-ink-muted hover:text-ink-soft transition-colors px-3 py-1.5 rounded border border-surface-border hover:border-surface-border"
           >
             Clear Events
           </button>
@@ -69,9 +69,9 @@ export default function DashboardPage() {
 
           {/* Row 4: Live collaboration feed */}
           <div className="panel">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-3 flex items-center justify-between">
+            <div className="text-xs text-ink-muted uppercase tracking-wider mb-3 flex items-center justify-between">
               <span>Live Collaboration Feed</span>
-              <span className="text-gray-600 text-[10px]">
+              <span className="text-ink-muted text-[10px]">
                 {events.filter(
                   (e) =>
                     e.type !== "overview_updated" &&

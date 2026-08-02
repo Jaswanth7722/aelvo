@@ -15,12 +15,10 @@ Usage:
 """
 
 import os
-import sys
 import json
 import logging
 import asyncio
 from core.rag import MemorySearcher
-import traceback
 from datetime import timedelta
 try:
     from dotenv import load_dotenv
@@ -40,10 +38,10 @@ from core.execution import AelvoKernel
 from core.filesystem import AelvoFileSystem
 from core.scraping import execute_heavy_crawl, execute_light_scrape
 from core.governance import MemoryEngine
-from core.provider_runtime import init_provider_runtime, format_provider_table, format_comparison_table
+from core.provider_runtime import init_provider_runtime
 from tools import build_extended_tool_registry
 from core.orchestration import Orchestrator
-from ui import select_project_interactive, detect_provider, show_boot_logo
+from core.startup import select_project, detect_provider
 from cognition import CognitiveEngine, CognitiveEngineConfig
 from repo_intelligence import RepoIntelligenceEngine
 from memory.forge_memory import ForgeMemory
@@ -300,7 +298,7 @@ class AelvoAgent:
         self._llm_cache = LLMCache()
         self.provider_name = provider_name
         self.config = provider_config
-        self.sdk_type = provider_config.sdk
+        self.sdk_type = getattr(provider_config, "sdk", None) if provider_config is not None else None
         self.provider_runtime = provider_runtime
         self.conversation_history = []
         self.last_context = None
@@ -904,7 +902,7 @@ class SessionTracker:
 async def main_async():
     # ---- Interactive Project Selection ----
     global _ws_name, DB_PATH, ANCHOR_PATH, WORKSPACE_PATH, BACKUP_DIR
-    _ws_name = select_project_interactive()
+    _ws_name = select_project(os.environ.get("AELVO_PROJECT", "").strip() or None)
 
     # ---- Map Paths based on Selection ----
     WORKSPACE_PATH = os.path.join(WORKSPACE_BASE, _ws_name)
@@ -1026,14 +1024,23 @@ async def main_async():
         log.warning(f"Provider runtime init skipped: {e}")
 
     # 6. AelvoAgent â€” connection context to the LLM (uses provider_runtime for adapters)
-    agent = AelvoAgent(
-        api_key=api_key,
-        model=model,
-        provider_name=provider_name,
-        provider_config=provider_config,
-        provider_runtime=provider_runtime,
-    )
-    log.info(f"âœ“ Using provider: {provider_name} | Model: {model}")
+    # Only build the agent when a provider is configured; otherwise leave it
+    # None so the web UI surfaces the missing-key error instead of crashing.
+    if provider_config is not None:
+        agent = AelvoAgent(
+            api_key=api_key,
+            model=model,
+            provider_name=provider_name,
+            provider_config=provider_config,
+            provider_runtime=provider_runtime,
+        )
+        log.info(f"âœ“ Using provider: {provider_name} | Model: {model}")
+    else:
+        agent = None
+        log.warning(
+            "No LLM provider configured — booting with agent=None. "
+            "Configure a provider in .env and restart."
+        )
 
     # 7. Orchestrator Coordinator
     orchestrator = Orchestrator(
@@ -1135,493 +1142,78 @@ async def main_async():
     # ------------------------------------------------------------------------
     # BOOT LOGO
     # ------------------------------------------------------------------------
-    show_boot_logo(provider_name, model, provider_config.sdk, DB_PATH, ANCHOR_PATH, WORKSPACE_PATH)
+    log.info(
+        "AELVO OMEGA ONLINE — provider=%s model=%s project=%s workspace=%s",
+        provider_name, model, _ws_name, WORKSPACE_PATH,
+    )
 
     # ------------------------------------------------------------------------
-    # TUI MODE (default) â€” use --cli for legacy REPL
     # ------------------------------------------------------------------------
-    use_cli = "--cli" in sys.argv or os.environ.get("AELVO_CLI", "").strip() in ("1", "true", "yes")
-    if not use_cli:
-        log.info("Launching TUI dashboard...")
-        from ui.integration import run_tui
-        await run_tui(
-            agent,
-            orchestrator,
-            memory_engine,
-            aelvo_kernel,
-            DB_PATH,
-            mcp_cli=mcp_cli,
-            runtime_cli=runtime_cli,
-            provider_runtime=provider_runtime,
-        )
-        log.info("TUI session ended.")
-        aelvo_kernel.conn.close()
-        memory_engine.db.close()
-        return
+    # WEB MODE (default) — serve the dashboard + WebSocket bridge
+    # ------------------------------------------------------------------------
+    _web_host = os.environ.get("AELVO_HOST", "127.0.0.1")
+    _web_http_port = int(os.environ.get("AELVO_HTTP_PORT", "8000"))
+    _web_ws_port = int(os.environ.get("AELVO_WS_PORT", "8765"))
+    _no_browser = os.environ.get("AELVO_NO_BROWSER", "").strip() in ("1", "true", "yes")
 
-    # ------------------------------------------------------------------------
-    # THE REPL LOOP
-    # ------------------------------------------------------------------------
-    while True:
+    log.info("Launching web dashboard...")
+    from web.server import run_web
+    await run_web(
+        agent=agent,
+        orchestrator=orchestrator,
+        memory_engine=memory_engine,
+        aelvo_kernel=aelvo_kernel,
+        db_path=DB_PATH,
+        host=_web_host,
+        http_port=_web_http_port,
+        ws_port=_web_ws_port,
+        open_browser=not _no_browser,
+        mcp_cli=mcp_cli,
+        runtime_cli=runtime_cli,
+        provider_runtime=provider_runtime,
+    )
+    log.info("Web session ended.")
+    if lhp:
         try:
-            # We use an executor for blocking input
-            loop = asyncio.get_event_loop()
-            user_input = await loop.run_in_executor(None, lambda: input("\nYOU > ").strip())
-            
-            if not user_input:
-                continue
-            if user_input.lower() in ("exit", "quit", "q"):
-                log.info("Shutting down AELVO...")
-                if lhp:
-                    try:
-                        await lhp.shutdown()
-                    except Exception as _ex: log.warning("Silenced exception: %s", _ex)
-                break
-
-            # Start session tracking for this interaction
-            session = SessionTracker()
-            session.user_query = user_input
-
-            # ========================================
-            # ROUTE 0: #help â€” show available commands
-            # ========================================
-            if user_input.lower().startswith("#help"):
-                print("\n" + "=" * 60)
-                print("  AELVO â€” Available Commands")
-                print("=" * 60)
-                print("  #help          â€” Show this help message")
-                print("  #status        — Runtime monitoring dashboard, health & alerts")
-                print("  #providers     â€” Show all configured LLM providers and their status")
-                print("  #doctor        â€” Run provider health diagnostics")
-                print("  #diagnostics   â€” Show system diagnostics and configuration")
-                print("  #checkpoint    â€” Save current session state")
-                print("  #restore       â€” Restore from a previous checkpoint")
-                print("  #lock          â€” Lock a constraint in the anchor")
-                print("  exit / quit    â€” Shut down AELVO")
-                print("=" * 60)
-                print("  Type any natural language task to run the pipeline.")
-                print("  Use @SPECIALIST prefix to force-route (e.g., @FORGE fix this)")
-                print("  Use #status dashboard / health / alerts for runtime monitoring")
-                print("=" * 60 + "\n")
-                continue
-
-            # ========================================
-            # ROUTE 1: Direct #kernel commands
-            # ========================================
-            if user_input.startswith("#"):
-                # Intercept #status commands before routing to kernel
-                if user_input.lower().startswith("#status"):
-                    if runtime_cli:
-                        log.info("Routing #status command...")
-                        result = runtime_cli.execute(user_input)
-                        # Output is already printed by the CLI methods
-                        session.record_tool("status", {"command": user_input[:80]}, result.get("status", "SUCCESS").lower())
-                        session.record_answer(json.dumps(result)[:300])
-                        session.save(DB_PATH)
-                    else:
-                        print("\n[STATUS] Runtime monitoring not initialized.\n")
-                    continue
-
-                # Intercept #mcp commands before routing to kernel
-                if user_input.lower().startswith("#mcp"):
-                    if mcp_cli:
-                        log.info("Routing #mcp command...")
-                        result = await mcp_cli.execute(user_input)
-                        print(f"\n[MCP] {json.dumps(result, indent=2)}\n")
-                        session.record_tool("mcp", {"command": user_input[:80]}, result.get("status", "SUCCESS").lower())
-                        session.record_answer(json.dumps(result)[:300])
-                        session.save(DB_PATH)
-                    else:
-                        print("\n[MCP] Subsystem not initialized.\n")
-                    continue
-
-                # Intercept #providers commands before routing to kernel
-                if user_input.lower().startswith("#providers"):
-                    log.info("Routing #providers command...")
-                    if provider_runtime:
-                        parts = user_input.split(maxsplit=1)
-                        subcmd = parts[1].strip().lower() if len(parts) > 1 else "list"
-                        
-                        if subcmd == "list" or subcmd == "ls":
-                            print("\n[PROVIDERS] Registered Providers:")
-                            print(format_provider_table(provider_runtime))
-                            print()
-                            result = {"status": "SUCCESS", "msg": f"Listed {len(provider_runtime.provider_configs)} providers"}
-                        elif subcmd == "health":
-                            print("\n[PROVIDERS] Provider Health:")
-                            header = f"  {'Provider':20s} | {'Status':12s} | {'Up 1h':8s} | {'Latency':8s} | {'Error%':8s} | {'Degrd':6s} | {'Creds'}"
-                            sep = f"  {'-'*20}-+-{'-'*12}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*6}-+-{'-----'}"
-                            print(header)
-                            print(sep)
-                            for pid in sorted(provider_runtime.provider_configs):
-                                status = provider_runtime.health.get_status(pid).name if provider_runtime.registry.has_provider(pid) else "UNKNOWN"
-                                uptime = f"{provider_runtime.health.uptime_percentage(pid, 60):.0%}"
-                                latency = f"{provider_runtime.health.average_latency(pid):.0f}ms"
-                                err_rate = f"{provider_runtime.health.error_rate(pid):.0%}"
-                                is_degraded = (
-                                    "âš ï¸"
-                                    if provider_runtime.degradation_detector
-                                    and provider_runtime.degradation_detector.is_degraded(pid)
-                                    else "  "
-                                )
-                                has_creds = "âœ…" if provider_runtime.has_credentials(pid) else "âŒ"
-                                print(f"  {pid:20s} | {status:12s} | {uptime:8s} | {latency:8s} | {err_rate:8s} | {is_degraded:6s} | {has_creds}")
-                            print()
-                            result = {"status": "SUCCESS", "msg": "Health check complete"}
-                        elif subcmd.startswith("creds"):
-                            pid = parts[2].strip() if len(parts) > 2 else provider_name
-                            has = provider_runtime.has_credentials(pid)
-                            print(f"\n[PROVIDERS] Credentials for '{pid}': {'âœ… Available' if has else 'âŒ Not found'}")
-                            result = {"status": "SUCCESS", "msg": f"Credential check for {pid}: {has}"}
-                        elif subcmd == "models":
-                            pid = parts[2].strip() if len(parts) > 2 else None
-                            models = provider_runtime.list_models(pid)
-                            if pid:
-                                print(f"\n[PROVIDERS] Models for {pid}:")
-                            else:
-                                print(f"\n[PROVIDERS] All Models ({len(models)}):")
-                            for m in sorted(models):
-                                print(f"  - {m}")
-                            print()
-                            result = {"status": "SUCCESS", "msg": f"Listed {len(models)} models"}
-                        elif subcmd == "monitoring" or subcmd == "mon":
-                            m = provider_runtime.monitoring_summary()
-                            print("\n[PROVIDERS] Monitoring Dashboard:")
-                            print(f"  Health Monitor: {'âœ… Running' if m['health_monitor_running'] else 'â¹ Stopped'}")
-                            print(f"  Total Alerts:   {m['total_alerts']}")
-                            print()
-                            for pid, pdata in m['providers'].items():
-                                deg = "âš ï¸ " if pdata['is_degraded'] else "  "
-                                print(f"  {deg}{pid:20s}")
-                                print(f"    Status:    {pdata['status']:12s} | Monitor: {pdata['monitor_status']:12s}")
-                                print(f"    Uptime:    {pdata['uptime_1h']:8s} | Latency: {pdata['avg_latency']:8s} | Errors: {pdata['error_rate']:8s}")
-                                if pdata['is_degraded']:
-                                    print(f"    Degradation: {pdata['degradation_level']}")
-                                if 'metrics' in pdata and pdata['metrics']:
-                                    for mname, mstats in list(pdata['metrics'].items())[:3]:
-                                        print(f"    {mname}: count={mstats['count']}, avg={mstats.get('avg', '?'):.1f}")
-                                print()
-                            result = {"status": "SUCCESS", "msg": "Monitoring dashboard displayed"}
-                        elif subcmd == "summary" or subcmd == "info":
-                            s = provider_runtime.summary()
-                            print("\n[PROVIDERS] Runtime Summary:")
-                            print(f"  Providers:  {s['providers_count']}")
-                            print(f"  Models:     {s['models_count']}")
-                            print(f"  Active:     {s['active_providers']}")
-                            print(f"  With Keys:  {s['providers_with_creds']}")
-                            print(f"  Local:      {s['local_providers']}")
-                            if 'monitoring' in s:
-                                print(f"  Monitoring: {'âœ… Running' if s['monitoring']['running'] else 'â¹ Stopped'}")
-                                print(f"  Alerts:     {s['monitoring']['total_alerts']} total ({s['monitoring']['critical_alerts']} critical)")
-                            print()
-                            result = {"status": "SUCCESS", "msg": "Summary displayed"}
-                        else:
-                            result = {"status": "REJECTED", "msg": "Unknown #providers subcommand. Use: list, health, creds [provider], models [provider], monitoring, summary"}
-                    else:
-                        result = {"status": "REJECTED", "msg": "Provider runtime not initialized"}
-                    print(f"\n[KERNEL] {json.dumps(result, indent=2)}\n")
-                    session.record_tool("providers", {"command": user_input[:80]}, result.get("status", "SUCCESS").lower())
-                    session.record_answer(json.dumps(result)[:300])
-                    session.save(DB_PATH)
-                    continue
-
-                # ========================================
-                # ROUTE: #doctor â€” provider diagnostics
-                # ========================================
-                if user_input.lower().startswith("#doctor"):
-                    log.info("Routing #doctor command...")
-                    if provider_runtime:
-                        parts = user_input.split(maxsplit=2)
-                        subcmd = parts[1].strip().lower() if len(parts) > 1 else "scan"
-                        target = parts[2].strip() if len(parts) > 2 else None
-
-                        if subcmd == "scan":
-                            print("\n[DOCTOR] Running full diagnostic scan...")
-                            reports = await provider_runtime.doctor_scan(target)
-                            for pid, report in reports.items():
-                                print(f"\n  â”€â”€ {pid} â”€â”€")
-                                print(f"  Health:      {report.overall_health}")
-                                print(f"  Connectivity: {'âœ…' if report.connectivity else 'âŒ'}")
-                                print(f"  Auth:         {'âœ…' if report.auth_status else 'âŒ'}")
-                                print(f"  Latency:      {report.latency_grade} ({report.metrics.get('avg_latency_ms', '?')}ms)")
-                                print(f"  Uptime:       {report.uptime_grade} ({report.metrics.get('uptime_1h', '?')}%)")
-                                if report.capabilities:
-                                    print(f"  Capabilities: {', '.join(report.capabilities)}")
-                                if report.issues:
-                                    print("  âš  Issues:")
-                                    for issue in report.issues:
-                                        print(f"     - {issue}")
-                                if report.recommendations:
-                                    print("  ðŸ’¡ Recommendations:")
-                                    for rec in report.recommendations:
-                                        print(f"     - {rec}")
-                            print()
-                            result = {"status": "SUCCESS", "msg": f"Diagnosed {len(reports)} provider(s)"}
-                        elif subcmd == "list" or subcmd == "ls":
-                            summary = provider_runtime.diagnostics_summary()
-                            print("\n[DOCTOR] Diagnostic Summary:")
-                            header = f"  {'Provider':20s} | {'Status':12s} | {'Latency':8s} | {'Uptime%':8s} | {'Err%':8s} | {'Models'}"
-                            sep = f"  {'-'*20}-+-{'-'*12}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'------'}"
-                            print(header)
-                            print(sep)
-                            for pid, data in summary.items():
-                                active = "âœ…" if data["is_active"] else "âŒ"
-                                latency = f"{data['latency_ms']:.0f}ms"
-                                uptime = f"{data['uptime_1h']:.1f}%"
-                                err = f"{data['error_rate_pct']:.1f}%"
-                                print(f"  {pid:20s} | {active:12s} | {latency:8s} | {uptime:8s} | {err:8s} | {data['models_count']}")
-                            print()
-                            result = {"status": "SUCCESS", "msg": f"Summary for {len(summary)} providers"}
-                        else:
-                            result = {"status": "REJECTED", "msg": "Unknown #doctor subcommand. Use: scan [provider], list"}
-                    else:
-                        result = {"status": "REJECTED", "msg": "Provider runtime not initialized"}
-                    print(f"\n[KERNEL] {json.dumps(result, indent=2)}\n")
-                    session.record_tool("doctor", {"command": user_input[:80]}, result.get("status", "SUCCESS").lower())
-                    session.record_answer(json.dumps(result)[:300])
-                    session.save(DB_PATH)
-                    continue
-
-                # ========================================
-                # ROUTE: #diagnostics â€” deep introspection
-                # ========================================
-                if user_input.lower().startswith("#diagnostics") or user_input.lower().startswith("#diag"):
-                    log.info("Routing #diagnostics command...")
-                    if provider_runtime:
-                        parts = user_input.split(maxsplit=2)
-                        subcmd = parts[1].strip().lower() if len(parts) > 1 else "summary"
-                        target = parts[2].strip() if len(parts) > 2 else None
-
-                        if subcmd == "auth":
-                            auth = provider_runtime.get_auth_diagnostics()
-                            pid = target or None
-                            if pid:
-                                result_diag = await auth.diagnose(pid)
-                                print(f"\n[DIAGNOSTICS] Auth Check: {pid}")
-                                print(f"  API Key Env:      {'âœ…' if result_diag.has_api_key_env else 'âŒ'}")
-                                print(f"  Registered:       {'âœ…' if result_diag.has_api_key_registered else 'âŒ'}")
-                                print(f"  OAuth:            {'âœ…' if result_diag.has_oauth_configured else 'âŒ'}")
-                                print(f"  Valid:            {'âœ…' if result_diag.is_valid else 'âŒ'}")
-                                if result_diag.issues:
-                                    print(f"  âš  Issues: {'; '.join(result_diag.issues)}")
-                                if result_diag.recommendations:
-                                    for rec in result_diag.recommendations:
-                                        print(f"  ðŸ’¡ {rec}")
-                            else:
-                                all_auth = await auth.diagnose_all()
-                                table = auth.summary(all_auth)
-                                print("\n[DIAGNOSTICS] Auth Configuration Summary:")
-                                header = f"  {'Provider':20s} | {'Valid':8s} | {'Env':8s} | {'Reg':8s} | Issues"
-                                sep = f"  {'-'*20}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'------'}"
-                                print(header)
-                                print(sep)
-                                for row in table[:30]:  # Cap at 30 rows
-                                    print(f"  {row['provider']:20s} | {row['configured']:8s} | {row['env_var']:8s} | {row['registered']:8s} | {row['issues'][:50]}")
-                                if len(table) > 30:
-                                    print(f"  ... and {len(table) - 30} more providers")
-                                print()
-                            result = {"status": "SUCCESS", "msg": f"Auth diagnostics for {pid or 'all providers'}"}
-
-                        elif subcmd == "capabilities" or subcmd == "caps":
-                            inspector = provider_runtime.get_capability_inspector()
-                            pid = target
-                            if pid:
-                                report = inspector.inspect(pid)
-                                print(f"\n[DIAGNOSTICS] Capabilities: {pid}")
-                                print(f"  Models Count: {report.models_count}")
-                                print(f"  Max Context:  {report.max_context}")
-                                print(f"  Streaming:    {'âœ…' if report.supports_streaming else 'âŒ'}")
-                                print(f"  Tool Calling: {'âœ…' if report.supports_tool_calling else 'âŒ'}")
-                                print(f"  Multimodal:   {'âœ…' if report.supports_multimodal else 'âŒ'}")
-                                print(f"  Local:        {'âœ…' if report.is_local else 'âŒ'}")
-                                if report.capabilities:
-                                    print(f"  Capabilities: {', '.join(report.capabilities)}")
-                            else:
-                                # Show matrix for top providers
-                                matrix = inspector.capability_matrix()
-                                print(f"\n[DIAGNOSTICS] Capability Matrix ({len(matrix)} providers):")
-                                for pid, caps in sorted(matrix.items())[:15]:
-                                    print(f"  {pid:20s} â†’ {', '.join(sorted(caps)[:8])}")
-                                print()
-                            result = {"status": "SUCCESS", "msg": f"Capability inspection for {pid or 'matrix'}"}
-
-                        elif subcmd == "compare":
-                            provider_ids = (target or "").split(",") if target else []
-                            if not provider_ids or len(provider_ids) < 2:
-                                result = {"status": "REJECTED", "msg": "Usage: #diagnostics compare <provider1,provider2,...> (at least 2 required)"}
-                            else:
-                                provider_ids = [p.strip() for p in provider_ids]
-                                generator = provider_runtime.get_comparison_generator()
-                                report = generator.compare(provider_ids)
-                                table_str = format_comparison_table(report)
-                                print("\n[DIAGNOSTICS] Comparison Report:")
-                                print(table_str)
-                                print()
-                                result = {"status": "SUCCESS", "msg": f"Compared {len(provider_ids)} providers, winner: {report.winner}"}
-
-                        elif subcmd == "find":
-                            task = target or "chat"
-                            inspector = provider_runtime.get_capability_inspector()
-                            providers = inspector.find_providers_for_task(task)
-                            print(f"\n[DIAGNOSTICS] Providers for '{task}':")
-                            for pid in providers:
-                                print(f"  - {pid}")
-                            if not providers:
-                                print("  (none found)")
-                            print()
-                            result = {"status": "SUCCESS", "msg": f"Found {len(providers)} providers for task '{task}'"}
-
-                        elif subcmd in ("health", "checks"):
-                            runner = provider_runtime.get_health_check_runner()
-                            pid = target or next(iter(provider_runtime.provider_configs.keys()), "openai")
-                            print(f"\n[DIAGNOSTICS] Running health checks for '{pid}'...")
-                            # Run connectivity and DNS checks
-                            config = provider_runtime.get_provider_config(pid)
-                            if config and config.base_url:
-                                from urllib.parse import urlparse
-                                hostname = urlparse(config.base_url).hostname
-                                if hostname:
-                                    print(f"  DNS Check ({hostname}): {'âœ…' if await runner.dns_check(hostname) else 'âŒ'}")
-                                    print(f"  Connectivity ({config.base_url}): {'âœ…' if await runner.connectivity_check(config.base_url) else 'âŒ'}")
-                            else:
-                                print(f"  No base URL configured for {pid}")
-                            print()
-                            result = {"status": "SUCCESS", "msg": f"Health checks completed for {pid}"}
-
-                        elif subcmd == "summary" or subcmd == "info":
-                            summary = provider_runtime.diagnostics_summary()
-                            print(f"\n[DIAGNOSTICS] Overview ({len(summary)} providers):")
-                            header = f"  {'Provider':20s} | {'Active':7s} | {'Creds':7s} | {'Latency':8s} | {'Uptime%':8s} | {'Err%':8s}"
-                            sep = f"  {'-'*20}-+-{'-'*7}-+-{'-'*7}-+-{'-'*8}-+-{'-'*8}-+-{'-'*6}"
-                            print(header)
-                            print(sep)
-                            for pid, data in summary.items():
-                                active = "âœ…" if data["is_active"] else "âŒ"
-                                creds = "âœ…" if data["has_credentials"] else "âŒ"
-                                active = "✅" if data["is_active"] else "❌"
-                                creds = "✅" if data["has_credentials"] else "❌"
-                                latency = f"{data['latency_ms']:.0f}ms" if data['latency_ms'] > 0 else "N/A"
-                                uptime = f"{data['uptime_1h']:.1f}%"
-                                err = f"{data['error_rate_pct']:.1f}%"
-                                print(f"  {pid:20s} | {active:7s} | {creds:7s} | {latency:8s} | {uptime:8s} | {err:6s}")
-                            print()
-                            result = {"status": "SUCCESS", "msg": f"Diagnostic summary for {len(summary)} providers"}
-
-                        else:
-                            result = {"status": "REJECTED", "msg": "Unknown #diagnostics subcommand. Use: auth [provider], capabilities [provider], compare <p1,p2>, find <task>, health [provider], summary"}
-                    else:
-                        result = {"status": "REJECTED", "msg": "Provider runtime not initialized"}
-                    print(f"\n[KERNEL] {json.dumps(result, indent=2)}\n")
-                    session.record_tool("diagnostics", {"command": user_input[:80]}, result.get("status", "SUCCESS").lower())
-                    session.record_answer(json.dumps(result)[:300])
-                    session.save(DB_PATH)
-                    continue
-
-                log.info(f"Routing kernel command: {user_input[:50]}...")
-                result = aelvo_kernel.parse_and_execute(user_input)
-                print(f"\n[KERNEL] {json.dumps(result, indent=2)}\n")
-                session.record_tool("kernel", {"command": user_input[:80]}, result.get("status", "SUCCESS").lower())
-                session.record_answer(json.dumps(result)[:300])
-                session.save(DB_PATH)
-                continue
-
-            # ========================================
-            # ROUTE 2: Natural language → Claude → Executor
-            # ========================================
-            log.info("Routing task through Orchestrator coordination loop...")
-            print("[UI] Orchestrator executing turn")
-            
-            # AWAIT the execution turn (Phase 5, Layer 3) with spinner
-            import itertools
-            spinner = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
-            spinner_task = None
-            
-            async def _spin():
-                while True:
-                    sys.stdout.write(f"\r[Thinking] {next(spinner)} ")
-                    sys.stdout.flush()
-                    await asyncio.sleep(0.1)
-            
-            spinner_task = asyncio.create_task(_spin())
-            try:
-                turn_result = await orchestrator.execute_turn(
-                    agent, user_input,
-                    session_tracker=session,
-                    mcp_cli=mcp_cli,
-                    db_path=DB_PATH
-                )
-            finally:
-                if spinner_task:
-                    spinner_task.cancel()
-                    try:
-                        await spinner_task
-                    except asyncio.CancelledError as _ex:
-                        log.warning("Silenced exception: %s", _ex)
-                    sys.stdout.write("\r" + " " * 40 + "\r")
-                    sys.stdout.flush()
-            
-            turn_result["output"]
-            log.info(f"Active Specialists: {turn_result['specialists_active']}")
-            
-            if hasattr(orchestrator, 'get_ui_status'):
-                ui_status = orchestrator.get_ui_status()
-                if ui_status.get('ui_available'):
-                    print(f"\n[UI STATUS] Active Specialists: {ui_status.get('active_specialists', [])}")
-                    print(f"[UI STATUS] Current Task: {ui_status.get('current_task', 'N/A')}")
-            for trace in turn_result.get("audit_traces", []):
-                log.info(trace)
-
-            # Display the Architect Intelligence plan to the user
-            plan_display = turn_result.get("plan_display")
-            if plan_display:
-                print(f"\n{plan_display}\n")
-
-            # Persist session to SQLite
-            session.save(DB_PATH)
-
-            # LHP: increment turn counter for session boundary tracking
-            if lhp:
-                try:
-                    lhp.on_turn_complete()
-                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
-
-        except KeyboardInterrupt:
-            log.info("AELVO terminated by user (Ctrl+C).")
-            if lhp:
-                try:
-                    await lhp.shutdown(interrupted_details={"interrupted": True})
-                except Exception as _ex: log.warning("Silenced exception: %s", _ex)
-            break
-        except Exception:
-            log.error("Unhandled REPL error:")
-            traceback.print_exc()
-
-    log.info("Database connections closed.")
+            await lhp.shutdown()
+        except Exception as _ex:
+            log.warning("Silenced exception: %s", _ex)
     aelvo_kernel.conn.close()
     memory_engine.db.close()
-    print("\n  AELVO shutdown complete.\n")
-
-
+    return
 def main():
-    # â”€â”€ Argument Parsing â”€â”€
+    # ── Argument Parsing ──
     import argparse
     parser = argparse.ArgumentParser(
         prog="AELVO",
-        description="AELVO is a terminal-based AI agent that plans and executes complex software engineering tasks using seven specialized sub-agents.",
-        epilog="Example: python main.py --tui --provider openai --model gpt-4"
+        description="AELVO is a web-based AI agent that plans and executes complex software engineering tasks using seven specialized sub-agents.",
+        epilog="Example: python main.py --provider openai --model gpt-4"
     )
-    parser.add_argument("--cli", action="store_true", help="Launch in CLI mode (legacy REPL)")
-    parser.add_argument("--tui", action="store_true", help="Launch in TUI mode (default)")
     parser.add_argument("--provider", type=str, default=None, help="Select LLM provider (e.g., openai, anthropic, groq)")
     parser.add_argument("--model", type=str, default=None, help="Override model selection (e.g., gpt-4, claude-3-opus)")
+    parser.add_argument("--project", type=str, default=None, help="Select workspace (default: most recently used)")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Web dashboard bind host")
+    parser.add_argument("--port", type=int, default=8000, help="Web dashboard HTTP port")
+    parser.add_argument("--ws-port", type=int, default=8765, help="WebSocket bridge port")
+    parser.add_argument("--no-browser", action="store_true", help="Do not auto-open the browser")
     args, _ = parser.parse_known_args()
     # Store parsed args in env for main_async to pick up
     if args.provider:
+        os.environ["LLM_PROVIDER"] = args.provider
         os.environ["AELVO_PROVIDER"] = args.provider
     if args.model:
+        os.environ["LLM_MODEL"] = args.model
         os.environ["AELVO_MODEL"] = args.model
-    if args.cli:
-        os.environ["AELVO_CLI"] = "1"
+    if args.project:
+        os.environ["AELVO_PROJECT"] = args.project
+    if args.host:
+        os.environ["AELVO_HOST"] = args.host
+    if args.port:
+        os.environ["AELVO_HTTP_PORT"] = str(args.port)
+    if args.ws_port:
+        os.environ["AELVO_WS_PORT"] = str(args.ws_port)
+    if args.no_browser:
+        os.environ["AELVO_NO_BROWSER"] = "1"
 
     try:
         asyncio.run(main_async())
