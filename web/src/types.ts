@@ -392,16 +392,6 @@ export interface ChatPhase {
   timestamp: number;
 }
 
-/** A chat session */
-export interface ChatSession {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  messageCount: number;
-  pinned: boolean;
-}
-
 /** ── Phase 16: Admin Settings Types ─────────────────────────── */
 
 export interface WSConfig {

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { UIEvent, ChatMessage, ChatSession, AgentStep, VerificationStepStatus, ChatPhase } from "../types";
+import type { UIEvent, ChatMessage, AgentStep, VerificationStepStatus, ChatPhase } from "../types";
 import { ChatMessageBubble } from "./ChatMessage";
-import { SessionSidebar } from "./SessionSidebar";
 
 interface ChatWorkspaceProps {
   events: UIEvent[];
@@ -21,7 +20,6 @@ const AGENT_DISPLAY: Record<string, { label: string; color: string; icon: string
   HERALD:    { label: "Herald",    color: "#FF9F45", icon: "★" },
 };
 
-let sessionCounter = 0;
 let msgCounter = 0;
 
 function genId(prefix: string): string {
@@ -29,131 +27,32 @@ function genId(prefix: string): string {
 }
 
 export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWorkspaceProps) {
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    const id = `session_${Date.now()}`;
-    sessionCounter = 1;
-    return [{
-      id,
-      title: "New Conversation",
-      createdAt: Date.now() / 1000,
-      updatedAt: Date.now() / 1000,
-      messageCount: 0,
-      pinned: false,
-    }];
-  });
-  const [activeSessionId, setActiveSessionId] = useState(sessions[0]?.id ?? null);
-
-  // Messages per session
-  const [messagesBySession, setMessagesBySession] = useState<Record<string, ChatMessage[]>>(() => {
-    const init: Record<string, ChatMessage[]> = {};
-    for (const s of sessions) init[s.id] = [];
-    return init;
-  });
-
-  // Input state
+  // Single continuous conversation
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Track the assistant message currently waiting on a real agent_response
-  const pendingAssistantRef = useRef<{ sessionId: string; messageId: string } | null>(null);
+  const pendingAssistantRef = useRef<{ messageId: string } | null>(null);
   // Track the last event count we processed for the real-response watcher
   const lastEventCountRef = useRef(0);
   // Timeout guard so a missing agent_response can never wedge the input
   const pendingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Active session's messages
-  const activeMessages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
-
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeMessages.length]);
+  }, [messages.length]);
 
-  // Update session message counts
-  useEffect(() => {
-    setSessions((prev) =>
-      prev.map((s) => {
-        const count = messagesBySession[s.id]?.length ?? 0;
-        return s.id === activeSessionId
-          ? { ...s, messageCount: count, updatedAt: Date.now() / 1000 }
-          : { ...s, messageCount: count };
-      })
-    );
-  }, [messagesBySession, activeSessionId]);
-
-  // Update session title from first message
-  const updateSessionTitle = useCallback((sessionId: string, firstMsg: string) => {
-    setSessions((prev) =>
-      prev.map((s) =>
-        s.id === sessionId
-          ? { ...s, title: firstMsg.length > 60 ? firstMsg.slice(0, 57) + "..." : firstMsg }
-          : s
-      )
-    );
-  }, []);
-
-  const createNewSession = useCallback(() => {
-    const id = `session_${Date.now()}_${++sessionCounter}`;
-    const now = Date.now() / 1000;
-    setSessions((prev) => [
-      ...prev,
-      { id, title: "New Conversation", createdAt: now, updatedAt: now, messageCount: 0, pinned: false },
-    ]);
-    setMessagesBySession((prev) => ({ ...prev, [id]: [] }));
-    setActiveSessionId(id);
-  }, []);
-
-  const deleteSession = useCallback((id: string) => {
-    setSessions((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      if (activeSessionId === id && next.length > 0) {
-        setActiveSessionId(next[0].id);
-      } else if (next.length === 0) {
-        // Re-create a default session
-        const now = Date.now() / 1000;
-        const newId = `session_${Date.now()}_${++sessionCounter}`;
-        setActiveSessionId(newId);
-        setMessagesBySession((m) => ({ ...m, [newId]: [] }));
-        return [{ id: newId, title: "New Conversation", createdAt: now, updatedAt: now, messageCount: 0, pinned: false }];
-      }
-      return next;
-    });
-    setMessagesBySession((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, [activeSessionId]);
-
-  const togglePin = useCallback((id: string) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, pinned: !s.pinned } : s))
-    );
-  }, []);
-
-  // Add a message to the active session
   const addMessage = useCallback((msg: ChatMessage) => {
-    setMessagesBySession((prev) => {
-      const sid = activeSessionId;
-      if (!sid || !prev[sid]) return prev;
-      return {
-        ...prev,
-        [sid]: [...prev[sid], msg],
-      };
-    });
-  }, [activeSessionId]);
+    setMessages((prev) => [...prev, msg]);
+  }, []);
 
-  // Update a specific message by id in a session
-  const patchMessage = useCallback((sessionId: string, messageId: string, patch: Partial<ChatMessage>) => {
-    setMessagesBySession((prev) => {
-      const list = prev[sessionId];
-      if (!list) return prev;
-      return {
-        ...prev,
-        [sessionId]: list.map((m) => (m.id === messageId ? { ...m, ...patch } : m)),
-      };
-    });
+  const patchMessage = useCallback((messageId: string, patch: Partial<ChatMessage>) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m))
+    );
   }, []);
 
   // ── Watch for real agent_response events and render them ──────────────
@@ -168,13 +67,13 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
     for (const ev of fresh) {
       if (ev.type === "agent_response" || ev.type === "agent_error") {
         if (ev.type === "agent_response") {
-          patchMessage(pending.sessionId, pending.messageId, {
+          patchMessage(pending.messageId, {
             content: ev.action || "(no output)",
             streamedContent: undefined,
             streaming: false,
           });
         } else {
-          patchMessage(pending.sessionId, pending.messageId, {
+          patchMessage(pending.messageId, {
             content: `⚠️ ${ev.action || "Agent error"}`,
             streamedContent: undefined,
             streaming: false,
@@ -244,7 +143,7 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
         timestamp: stepStart,
       });
 
-      patchMessage(activeSessionId!, assistantId, {
+      patchMessage(assistantId, {
         agentSteps: [...steps],
         phases: [...phases],
         streamedContent: responseTexts.slice(0, i + 2).join(""),
@@ -262,7 +161,7 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
       steps[steps.length - 1] = { ...steps[steps.length - 1], status: "completed" };
       phases[i] = { ...phases[i], status: "completed" };
 
-      patchMessage(activeSessionId!, assistantId, {
+      patchMessage(assistantId, {
         agentSteps: [...steps],
         phases: [...phases],
         streamedContent: responseTexts.slice(0, i + 2).join(""),
@@ -275,18 +174,17 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
       { check: "Security Scan", status: "passed", details: "No vulnerabilities" },
     ];
 
-    patchMessage(activeSessionId!, assistantId, {
+    patchMessage(assistantId, {
       content: responseTexts.join(""),
       streamedContent: undefined,
       streaming: false,
       verificationSummary: finalVerifications,
     });
-  }, [activeSessionId, patchMessage]);
+  }, [patchMessage]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || isProcessing) return;
-    if (!activeSessionId) return;
     setInput("");
 
     const now = Date.now() / 1000;
@@ -299,7 +197,6 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
       timestamp: now,
     };
     addMessage(userChatMsg);
-    updateSessionTitle(activeSessionId, text);
 
     const assistantId = genId("assistant");
     const assistantMsg: ChatMessage = {
@@ -319,7 +216,7 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
     // Real agent path — send over the WebSocket bridge
     if (sendMessage && sendMessage(text)) {
       lastEventCountRef.current = events.length;
-      pendingAssistantRef.current = { sessionId: activeSessionId, messageId: assistantId };
+      pendingAssistantRef.current = { messageId: assistantId };
       // Safety net: if the backend never replies, drop the pending state
       // so the user can send again (message stays as "Thinking…").
       if (pendingTimeoutRef.current) clearTimeout(pendingTimeoutRef.current);
@@ -335,7 +232,7 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
     // Offline fallback — simulate the pipeline
     await simulatePipeline(text, assistantId);
     setIsProcessing(false);
-  }, [input, isProcessing, activeSessionId, addMessage, updateSessionTitle, sendMessage, simulatePipeline, events.length]);
+  }, [input, isProcessing, addMessage, sendMessage, simulatePipeline, events.length]);
 
   // Clear any pending real-response timeout on unmount
   useEffect(() => {
@@ -359,26 +256,11 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Left sidebar — Sessions */}
-      <SessionSidebar
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={setActiveSessionId}
-        onNewSession={createNewSession}
-        onTogglePin={togglePin}
-        onDeleteSession={deleteSession}
-      />
-
-      {/* Center — Chat */}
+      {/* Full-width chat (no sidebars) */}
       <div className="flex-1 flex flex-col overflow-hidden bg-[#FFFBF4]">
         {/* Top bar */}
         <header className="border-b border-surface-border px-6 py-3 flex items-center justify-between shrink-0 bg-white/70 backdrop-blur-md">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-extrabold text-ink">Chat</h2>
-            <span className="text-xs text-ink-muted">
-              {sessions.find((s) => s.id === activeSessionId)?.title || "Conversation"}
-            </span>
-          </div>
+          <h2 className="text-lg font-extrabold text-ink">Chat</h2>
           <div className="flex items-center gap-2 text-xs">
             <span
               className={`w-2 h-2 rounded-full ${
@@ -398,7 +280,7 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
 
         {/* Message area */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {activeMessages.length === 0 ? (
+          {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center max-w-lg">
                 <div className="text-5xl mb-4 animate-float">◈</div>
@@ -442,7 +324,7 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
             </div>
           ) : (
             <div className="max-w-4xl mx-auto">
-              {activeMessages.map((msg) => (
+              {messages.map((msg) => (
                 <ChatMessageBubble key={msg.id} message={msg} />
               ))}
               <div ref={messagesEndRef} />
@@ -502,7 +384,6 @@ export function ChatWorkspace({ events, connectionStatus, sendMessage }: ChatWor
           </div>
         </div>
       </div>
-
     </div>
   );
 }
