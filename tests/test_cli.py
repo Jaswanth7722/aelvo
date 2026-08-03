@@ -5,10 +5,23 @@ import os
 import sqlite3
 import sys
 
+import pytest
+
 from cli.commands import CliContext, handle_command, is_slash_command, parse_command
 from cli.session import SessionRecorder, TerminalSession
 from cli.theme import build_console
 from runtime_next.models.events import EventType as RuntimeEventType
+
+
+@pytest.fixture(autouse=True)
+def _clean_aelvo_env():
+    """Isolate AELVO_* env vars between tests (main() mutates them)."""
+    saved = {k: v for k, v in os.environ.items() if k.startswith("AELVO_")}
+    yield
+    for k in list(os.environ):
+        if k.startswith("AELVO_"):
+            os.environ.pop(k, None)
+    os.environ.update(saved)
 
 
 # ── command parsing ─────────────────────────────────────────────────────────
@@ -218,6 +231,46 @@ def test_main_cli_args_map_to_env(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["main.py", "--cli", "--project", "tcli"])
     main.main()
     assert captured["env"].get("AELVO_CLI") == "1"
+
+
+def test_main_defaults_to_cli(monkeypatch):
+    """No args must launch the terminal CLI, not the web dashboard."""
+    import main
+
+    captured = {}
+
+    def fake_run(coro):
+        coro.close()
+        captured["env"] = {
+            k: v for k, v in os.environ.items() if k.startswith("AELVO_")
+        }
+        return None
+
+    monkeypatch.setattr(main.asyncio, "run", fake_run)
+    monkeypatch.setattr(sys, "argv", ["main.py"])
+    main.main()
+    assert captured["env"].get("AELVO_CLI") == "1"
+    assert "AELVO_WEB" not in captured["env"]
+
+
+def test_main_web_flag_disables_cli(monkeypatch):
+    """--web must opt out of the CLI and enable the dashboard."""
+    import main
+
+    captured = {}
+
+    def fake_run(coro):
+        coro.close()
+        captured["env"] = {
+            k: v for k, v in os.environ.items() if k.startswith("AELVO_")
+        }
+        return None
+
+    monkeypatch.setattr(main.asyncio, "run", fake_run)
+    monkeypatch.setattr(sys, "argv", ["main.py", "--web"])
+    main.main()
+    assert captured["env"].get("AELVO_WEB") == "1"
+    assert captured["env"].get("AELVO_CLI", "") != "1"
 
 
 def test_main_ask_implies_cli(monkeypatch):

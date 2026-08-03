@@ -1244,7 +1244,7 @@ async def main_async():
 
     # ------------------------------------------------------------------------
     # ------------------------------------------------------------------------
-    # WEB MODE (default) — serve the dashboard + WebSocket bridge
+    # WEB MODE (opt-in via --web) — serve the dashboard + WebSocket bridge
     # ------------------------------------------------------------------------
     _web_host = os.environ.get("AELVO_HOST", "127.0.0.1")
     _web_http_port = int(os.environ.get("AELVO_HTTP_PORT", "8000"))
@@ -1293,8 +1293,9 @@ def main():
     parser.add_argument("--port", type=int, default=8000, help="Web dashboard HTTP port")
     parser.add_argument("--ws-port", type=int, default=8765, help="WebSocket bridge port")
     parser.add_argument("--no-browser", action="store_true", help="Do not auto-open the browser")
-    parser.add_argument("--cli", action="store_true", help="Run the interactive terminal CLI (CodeBuff/Claude Code style) instead of the web dashboard")
+    parser.add_argument("--cli", action="store_true", help="Run the interactive terminal CLI (default mode)")
     parser.add_argument("--ask", type=str, default=None, help="CLI one-shot: run a single prompt and exit (implies --cli)")
+    parser.add_argument("--web", action="store_true", help="Launch the web dashboard instead of the terminal CLI")
     args, _ = parser.parse_known_args()
     # Store parsed args in env for main_async to pick up
     if args.provider:
@@ -1313,7 +1314,12 @@ def main():
         os.environ["AELVO_WS_PORT"] = str(args.ws_port)
     if args.no_browser:
         os.environ["AELVO_NO_BROWSER"] = "1"
-    if args.cli or args.ask:
+    if args.web:
+        os.environ["AELVO_WEB"] = "1"
+        os.environ.pop("AELVO_CLI", None)
+    else:
+        # The terminal CLI is the default interface (CodeBuff / Claude Code
+        # style); the web dashboard is opt-in via --web.
         os.environ["AELVO_CLI"] = "1"
     if args.ask:
         os.environ["AELVO_ASK"] = args.ask

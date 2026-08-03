@@ -5,6 +5,7 @@
 *.env
 auth.json
 *.key
+REPORT_ANALYZE.md
 
 
 # 2. Local State & Project Data
@@ -58,3 +59,6 @@ Thumbs.db
 
 generator.py
 web/node_modules/
+
+# 5. Terminal-bench harness artifacts (keep agents, reports, patches tracked)
+aelvo_bench/

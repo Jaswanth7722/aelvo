@@ -84,14 +84,14 @@ cp .env.example .env
 ### Launch
 
 ```bash
-# Launch the web dashboard (default)
+# Launch the interactive terminal CLI (default — CodeBuff / Claude Code style)
 python main.py
 
-# Launch the interactive terminal CLI (CodeBuff / Claude Code style)
-python main.py --cli
-
 # One-shot CLI — run a single prompt and exit
-python main.py --cli --ask "refactor the auth module to use async sessions"
+python main.py --ask "refactor the auth module to use async sessions"
+
+# Launch the web dashboard instead
+python main.py --web
 
 # Launch with a specific provider and model
 python main.py --provider openai --model gpt-4
@@ -99,7 +99,7 @@ python main.py --provider openai --model gpt-4
 
 ---
 
-## Terminal CLI (`python main.py --cli`)
+## Terminal CLI (default — `python main.py`)
 
 A dedicated interactive terminal agent in the spirit of CodeBuff / Claude
 Code, reusing the exact same backend as the web dashboard. Type any natural
@@ -139,12 +139,12 @@ Force-route to specific specialists with `@SPECIALIST` prefixes:
 
 ---
 
-## Web Dashboard (default)
+## Web Dashboard (`python main.py --web`)
 
-`python main.py` serves the web dashboard (HTTP + WebSocket bridge): chat,
-a terminal-style **Files** page with an *Open as Workspace* action, agent
-metrics, and provider setup from the browser. Add `--no-browser` to run the
-server headless.
+`python main.py --web` serves the web dashboard (HTTP + WebSocket bridge):
+chat, a terminal-style **Files** page with an *Open as Workspace* action,
+agent metrics, and provider setup from the browser. The terminal CLI is the
+default interface; add `--no-browser` to run the server headless.
 
 ---
 
@@ -204,7 +204,7 @@ server headless.
 ## Example Workflow
 
 ```text
-$ python main.py --cli
+$ python main.py
 AELVO — the automated engineering & logic-verification agent
 ────────────────────────────────────────────────────────────────
   project: default   provider: nvidia   model: nvidia/nemotron-3-super
