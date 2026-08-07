@@ -5,6 +5,7 @@ python-dotenv
 pyyaml
 filelock
 requests
+httpx
 cryptography>=41.0.0
 
 # The Intelligence Engines (LLM SDKs)

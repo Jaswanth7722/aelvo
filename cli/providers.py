@@ -67,19 +67,93 @@ def provider_models(provider_key: str) -> list:
     return [m for m in ids if not (m in seen or seen.add(m))]
 
 
-def list_models_for(ctx, provider_key: str) -> list:
-    """Models available for a provider: curated registry first, runtime fallback.
+#: Vendor prefixes kept when merging OpenRouter's live list (several hundred
+#: routed variants would otherwise flood the picker). Everything else stays out.
+_OPENROUTER_PREFIXES = (
+    "anthropic/", "openai/", "google/", "deepseek/", "qwen/", "moonshotai/",
+    "x-ai/", "meta-llama/", "mistralai/", "nvidia/", "cohere/",
+    "amazon/", "perplexity/", "minimax/", "z-ai/",
+)
 
-    The curated registry is authoritative for the providers the CLI can
-    switch to; the runtime registry is only consulted for providers that are
-    not in it.
+#: Hard cap on appended live-only ids — the picker must stay scrollable.
+_MAX_LIVE_EXTRAS = 80
+
+
+def _merge_models(provider_key: str, curated: list, live: list) -> list:
+    """Live ∪ curated, preserving curated order (default first), live extras appended.
+
+    OpenRouter's live list is huge, so only its known vendor-prefixed routing
+    families are appended; other providers are capped at ``_MAX_LIVE_EXTRAS``
+    fresh ids as a safety net.
     """
-    curated = provider_models(provider_key)
-    if curated:
-        return curated
+    if (provider_key or "").lower() == "openrouter":
+        live = [m for m in live if m.startswith(_OPENROUTER_PREFIXES)]
+    seen = set(curated)
+    merged = list(curated)
+    for m in live:
+        if m not in seen:
+            seen.add(m)
+            merged.append(m)
+        if len(merged) - len(curated) >= _MAX_LIVE_EXTRAS:
+            break
+    return merged
+
+
+async def available_models(ctx, provider_key: str):
+    """Live-first model list for a provider: ``(models, source)``.
+
+    ``source`` is one of ``'live'`` (fetched from the provider's API),
+    ``'catalog'`` (curated registry — offline fallback), ``'runtime'``
+    (runtime registry, for providers outside the curated one) or ``''``.
+    """
+    key = (provider_key or "").lower()
+    cfg = get_registry().get(key)
+    curated = provider_models(key)
+    if cfg is not None:
+        api_key = resolve_api_key(key, cfg.env_key)
+        if api_key:
+            from cli.live_models import fetch_live_models_async
+
+            live = await fetch_live_models_async(key, cfg, api_key)
+            if live:
+                return _merge_models(key, curated, live), "live"
+        if curated:
+            return curated, "catalog"
     if ctx.provider_runtime is not None:
         try:
-            models = ctx.provider_runtime.list_models(provider_key) or []
+            models = ctx.provider_runtime.list_models(key) or []
+            strings = [m for m in models if isinstance(m, str)]
+            if strings:
+                return strings, "runtime"
+        except Exception as exc:
+            log.debug("provider_runtime.list_models failed: %s", exc)
+    return [], ""
+
+
+def list_models_for(ctx, provider_key: str) -> list:
+    """Models available for a provider: live API first, curated, then runtime.
+
+    Uses the sync ``fetch_live_models`` (cached), so repeated calls in a
+    session (validation, ``/models``, pickers) only hit the API once per TTL.
+    Any live failure falls back to the curated registry, then the runtime
+    registry for providers outside the curated set.
+    """
+    key = (provider_key or "").lower()
+    cfg = get_registry().get(key)
+    curated = provider_models(key)
+    if cfg is not None:
+        api_key = resolve_api_key(key, cfg.env_key)
+        if api_key:
+            from cli.live_models import fetch_live_models
+
+            live = fetch_live_models(key, cfg, api_key)
+            if live:
+                return _merge_models(key, curated, live)
+        if curated:
+            return curated
+    if ctx.provider_runtime is not None:
+        try:
+            models = ctx.provider_runtime.list_models(key) or []
             strings = [m for m in models if isinstance(m, str)]
             if strings:
                 return strings
@@ -154,6 +228,13 @@ def store_api_key(provider_key: str, display_name: str, api_key: str) -> bool:
         log.warning("Credential store failed: %s", exc)
         ok = False
     if ok:
+        # A new key may expose different models — drop the cached live list.
+        try:
+            from cli.live_models import clear_cache
+
+            clear_cache()
+        except Exception as exc:
+            log.debug("Live cache clear failed: %s", exc)
         try:
             from core.registry.models import get_provider_config
 
@@ -229,9 +310,10 @@ async def switch_provider(
 ) -> bool:
     """Switch the active LLM provider; resolves/persists a key and hot-swaps the agent.
 
-    ``model_override`` (from the two-step picker) wins over the previous
-    provider's model; anything not in the provider's curated list falls back
-    to its default model.
+    ``model_override`` (from the two-step picker) is honored as-is — it was
+    already validated against the provider's live list. The fallback chain
+    (previous provider's model, then the default) is clamped to a model the
+    provider actually offers.
     """
     cfg = get_registry().get(name.lower())
     if cfg is None:
@@ -251,9 +333,13 @@ async def switch_provider(
     os.environ["AELVO_PROVIDER"] = name.lower()
 
     model = model_override.strip() or (ctx.model or "").strip() or cfg.default_model
-    available = list_models_for(ctx, name.lower())
-    if available and model not in available:
-        model = cfg.default_model
+    if not model_override.strip():
+        # Only clamp the *fallback* chain to a valid curated model. An explicit
+        # picker choice (model_override) was already validated against the live
+        # list — clamping it would silently undo the user's selection.
+        available, _src = await available_models(ctx, name.lower())
+        if available and model not in available:
+            model = cfg.default_model
     agent = build_agent(name.lower(), cfg, api_key, model, ctx.provider_runtime)
     if agent is None:
         ctx.console.print(
@@ -322,14 +408,16 @@ async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
 
 
 async def pick_model(ctx, provider_key: str = "") -> str:
-    """Full-screen picker over a provider's curated models; returns the id or ''.
+    """Full-screen picker over a provider's models; returns the id or ''.
 
-    With no ``provider_key`` the active provider (``ctx.provider_name``) is
-    used and the current model is preselected and marked ``[● current]``.
-    When called for a *different* provider (the two-step ``/provider`` flow)
-    its default model is preselected and marked ``[● default]``. The result
-    is validated against the curated list, so ``''`` means "cancelled" and
-    callers fall back to the default model.
+    The list is the provider's live API models merged with the curated
+    catalog (curated when no key / offline) — the title shows ``(live)`` when
+    the live list is in use. With no ``provider_key`` the active provider
+    (``ctx.provider_name``) is used and the current model is preselected and
+    marked ``[● current]``. When called for a *different* provider (the
+    two-step ``/provider`` flow) its default model is preselected and marked
+    ``[● default]``. The result is validated against the offered list, so
+    ``''`` means "cancelled" and callers fall back to the default model.
     """
     from cli.picker import pick_item
     from core.registry.models import get_model_manifest
@@ -337,7 +425,7 @@ async def pick_model(ctx, provider_key: str = "") -> str:
     provider_key = (provider_key or ctx.provider_name or "").lower()
     if not provider_key:
         return ""
-    available = provider_models(provider_key)
+    available, source = await available_models(ctx, provider_key)
     if not available:
         return ""
     cfg = get_registry().get(provider_key)
@@ -357,8 +445,9 @@ async def pick_model(ctx, provider_key: str = "") -> str:
             items.append((m, f"{m:<30} {hint:<26} [● {marker}]"))
         else:
             items.append((m, f"{m:<30} {hint}"))
+    source_tag = f" ({source})" if source in ("live", "runtime") else ""
     picked = await pick_item(
-        f"Select a model · {provider_key}",
+        f"Select a model · {provider_key}{source_tag}",
         items,
         subtitle="↑/↓ or j/k move · Enter switches · Esc uses the default",
         default=current or None,

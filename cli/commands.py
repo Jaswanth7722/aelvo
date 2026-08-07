@@ -152,7 +152,7 @@ async def handle_command(
     elif name == "projects":
         _cmd_projects(ctx)
     elif name == "models":
-        _cmd_models(ctx)
+        await _cmd_models(ctx, arg)
     elif name == "provider":
         from cli.providers import pick_provider, provider_table, switch_provider
         parts = arg.split(maxsplit=1)
@@ -306,19 +306,23 @@ def _cmd_projects(ctx: CliContext) -> None:
     ctx.console.print(table)
 
 
-def _cmd_models(ctx: CliContext) -> None:
-    """List models: the active provider's curated models, else provider defaults."""
-    from cli.providers import get_registry, list_models_for
+async def _cmd_models(ctx: CliContext, arg: str) -> None:
+    """List models: the active provider's live API list, else curated, else defaults."""
+    from cli.providers import available_models, get_registry
 
     if ctx.provider_name:
-        models = list_models_for(ctx, ctx.provider_name)
+        models, source = await available_models(ctx, ctx.provider_name)
+        title = "Available models"
+        if source in ("live", "runtime"):
+            title += f" ({source})"
     else:
         # No provider active: show each provider's default model.
         models = [cfg.default_model for cfg in get_registry().values()]
+        title = "Available models"
     if not models:
         ctx.console.print(Text("No models available — configure a provider first.", style="aelvo.dim"))
         return
-    table = Table(title="Available models", title_style="aelvo.gold")
+    table = Table(title=title, title_style="aelvo.gold")
     table.add_column("Model", style="aelvo.snow")
     table.add_column("Provider", style="aelvo.purple")
     for m in models:
@@ -328,7 +332,7 @@ def _cmd_models(ctx: CliContext) -> None:
 
 async def _cmd_model(ctx: CliContext, arg: str) -> None:
     """Show the active model, or open the picker / switch it on the live agent."""
-    from cli.providers import list_models_for, pick_model
+    from cli.providers import available_models, pick_model
 
     name = arg.strip()
     if not name:
@@ -345,7 +349,7 @@ async def _cmd_model(ctx: CliContext, arg: str) -> None:
         table.add_row("Current model", ctx.model or "-")
         ctx.console.print(table)
         if ctx.provider_name:
-            available = list_models_for(ctx, ctx.provider_name)
+            available, _src = await available_models(ctx, ctx.provider_name)
             if available:
                 ctx.console.print(Text("Available:", style="aelvo.gold"))
                 for m in available:

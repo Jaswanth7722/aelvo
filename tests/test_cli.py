@@ -25,6 +25,20 @@ def _clean_aelvo_env():
     os.environ.update(saved)
 
 
+@pytest.fixture(autouse=True)
+def _no_live_model_network(monkeypatch):
+    """Live model fetches are unit-tested in test_live_models.py — the CLI
+    tests must never hit the network (a stray real API key on the dev machine
+    would otherwise trigger an actual request)."""
+    import cli.live_models as lm
+
+    async def _none_async(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(lm, "fetch_live_models_async", _none_async)
+    monkeypatch.setattr(lm, "fetch_live_models", lambda *_a, **_k: None)
+
+
 # ── command parsing ─────────────────────────────────────────────────────────
 
 def test_is_slash_command():
@@ -655,6 +669,194 @@ def test_list_models_for_is_provider_scoped():
     assert models[0] == "gpt-5" and "gpt-4o" in models and "o3" in models
     assert "text-embedding-3-large" not in models
     assert "random-model-xyz" not in models
+
+
+# ── live model lists (fetch → merge → picker) ───────────────────────────────
+
+def test_available_models_live_merges_with_curated(monkeypatch):
+    """A successful live fetch merges with the curated catalog — curated first
+    (default on top), fresh live-only ids appended — and reports 'live'."""
+    from cli import live_models, providers
+
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-live")
+    monkeypatch.setattr(
+        live_models, "fetch_live_models_async", _async_val(["gpt-5", "brand-new-live-model"])
+    )
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model=None,
+    )
+    models, source = asyncio.run(providers.available_models(ctx, "openai"))
+    assert source == "live"
+    assert models[0] == "gpt-5"  # curated default first
+    assert "brand-new-live-model" in models
+    assert models.index("brand-new-live-model") > models.index("gpt-4o")
+
+
+def test_available_models_no_key_uses_catalog(monkeypatch):
+    """Without a key there is no fetch — the curated catalog is the source."""
+    from cli import providers
+
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "")
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model=None,
+    )
+    models, source = asyncio.run(providers.available_models(ctx, "openai"))
+    assert source == "catalog"
+    assert models[0] == "gpt-5"
+
+
+def test_available_models_live_failure_uses_catalog(monkeypatch):
+    """A failed live fetch (None) silently falls back to the curated catalog —
+    the picker can never break on a network error."""
+    from cli import live_models, providers
+
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-live")
+    monkeypatch.setattr(
+        live_models, "fetch_live_models_async", _async_val(None)
+    )
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model=None,
+    )
+    models, source = asyncio.run(providers.available_models(ctx, "openai"))
+    assert source == "catalog"
+    assert models[0] == "gpt-5"
+
+
+def test_openrouter_live_list_is_capped_to_vendor_prefixes(monkeypatch):
+    """OpenRouter's live list is huge — only known vendor-prefixed routing
+    families are merged in, so the picker stays sane."""
+    from cli import live_models, providers
+
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-or")
+    monkeypatch.setattr(
+        live_models,
+        "fetch_live_models_async",
+        _async_val(
+            [
+                "anthropic/claude-sonnet-4-20250514",
+                "some/random-vendor-model",
+                "x-ai/grok-4",
+                "totally/unrelated",
+            ]
+        ),
+    )
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openrouter", model=None,
+    )
+    models, source = asyncio.run(providers.available_models(ctx, "openrouter"))
+    assert source == "live"
+    assert "anthropic/claude-sonnet-4-20250514" in models
+    assert "x-ai/grok-4" in models
+    assert "some/random-vendor-model" not in models
+    assert "totally/unrelated" not in models
+
+
+def test_list_models_for_live_first(monkeypatch):
+    """The sync list_models_for also goes live-first when a key is present."""
+    from cli import live_models, providers
+
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-live")
+    monkeypatch.setattr(
+        live_models, "fetch_live_models", lambda *a, **k: ["gpt-5", "gpt-5-new"]
+    )
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model=None,
+    )
+    models = providers.list_models_for(ctx, "openai")
+    assert models[0] == "gpt-5"
+    assert "gpt-5-new" in models
+
+
+def test_pick_model_live_title_and_items(monkeypatch):
+    """A live list is flagged '(live)' in the picker title and the fresh ids
+    are offered alongside the curated ones."""
+    from cli import picker, providers
+
+    captured = {}
+
+    async def fake_pick_item(title, items, **kwargs):
+        captured["title"] = title
+        captured["items"] = list(items)
+        return "gpt-5-live-beta"
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(
+        providers, "available_models", _async_val((["gpt-5", "gpt-5-live-beta"], "live"))
+    )
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-5",
+    )
+    assert asyncio.run(providers.pick_model(ctx)) == "gpt-5-live-beta"
+    assert captured["title"].endswith("(live)")
+    assert [v for v, _ in captured["items"]] == ["gpt-5", "gpt-5-live-beta"]
+
+
+def test_cmd_models_live_title(monkeypatch):
+    """/models reflects the live source in the table title."""
+    from cli import providers
+
+    console = build_console()
+    monkeypatch.setattr(
+        providers, "available_models", _async_val((["gpt-5", "gpt-5-live"], "live"))
+    )
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=console, db_path="", workspace_path=".", project="t",
+        provider_name="openai", model=None,
+    )
+    with console.capture() as cap:
+        asyncio.run(handle_command(ctx, "models", ""))
+    rendered = cap.get()
+    assert "Available models (live)" in rendered
+    assert "gpt-5-live" in rendered
+
+
+def test_switch_provider_keeps_explicit_live_model(monkeypatch):
+    """A model explicitly picked from the live list must survive the switch —
+    the curated-only validation list must not clamp it to the default."""
+    from cli import providers
+
+    built = {}
+
+    def fake_build(provider_key, cfg, api_key, model, pr):
+        built["model"] = model
+        agent = MagicMock()
+        agent.model = model
+        return agent
+
+    monkeypatch.setattr(providers, "build_agent", fake_build)
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: True)
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "sk-openai")
+    monkeypatch.setattr(
+        providers, "available_models", _async_val((["gpt-5", "gpt-4o"], "catalog"))
+    )
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    ok = asyncio.run(
+        providers.switch_provider(ctx, "openai", model_override="gpt-5-live-beta")
+    )
+    assert ok
+    assert built["model"] == "gpt-5-live-beta"  # not clamped to gpt-5
+    assert ctx.model == "gpt-5-live-beta"
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
 
 # ── main.py --cli / --ask wiring ────────────────────────────────────────────
