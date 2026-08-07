@@ -161,10 +161,12 @@ async def handle_command(
         if pname:
             await switch_provider(ctx, pname, pkey)
         else:
-            # Interactive: open the picker; cancel or non-tty falls back to the table.
+            # Interactive: two-step picker (provider → its model); cancel or
+            # non-tty falls back to the table.
             picked = await pick_provider(ctx)
             if picked:
-                await switch_provider(ctx, picked)
+                pkey, pmodel = picked
+                await switch_provider(ctx, pkey, model_override=pmodel)
             else:
                 ctx.console.print(provider_table(ctx))
                 ctx.console.print(

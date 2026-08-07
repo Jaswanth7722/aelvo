@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import Any
+from typing import Any, Optional, Tuple
 
 from rich.table import Table
 from rich.text import Text
@@ -224,8 +224,15 @@ def build_agent(provider_key: str, cfg, api_key: str, model: str, provider_runti
         return None
 
 
-async def switch_provider(ctx, name: str, inline_key: str = "") -> bool:
-    """Switch the active LLM provider; resolves/persists a key and hot-swaps the agent."""
+async def switch_provider(
+    ctx, name: str, inline_key: str = "", model_override: str = ""
+) -> bool:
+    """Switch the active LLM provider; resolves/persists a key and hot-swaps the agent.
+
+    ``model_override`` (from the two-step picker) wins over the previous
+    provider's model; anything not in the provider's curated list falls back
+    to its default model.
+    """
     cfg = get_registry().get(name.lower())
     if cfg is None:
         ctx.console.print(Text(f"Unknown provider: {name} — use /provider to list.", style="aelvo.err"))
@@ -243,7 +250,7 @@ async def switch_provider(ctx, name: str, inline_key: str = "") -> bool:
     os.environ["LLM_PROVIDER"] = name.lower()
     os.environ["AELVO_PROVIDER"] = name.lower()
 
-    model = (ctx.model or "").strip() or cfg.default_model
+    model = model_override.strip() or (ctx.model or "").strip() or cfg.default_model
     available = list_models_for(ctx, name.lower())
     if available and model not in available:
         model = cfg.default_model
@@ -277,11 +284,15 @@ def set_api_key(ctx, provider_key: str, api_key: str) -> bool:
 
 # ── interactive pickers ──────────────────────────────────────────────────────
 
-async def pick_provider(ctx) -> str:
-    """Full-screen picker over the registered providers; returns the key or ''.
+async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
+    """Two-step picker: choose a provider, then one of its models.
 
-    Non-interactive terminals fall back to ``''`` so callers can print the
-    plain table instead.
+    Returns ``(provider_key, model)`` after both steps, or ``None`` when the
+    provider step is cancelled (callers fall back to the plain table).
+    Cancelling the model step yields ``(provider_key, default_model)`` — the
+    switch still happens, on the new provider's default model.
+    Non-interactive terminals return ``None`` (``pick_item`` returns None
+    off-tty).
     """
     from cli.picker import pick_item
 
@@ -293,48 +304,68 @@ async def pick_provider(ctx) -> str:
         label = f"{cfg.name:<20} {cfg.default_model}   [{creds}]{marker}"
         items.append((key, label))
     if not items:
-        return ""
+        return None
     picked = await pick_item(
         "Select a provider",
         items,
-        subtitle="↑/↓ or j/k move · Enter switches · Esc cancels",
+        subtitle="↑/↓ or j/k move · Enter opens its models · Esc cancels",
         default=current or None,
     )
-    return picked or ""
+    if not picked:
+        return None
+    model = await pick_model(ctx, picked)
+    if not model:
+        # Model step cancelled: switch on the provider's default model.
+        cfg = get_registry().get(picked)
+        model = cfg.default_model if cfg is not None else ""
+    return picked, model
 
 
-async def pick_model(ctx) -> str:
-    """Full-screen picker over the active provider's models; returns the id or ''.
+async def pick_model(ctx, provider_key: str = "") -> str:
+    """Full-screen picker over a provider's curated models; returns the id or ''.
 
-    Only the provider's curated models are offered (``provider_models``), and
-    each row carries the same visual style as the provider picker — model id,
-    ability hints, and a ``[● current]`` marker.
+    With no ``provider_key`` the active provider (``ctx.provider_name``) is
+    used and the current model is preselected and marked ``[● current]``.
+    When called for a *different* provider (the two-step ``/provider`` flow)
+    its default model is preselected and marked ``[● default]``. The result
+    is validated against the curated list, so ``''`` means "cancelled" and
+    callers fall back to the default model.
     """
     from cli.picker import pick_item
     from core.registry.models import get_model_manifest
 
-    if not ctx.provider_name:
+    provider_key = (provider_key or ctx.provider_name or "").lower()
+    if not provider_key:
         return ""
-    available = provider_models(ctx.provider_name)
+    available = provider_models(provider_key)
     if not available:
         return ""
-    current = ctx.model or ""
+    cfg = get_registry().get(provider_key)
+    default_model = cfg.default_model if cfg is not None else available[0]
+    is_active = provider_key == (ctx.provider_name or "").lower()
+    current = ctx.model if is_active else default_model
+    if current not in available:  # stale / cross-provider model id
+        current = default_model
+    marker = "current" if is_active else "default"
+
     items = []
     for m in available:
-        manifest = get_model_manifest(ctx.provider_name, m)
+        manifest = get_model_manifest(provider_key, m)
         abilities = ", ".join(a.value.replace("_", " ") for a in manifest.abilities)
         hint = f"({abilities})" if abilities else ""
         if m == current:
-            items.append((m, f"{m:<30} {hint:<26} [● current]"))
+            items.append((m, f"{m:<30} {hint:<26} [● {marker}]"))
         else:
             items.append((m, f"{m:<30} {hint}"))
     picked = await pick_item(
-        f"Select a model · {ctx.provider_name}",
+        f"Select a model · {provider_key}",
         items,
-        subtitle="↑/↓ or j/k move · Enter switches · Esc cancels",
+        subtitle="↑/↓ or j/k move · Enter switches · Esc uses the default",
         default=current or None,
     )
-    return picked or ""
+    if picked and picked in available:
+        return picked
+    return ""
 
 
 # ── tables ───────────────────────────────────────────────────────────────────

@@ -448,16 +448,17 @@ def test_pick_item_jk_navigation():
 
 
 def test_pick_provider_builds_items(monkeypatch):
-    """pick_provider must offer every registered provider with creds/active
-    markers and return the chosen key."""
+    """Two-step pick_provider: offers every registered provider (creds/active
+    markers), then its models, and returns (key, model)."""
     from cli import picker, providers
 
-    captured = {}
+    captured = {"calls": [], "items": []}
 
     async def fake_pick_item(title, items, **kwargs):
-        captured["title"] = title
-        captured["items"] = list(items)
-        return "openai"
+        captured["calls"].append(title)
+        captured["items"].append(list(items))
+        # Step 1 = provider, step 2 = its models.
+        return "openai" if len(captured["calls"]) == 1 else "gpt-4o"
 
     # pick_provider does `from cli.picker import pick_item` at call time.
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
@@ -466,19 +467,46 @@ def test_pick_provider_builds_items(monkeypatch):
         console=build_console(), db_path="", workspace_path=".", project="t",
         provider_name="nvidia", model=None,
     )
-    assert asyncio.run(providers.pick_provider(ctx)) == "openai"
-    keys = [v for v, _ in captured["items"]]
+    assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
+    provider_items = captured["items"][0]
+    model_items = captured["items"][1]
+    keys = [v for v, _ in provider_items]
     assert "openai" in keys and "nvidia" in keys and "google" in keys
-    labels = " ".join(lbl for _, lbl in captured["items"])
+    labels = " ".join(lbl for _, lbl in provider_items)
     assert "active" in labels  # nvidia marked as the current provider
+    assert [v for v, _ in model_items] == ["gpt-4o", "o1-preview", "gpt-4"]
+    assert len(captured["calls"]) == 2  # provider step, then model step
+    assert captured["calls"][1] == "Select a model · openai"
+
+
+def test_pick_provider_cancelled_at_model_step_keeps_default(monkeypatch):
+    """Cancelling the model step yields (key, its default model)."""
+    from cli import picker, providers
+
+    calls = []
+
+    async def fake_pick_item(title, items, **kwargs):
+        calls.append(title)
+        return "openai" if len(calls) == 1 else None  # cancel the model step
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
+
+
+NVIDIA_DEFAULT = "nvidia/nemotron-3-super-120b-a12b"
 
 
 def test_provider_noarg_picker_switches_provider(monkeypatch):
-    """Selecting a provider in the picker runs the switch (key from vault)."""
+    """Two-step selection runs the switch with the picked model (key from vault)."""
     from cli import providers
 
     agent = MagicMock()
-    monkeypatch.setattr(providers, "pick_provider", _async_val("nvidia"))
+    monkeypatch.setattr(providers, "pick_provider", _async_val(("nvidia", NVIDIA_DEFAULT)))
     monkeypatch.setattr(providers, "build_agent", lambda *a, **k: agent)
     monkeypatch.setattr(providers, "write_env", lambda k, v: None)
     monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: True)
@@ -492,16 +520,41 @@ def test_provider_noarg_picker_switches_provider(monkeypatch):
     )
     assert asyncio.run(handle_command(ctx, "provider", "")) is None
     assert ctx.provider_name == "nvidia"
+    assert ctx.model == NVIDIA_DEFAULT  # the model picked in step 2
     assert ctx.agent is agent
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
 
+def test_provider_noarg_picker_cancelled_model_keeps_default(monkeypatch):
+    """Esc on the model step still switches, with the provider's default model."""
+    from cli import providers
+
+    agent = MagicMock()
+    agent.model = "gpt-4o"
+    monkeypatch.setattr(providers, "pick_provider", _async_val(("openai", "")))
+    monkeypatch.setattr(providers, "build_agent", lambda *a, **k: agent)
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: True)
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "sk-openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(handle_command(ctx, "provider", "")) is None
+    assert ctx.provider_name == "openai"
+    assert ctx.model == "gpt-4o"  # openai's default model
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+
 def test_provider_noarg_cancelled_falls_back_to_table(monkeypatch):
-    """Cancelling the picker (or non-tty) prints the plain provider table."""
+    """Cancelling the provider step (or non-tty) prints the plain provider table."""
     from cli import providers
 
     console = build_console()
-    monkeypatch.setattr(providers, "pick_provider", _async_val(""))
+    monkeypatch.setattr(providers, "pick_provider", _async_val(None))
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=console, db_path="", workspace_path=".", project="t",
@@ -555,6 +608,29 @@ def test_pick_model_offers_only_provider_models(monkeypatch):
     assert not any("embedding" in m for m in models)  # no runtime junk
     labels = " ".join(lbl for _, lbl in captured["items"])
     assert "current" in labels  # current model marked like the provider picker
+
+
+def test_pick_model_for_new_provider_marks_default(monkeypatch):
+    """Two-step flow: picking models for a provider that is NOT active marks
+    its default model (not the old provider's current model)."""
+    from cli import picker, providers
+
+    captured = {}
+
+    async def fake_pick_item(title, items, **kwargs):
+        captured["items"] = list(items)
+        return None  # cancel the model step
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="nvidia", model="some-old-model",
+    )
+    assert asyncio.run(providers.pick_model(ctx, "openai")) == ""
+    labels = " ".join(lbl for _, lbl in captured["items"])
+    assert "● default" in labels  # openai's default (gpt-4o) preselected
+    assert "some-old-model" not in labels
 
 
 def test_list_models_for_is_provider_scoped():
