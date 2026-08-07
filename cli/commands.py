@@ -211,6 +211,16 @@ def _cmd_status(ctx: CliContext) -> None:
     table.add_row("Provider", ctx.provider_name or "not configured")
     table.add_row("Model", ctx.model or "-")
     table.add_row("Turns", str(getattr(ctx.orchestrator, "_turn_counter", 0)))
+
+    # System-prompt cache metrics (hits vs regenerations)
+    if ctx.agent is not None and hasattr(ctx.agent, "prompt_cache_stats"):
+        stats = ctx.agent.prompt_cache_stats()
+        table.add_row(
+            "Prompt cache",
+            f"{stats['hits']} hits / {stats['regenerations']} regens "
+            f"({stats['hit_rate'] * 100:.1f}% hit rate)",
+        )
+
     ctx.console.print(table)
 
     metrics = getattr(ctx.orchestrator, "agent_metrics", None)

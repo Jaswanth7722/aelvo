@@ -490,6 +490,9 @@ class WebBridge:
                 source = "orchestrator"
             except Exception as exc:
                 log.debug("Agent metrics fetch failed: %s", exc)
+        # System-prompt cache hit/miss metrics (hits vs regenerations)
+        if self._agent is not None and hasattr(self._agent, "prompt_cache_stats"):
+            report["prompt_cache"] = self._agent.prompt_cache_stats()
         await self._send_raw(websocket, {
             "type": "agent_metrics",
             "source": source,

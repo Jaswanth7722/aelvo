@@ -17,8 +17,11 @@ class MockProviderConfig:
 
 
 @pytest.fixture
-def agent():
+def agent(monkeypatch):
     """Create an AelvoAgent with fully mocked internals for testing."""
+    # Hermetic: never let a developer's AELVO_PROMPT_CACHE_TTL leak into
+    # tests that assume the default/instance TTL.
+    monkeypatch.delenv("AELVO_PROMPT_CACHE_TTL", raising=False)
     from main import AelvoAgent
 
     config = MockProviderConfig()
@@ -215,3 +218,200 @@ class TestSystemPromptCaching:
             # Turn 4 — within TTL of turn 3
             agent._call_llm([{"role": "user", "content": "turn 4"}])
             assert mock_get.call_count == 3, "Should cache within TTL window"
+
+
+class TestEnvVarTTL:
+    """Tests for AELVO_PROMPT_CACHE_TTL env-var configuration."""
+
+    def test_env_var_overrides_class_default(self, agent, monkeypatch):
+        """A valid env var takes precedence over the class default TTL."""
+        monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", "0.1")
+        assert agent._resolve_prompt_cache_ttl() == 0.1
+
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+
+            # First call — regenerate
+            agent._call_llm([{"role": "user", "content": "hello"}])
+            assert mock_get.call_count == 1
+
+            time.sleep(0.15)  # Past the 0.1s env TTL
+
+            agent._call_llm([{"role": "user", "content": "hello again"}])
+            assert mock_get.call_count == 2, \
+                "Env-var TTL should force regeneration after expiry"
+
+    def test_env_var_respected_within_ttl(self, agent, monkeypatch):
+        """Within the env-configured TTL, the cache is still used."""
+        monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", "0.2")
+
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+
+            agent._call_llm([{"role": "user", "content": "first"}])
+            assert mock_get.call_count == 1
+
+            # Well within the 0.2s window
+            time.sleep(0.05)
+            agent._call_llm([{"role": "user", "content": "second"}])
+            assert mock_get.call_count == 1, "Should use cache within env TTL"
+
+    def test_env_var_invalid_falls_back_to_class_var(self, agent, monkeypatch):
+        """A non-numeric env var falls back to the class variable TTL."""
+        monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", "not-a-number")
+
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+
+            # With default 300s, a quick second call must hit the cache
+            agent._call_llm([{"role": "user", "content": "first"}])
+            assert mock_get.call_count == 1
+            agent._call_llm([{"role": "user", "content": "second"}])
+            assert mock_get.call_count == 1, \
+                "Invalid env var should fall back to default TTL (cache hit)"
+
+    def test_env_var_non_positive_falls_back(self, agent, monkeypatch):
+        """Zero/negative env values are rejected and fall back."""
+        for bad in ("0", "-5", "0.0"):
+            monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", bad)
+            resolved = agent._resolve_prompt_cache_ttl()
+            assert resolved == agent.SYSTEM_PROMPT_CACHE_TTL, \
+                f"{bad!r} should fall back to class default"
+
+    def test_env_var_non_finite_falls_back(self, agent, monkeypatch):
+        """inf/nan/overflow env values are rejected and fall back."""
+        for bad in ("inf", "-inf", "nan", "1e309"):
+            monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", bad)
+            resolved = agent._resolve_prompt_cache_ttl()
+            assert resolved == agent.SYSTEM_PROMPT_CACHE_TTL, \
+                f"{bad!r} should fall back to class default"
+
+    def test_env_var_float_accepted(self, agent, monkeypatch):
+        """Fractional (float) TTL values from env are honored."""
+        monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", "0.05")
+        assert agent._resolve_prompt_cache_ttl() == 0.05
+
+    def test_env_var_int_accepted(self, agent, monkeypatch):
+        """Integer TTL values from env are honored."""
+        monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", "42")
+        assert agent._resolve_prompt_cache_ttl() == 42.0
+
+    def test_instance_attribute_still_works_without_env(self, agent):
+        """With no env var, an instance-level TTL override is respected."""
+        agent.SYSTEM_PROMPT_CACHE_TTL = 123
+        assert agent._resolve_prompt_cache_ttl() == 123
+
+    def test_class_default_is_fallback(self, agent, monkeypatch):
+        """With no env var, the class variable (300s) is the fallback."""
+        assert agent._resolve_prompt_cache_ttl() == 300
+
+    def test_env_var_wins_over_instance_attribute(self, agent, monkeypatch):
+        """A valid env var takes precedence over an instance override."""
+        monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", "7")
+        agent.SYSTEM_PROMPT_CACHE_TTL = 123
+        assert agent._resolve_prompt_cache_ttl() == 7.0
+
+    def test_env_var_regenerates_after_expiry(self, agent, monkeypatch):
+        """End-to-end: env TTL expiry actually regenerates the prompt."""
+        monkeypatch.setenv("AELVO_PROMPT_CACHE_TTL", "0.1")
+
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "fresh"
+            agent._call_llm([{"role": "user", "content": "first"}])
+            assert mock_get.call_count == 1
+
+            time.sleep(0.15)
+            agent._call_llm([{"role": "user", "content": "second"}])
+            assert mock_get.call_count == 2, \
+                "Env-configured TTL should drive cache regeneration"
+
+
+class TestPromptCacheMetrics:
+    """Tests for system-prompt cache hit/miss metric tracking."""
+
+    def test_metrics_start_at_zero(self, agent):
+        """Counters begin at zero and no cache exists yet."""
+        assert agent._prompt_cache_hits == 0
+        assert agent._prompt_cache_misses == 0
+        assert agent.prompt_cache_hit_rate() == 0.0
+        stats = agent.prompt_cache_stats()
+        assert stats["hits"] == 0
+        assert stats["regenerations"] == 0
+        assert stats["hit_rate"] == 0.0
+
+    def test_first_call_counts_as_miss(self, agent):
+        """First call is a regeneration (miss), reason 'first_call'."""
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+            agent._call_llm([{"role": "user", "content": "hello"}])
+
+        stats = agent.prompt_cache_stats()
+        assert stats["hits"] == 0
+        assert stats["regenerations"] == 1
+        assert stats["regen_reasons"]["first_call"] == 1
+
+    def test_second_call_counts_as_hit(self, agent):
+        """A cache reuse within TTL counts as a hit."""
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+            agent._call_llm([{"role": "user", "content": "hello"}])  # miss
+            agent._call_llm([{"role": "user", "content": "hello again"}])  # hit
+
+        stats = agent.prompt_cache_stats()
+        assert stats["hits"] == 1
+        assert stats["regenerations"] == 1
+        assert stats["hit_rate"] == 0.5
+
+    def test_hash_mismatch_tracks_reason(self, agent):
+        """Hash change counts as a miss with reason 'hash_mismatch'."""
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+            agent._call_llm([{"role": "user", "content": "first"}])  # miss
+            agent.last_context = {"anchor_hash": "changed"}
+            agent._call_llm([{"role": "user", "content": "second"}])  # miss: hash
+
+        stats = agent.prompt_cache_stats()
+        assert stats["regenerations"] == 2
+        assert stats["regen_reasons"]["hash_mismatch"] == 1
+
+    def test_ttl_expiry_tracks_reason(self, agent):
+        """TTL expiry counts as a miss with reason 'ttl_expired'."""
+        agent.SYSTEM_PROMPT_CACHE_TTL = 0.1
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+            agent._call_llm([{"role": "user", "content": "first"}])  # miss
+            time.sleep(0.15)
+            agent._call_llm([{"role": "user", "content": "second"}])  # miss: ttl
+
+        stats = agent.prompt_cache_stats()
+        assert stats["regenerations"] == 2
+        assert stats["regen_reasons"]["ttl_expired"] == 1
+
+    def test_hit_rate_after_mixed_sequence(self, agent):
+        """Hit rate reflects hits / (hits + misses)."""
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+            agent._call_llm([{"role": "user", "content": "a"}])  # miss
+            agent._call_llm([{"role": "user", "content": "b"}])  # hit
+            agent._call_llm([{"role": "user", "content": "c"}])  # hit
+            agent.last_context = {"anchor_hash": "x"}
+            agent._call_llm([{"role": "user", "content": "d"}])  # miss
+            agent._call_llm([{"role": "user", "content": "e"}])  # hit
+
+        stats = agent.prompt_cache_stats()
+        assert stats["hits"] == 3
+        assert stats["regenerations"] == 2
+        assert stats["hit_rate"] == 0.6
+        assert agent.prompt_cache_hit_rate() == 0.6
+
+    def test_stats_are_a_snapshot(self, agent):
+        """prompt_cache_stats returns a copy; mutating it doesn't affect state."""
+        stats = agent.prompt_cache_stats()
+        stats["hits"] = 999
+        assert agent._prompt_cache_hits == 0
+
+    def test_stats_regen_reasons_is_copied(self, agent):
+        """The nested regen_reasons dict is copied, not shared."""
+        stats = agent.prompt_cache_stats()
+        stats["regen_reasons"]["first_call"] = 999
+        assert agent._prompt_cache_miss_reasons["first_call"] == 0
