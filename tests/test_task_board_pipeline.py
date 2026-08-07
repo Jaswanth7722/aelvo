@@ -387,6 +387,40 @@ class TestTaskBoardPipelineExecution:
         assert ("in_progress", "reviewing") in hops, hops
         assert ("reviewing", "completed") in hops, hops
 
+    @pytest.mark.asyncio
+    async def test_clean_pipeline_emits_no_error_logs(
+        self, task_board_pipeline, task_board, blackboard, caplog,
+    ):
+        """Regression: a clean Mode B run must not emit any ERROR/CRITICAL logs.
+
+        The old bugs (invalid task transitions, wrong specialist kwargs) were
+        invisible to the loose phase assertions — they only surfaced as
+        ``Mode B <phase> phase failed`` ERROR lines in the log file. This guard
+        fails the run if any aelvo logger emits ERROR+ during a clean pipeline.
+        """
+        import logging
+
+        caplog.set_level(logging.DEBUG, logger="aelvo")
+
+        result = await task_board_pipeline.run(
+            user_input="@MODE_B research and implement a new auth handler with security review",
+            agent=MagicMock(),
+            conversation_history=[],
+            task_board=task_board,
+            blackboard=blackboard,
+        )
+        assert result is not None
+        assert len(result.failures) == 0, f"pipeline failures: {result.failures}"
+
+        errors = [
+            rec for rec in caplog.records
+            if rec.levelno >= logging.ERROR and rec.name.startswith("aelvo")
+        ]
+        assert errors == [], (
+            "clean Mode B run emitted ERROR logs: "
+            + repr([f"{r.name}: {r.getMessage()}" for r in errors])
+        )
+
 
 # =========================================================================
 # 5. Task Board Resource Creation
