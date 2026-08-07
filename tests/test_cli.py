@@ -859,6 +859,84 @@ def test_switch_provider_keeps_explicit_live_model(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
 
+# ── context + cost-tier hints ───────────────────────────────────────────────
+
+def test_format_context_window():
+    from core.registry.models import format_context_window
+
+    assert format_context_window(131072) == "128k"
+    assert format_context_window(400000) == "400k"
+    assert format_context_window(200000) == "200k"
+    assert format_context_window(2000000) == "2M"
+    assert format_context_window(1047576) == "1M"
+    assert format_context_window(1048576) == "1M"
+    assert format_context_window(65536) == "64k"
+    assert format_context_window(8192) == "8k"
+    # Small windows render as raw digits; zero/negative → '?' (never a crash
+    # or a bogus '-1k' in the picker rows).
+    assert format_context_window(512) == "512"
+    assert format_context_window(0) == "?"
+    assert format_context_window(-1000) == "?"
+
+
+def test_registry_package_exports():
+    """CostTier and the tier/format helpers are reachable from the package
+    root (``core.registry``), not just the models submodule."""
+    from core.registry import (  # noqa: F401
+        MODEL_REGISTRY,
+        CostTier,
+        format_context_window,
+        get_cost_tier,
+        get_model_manifest,
+    )
+
+    assert CostTier.PREMIUM.value == "premium"
+    assert format_context_window(400000) == "400k"
+    assert get_cost_tier("openai", "gpt-5") == CostTier.STANDARD
+
+
+def test_get_cost_tier_runtime_fallback():
+    """Live-only models get a price-derived tier + real context from the
+    runtime registry; curated models keep their curated tier; unknown → standard."""
+    from core.registry.models import CostTier, get_cost_tier, get_model_manifest
+
+    # gpt-4-turbo is NOT in the curated openai catalog but has real pricing
+    # ($10 in / $30 out per 1M) in auth.config → premium tier + real context.
+    assert get_cost_tier("openai", "gpt-4-turbo") == CostTier.PREMIUM
+    assert get_model_manifest("openai", "gpt-4-turbo").context_window == 128000
+    # Curated models keep their curated tiers.
+    assert get_cost_tier("openai", "gpt-5") == CostTier.STANDARD
+    assert get_cost_tier("openai", "gpt-4o-mini") == CostTier.BUDGET
+    assert get_cost_tier("anthropic", "claude-opus-4-1-20250805") == CostTier.PREMIUM
+    # Unknown models default to standard.
+    assert get_cost_tier("openai", "gpt-9-future-model") == CostTier.STANDARD
+
+
+def test_pick_model_rows_show_context_and_tier(monkeypatch):
+    """Each picker row shows the model's context window and cost tier, and
+    the [● current] marker is preserved."""
+    from cli import picker, providers
+
+    captured = {}
+
+    async def fake_pick_item(title, items, **kwargs):
+        captured["items"] = list(items)
+        return "gpt-4o-mini"
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-4o-mini",
+    )
+    assert asyncio.run(providers.pick_model(ctx)) == "gpt-4o-mini"
+    rows = {v: lbl for v, lbl in captured["items"]}
+    assert "400k" in rows["gpt-5"] and "$$" in rows["gpt-5"]  # standard tier
+    assert "128k" in rows["gpt-4o"] and "$$" in rows["gpt-4o"]
+    assert "128k" in rows["gpt-4o-mini"] and "$" in rows["gpt-4o-mini"]  # budget
+    assert "[● current]" in rows["gpt-4o-mini"]  # marker preserved
+
+
 # ── main.py --cli / --ask wiring ────────────────────────────────────────────
 
 def test_main_cli_args_map_to_env(monkeypatch):

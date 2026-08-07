@@ -26,6 +26,13 @@ from rich.text import Text
 
 log = logging.getLogger("aelvo.cli")
 
+#: Cost-tier symbols shown next to each model row in the picker.
+_TIER_SYMBOLS = {
+    "budget": "$",
+    "standard": "$$",
+    "premium": "$$$",
+}
+
 
 # ── paths ────────────────────────────────────────────────────────────────────
 
@@ -420,7 +427,7 @@ async def pick_model(ctx, provider_key: str = "") -> str:
     ``''`` means "cancelled" and callers fall back to the default model.
     """
     from cli.picker import pick_item
-    from core.registry.models import get_model_manifest
+    from core.registry.models import format_context_window, get_model_manifest
 
     provider_key = (provider_key or ctx.provider_name or "").lower()
     if not provider_key:
@@ -441,10 +448,15 @@ async def pick_model(ctx, provider_key: str = "") -> str:
         manifest = get_model_manifest(provider_key, m)
         abilities = ", ".join(a.value.replace("_", " ") for a in manifest.abilities)
         hint = f"({abilities})" if abilities else ""
+        # Context window + cost tier hint, e.g. "400k · $$".
+        meta = (
+            f"{format_context_window(manifest.context_window)} · "
+            f"{_TIER_SYMBOLS.get(manifest.cost_tier.value, '$$')}"
+        )
         if m == current:
-            items.append((m, f"{m:<30} {hint:<26} [● {marker}]"))
+            items.append((m, f"{m:<28} {meta:<12} {hint:<22} [● {marker}]"))
         else:
-            items.append((m, f"{m:<30} {hint}"))
+            items.append((m, f"{m:<28} {meta:<12} {hint:<22}"))
     source_tag = f" ({source})" if source in ("live", "runtime") else ""
     picked = await pick_item(
         f"Select a model · {provider_key}{source_tag}",
