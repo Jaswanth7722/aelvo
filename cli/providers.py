@@ -24,6 +24,10 @@ from typing import Any, Optional, Tuple
 from rich.table import Table
 from rich.text import Text
 
+# Light module (enums + pydantic only) — the heavy imports (main, the provider
+# runtime) stay lazy below.
+from core.registry.models import ModelAbility
+
 log = logging.getLogger("aelvo.cli")
 
 #: Cost-tier symbols shown next to each model row in the picker.
@@ -64,6 +68,18 @@ _MAX_DEFAULT_MODELS = 10
 #: Sentinel value for the "Custom model id…" entry at the bottom of the model
 #: picker. Real model ids can never collide with this.
 _CUSTOM_MODEL_MARKER = "__aelvo_custom_model__"
+
+#: Model picker categories, in priority order. A model lands in the FIRST
+#: category matching one of its abilities, so every model appears exactly once;
+#: the rest go to the general bucket. Keys are ModelAbility values (no magic
+#: strings — the enum is the single source of truth).
+_CATEGORY_ORDER = (
+    ("🧠  Reasoning", ModelAbility.REASONING.value),
+    ("👁️  Vision", ModelAbility.VISION.value),
+    ("📜  Long context", ModelAbility.LONG_CONTEXT.value),
+    ("⚡  Fast & light", ModelAbility.FAST_INFERENCE.value),
+)
+_GENERAL_CATEGORY = "✨  General"
 
 
 def provider_models(provider_key: str) -> list:
@@ -647,21 +663,25 @@ async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
 
 
 async def pick_model(ctx, provider_key: str = "") -> str:
-    """Full-screen picker over a provider's models; returns the id or ''.
+    """Full-screen, categorized model picker; returns the id or ''.
 
     The list is the provider's live API models merged with the curated
     catalog (curated when no key / offline, capped at the top ~10) — the
-    title shows ``(live)`` when the live list is in use. With no
-    ``provider_key`` the active provider (``ctx.provider_name``) is used and
-    the current model is preselected and marked ``[● current]``. When called
-    for a *different* provider (the two-step ``/provider`` flow) its default
-    model is preselected and marked ``[● default]``.
+    title shows ``(live)`` when the live list is in use. Models are grouped
+    under ability-derived category headers (Reasoning / Vision / Long
+    context / Fast & light / General), and the picker is mouse-friendly:
+    hover moves the cursor, a left-click selects, the wheel scrolls.
+
+    With no ``provider_key`` the active provider (``ctx.provider_name``) is
+    used and the current model is preselected and marked ``[● current]``.
+    When called for a *different* provider (the two-step ``/provider`` flow)
+    its default model is preselected and marked ``[● default]``.
 
     A ``✏️  Custom model id…`` entry at the bottom lets you type any id the
     provider accepts — it is returned as-is (never clamped to the list).
     ``''`` means "cancelled" and callers fall back to the default model.
     """
-    from cli.picker import pick_item
+    from cli.picker import pick_categorized
     from core.registry.models import format_context_window, get_model_manifest
 
     provider_key = (provider_key or ctx.provider_name or "").lower()
@@ -678,8 +698,7 @@ async def pick_model(ctx, provider_key: str = "") -> str:
         current = default_model
     marker = "current" if is_active else "default"
 
-    items = []
-    for m in available:
+    def _row(m: str):
         manifest = get_model_manifest(provider_key, m)
         abilities = ", ".join(a.value.replace("_", " ") for a in manifest.abilities)
         hint = f"({abilities})" if abilities else ""
@@ -689,16 +708,39 @@ async def pick_model(ctx, provider_key: str = "") -> str:
             f"{_TIER_SYMBOLS.get(manifest.cost_tier.value, '$$')}"
         )
         if m == current:
-            items.append((m, f"{m:<28} {meta:<12} {hint:<22} [● {marker}]"))
-        else:
-            items.append((m, f"{m:<28} {meta:<12} {hint:<22}"))
+            return (m, f"{m:<28} {meta:<12} {hint:<22} [● {marker}]")
+        return (m, f"{m:<28} {meta:<12} {hint:<22}")
+
+    # Group the merged list into ability-derived categories. Each model lands
+    # in exactly one category (first match in priority order); curated order
+    # is preserved, so the default model stays at the top of its category.
+    sections = []
+    placed = set()
+    for header, ability in _CATEGORY_ORDER:
+        members = [
+            m for m in available
+            if m not in placed
+            and ability in {a.value for a in get_model_manifest(provider_key, m).abilities}
+        ]
+        if members:
+            sections.append((header, [_row(m) for m in members]))
+            placed.update(members)
+    rest = [m for m in available if m not in placed]
+    if rest:
+        sections.append((_GENERAL_CATEGORY, [_row(m) for m in rest]))
     # Escape hatch for models the curated/live lists don't cover.
-    items.append((_CUSTOM_MODEL_MARKER, "✏️  Custom model id…"))
+    sections.append((None, [(_CUSTOM_MODEL_MARKER, "✏️  Custom model id…")]))
+
     source_tag = f" ({source})" if source in ("live", "runtime") else ""
-    picked = await pick_item(
+    picked = await pick_categorized(
         f"Select a model · {provider_key}{source_tag}",
-        items,
-        subtitle="↑/↓ or j/k move · Enter switches · Esc uses the default · custom id at the bottom",
+        sections,
+        subtitle=(
+            "Mouse: hover to move · click to select · wheel scrolls · "
+            "↑/↓, j/k, PgUp/PgDn, Home/End move · Enter switches · "
+            "Esc uses the default"
+        ),
+        footer="$ budget · $$ standard · $$$ premium · custom id at the bottom",
         default=current or None,
     )
     if picked == _CUSTOM_MODEL_MARKER:

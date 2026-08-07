@@ -431,10 +431,11 @@ def test_pick_provider_prompts_and_stores_key_before_model(monkeypatch):
 
     async def fake_pick_item(title, items, **kwargs):
         calls.append(title)
-        # Step 1 = provider, step 2 = its models (the key step has no picker).
-        return "google" if len(calls) == 1 else "gemini-2.5-pro"
+        # Step 1 = provider (the key step has no picker).
+        return "google"
 
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", _async_val("gemini-2.5-pro"))
     monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "")  # no key anywhere
     monkeypatch.setattr(providers, "prompt_api_key", _async_val("AIza-fresh-key"))
     monkeypatch.setattr(
@@ -485,13 +486,12 @@ def test_pick_provider_rotate_replaces_key(monkeypatch):
 
     async def fake_pick_item(title, items, **kwargs):
         calls.append(title)
-        if len(calls) == 1:
-            return "openai"   # provider step
-        if len(calls) == 2:
-            return "yes"      # rotate confirm
-        return "gpt-4o"       # model step
+        # Step 1 = provider, step 2 = rotate confirm (the model step now uses
+        # the categorized picker).
+        return "openai" if len(calls) == 1 else "yes"
 
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", _async_val("gpt-4o"))
     monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-old")
     monkeypatch.setattr(providers, "prompt_api_key", _async_val("sk-new"))
     monkeypatch.setattr(providers, "store_api_key", lambda k, n, v: stored.append((k, v)) or True)
@@ -502,7 +502,7 @@ def test_pick_provider_rotate_replaces_key(monkeypatch):
     )
     assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
     assert stored == [("openai", "sk-new")]  # exactly one replacement store
-    assert len(calls) == 3
+    assert len(calls) == 2  # provider + rotate confirm
     assert calls[1].startswith("Replace the stored key for ")
 
 
@@ -517,13 +517,11 @@ def test_pick_provider_rotate_declined_keeps_key(monkeypatch):
 
     async def fake_pick_item(title, items, **kwargs):
         calls.append(title)
-        if len(calls) == 1:
-            return "openai"
-        if len(calls) == 2:
-            return "no"   # keep the existing key
-        return "gpt-4o"
+        # Step 1 = provider, step 2 = rotate confirm.
+        return "openai" if len(calls) == 1 else "no"  # keep the existing key
 
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", _async_val("gpt-4o"))
     monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-old")
     monkeypatch.setattr(providers, "prompt_api_key", lambda *a, **k: prompted.append(1) or "")
     monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: stored.append(1) or True)
@@ -547,13 +545,11 @@ def test_pick_provider_rotate_key_prompt_cancelled_keeps_existing(monkeypatch):
 
     async def fake_pick_item(title, items, **kwargs):
         calls.append(title)
-        if len(calls) == 1:
-            return "openai"
-        if len(calls) == 2:
-            return "yes"   # wants to rotate…
-        return "gpt-4o"
+        # Step 1 = provider, step 2 = rotate confirm.
+        return "openai" if len(calls) == 1 else "yes"  # wants to rotate…
 
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", _async_val("gpt-4o"))
     monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-old")
     monkeypatch.setattr(providers, "prompt_api_key", _async_val(""))  # …but Esc
     monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: stored.append(1) or True)
@@ -658,8 +654,8 @@ def test_provider_flow_stores_key_exactly_once(monkeypatch):
     stores = []
 
     async def fake_pick_item(title, items, **kwargs):
-        # Step 1 = provider picker, step 2 = model picker.
-        return "openai" if title.startswith("Select a provider") else "gpt-4o"
+        # Step 1 = provider picker (the model step uses the categorized picker).
+        return "openai"
 
     def fake_store(key, name, value):
         stores.append((key, value))
@@ -671,6 +667,7 @@ def test_provider_flow_stores_key_exactly_once(monkeypatch):
         return "sk-e2e" if stores else ""
 
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", _async_val("gpt-4o"))
     monkeypatch.setattr(providers, "resolve_api_key", fake_resolve)
     monkeypatch.setattr(providers, "prompt_api_key", _async_val("sk-e2e"))
     monkeypatch.setattr(providers, "store_api_key", fake_store)
@@ -809,6 +806,15 @@ def _async_val(value):
     return _fn
 
 
+def _flatten(sections):
+    """Flatten ``(header, items)`` picker sections into ``[(value, label)]`` in
+    display order (headers themselves are dropped)."""
+    flat = []
+    for _header, items in sections:
+        flat.extend(items)
+    return flat
+
+
 def test_pick_item_returns_none_when_not_interactive(monkeypatch):
     """On non-interactive terminals (pipes, CI, tests) the picker must not
     launch a full-screen app — it returns None so callers fall back."""
@@ -877,25 +883,176 @@ def test_pick_item_jk_navigation():
     assert _drive_picker("j\r") == "'b'"
 
 
+_CATEGORY_PICKER_DRIVER = r'''
+import asyncio, sys
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output import DummyOutput
+from cli import picker
+
+picker.is_interactive = lambda: True
+KEYS = sys.argv[1]
+
+SECTIONS = [
+    ("Cat A", [("a1", "Alpha 1"), ("a2", "Alpha 2"), ("a3", "Alpha 3")]),
+    ("Cat B", [("b1", "Beta 1"), ("b2", "Beta 2")]),
+    (None, [("custom", "✏️  Custom id")]),
+]
+
+async def _main():
+    with create_pipe_input() as inp:
+        inp.send_text(KEYS)
+        return await picker.pick_categorized(
+            "pick", SECTIONS, _input=inp, _output=DummyOutput(),
+        )
+
+print(repr(asyncio.run(_main())))
+'''
+
+
+def _drive_cat_picker(keys: str) -> str:
+    """Run one pick_categorized in a fresh interpreter (see _drive_picker)."""
+    out = subprocess.run(
+        [sys.executable, "-c", _CATEGORY_PICKER_DRIVER, keys],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    return out.stdout.strip()
+
+
+def test_pick_categorized_enter_selects_first():
+    """Enter on the first frame selects the first item (headers skipped)."""
+    assert _drive_cat_picker("\r") == "'a1'"
+
+
+def test_pick_categorized_arrow_down_then_enter():
+    """Down arrow moves across the first header to the second item."""
+    assert _drive_cat_picker("\x1b[B\r") == "'a2'"
+
+
+def test_pick_categorized_jk_navigation():
+    """Vi-style j/k navigation crosses category headers to the next section."""
+    assert _drive_cat_picker("jjj\r") == "'b1'"
+
+
+def test_pick_categorized_escape_cancels():
+    """Esc cancels the categorized picker and returns None."""
+    assert _drive_cat_picker("\x1b") == "None"
+
+
+def test_pick_categorized_home_end_jump():
+    """Home/End jump to the first/last entry (the custom id)."""
+    assert _drive_cat_picker("\x1b[4~\r") == "'custom'"  # End
+    assert _drive_cat_picker("\x1b[4~\x1b[1~\r") == "'a1'"  # End then Home
+
+
+def test_pick_categorized_page_down_jumps_to_end():
+    """PageDown jumps a full page and clamps to the last entry."""
+    assert _drive_cat_picker("\x1b[6~\r") == "'custom'"
+
+
+def test_section_list_control_mouse_behavior():
+    """The sectioned control: hover moves the cursor, left-click selects the
+    clicked row, headers are not selectable, scroll falls through to the host
+    Window (native wheel scrolling)."""
+    from prompt_toolkit.data_structures import Point
+    from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+
+    from cli.picker import _SectionListControl
+
+    rows = [
+        ("header", None, "Cat A"),
+        ("item", "a", "A"),
+        ("item", "b", "B"),
+        ("item", "c", "C"),
+    ]
+    item_rows = [1, 2, 3]
+    ctrl = _SectionListControl(rows, item_rows, 0)
+    assert ctrl.current_value == "a"
+
+    selected = []
+    ctrl.on_activate = selected.append
+
+    # modifiers expects frozenset[MouseModifier] — empty means no modifiers.
+    no_mods = frozenset()
+
+    # Hover over row 3 (content index 2 = 'b') — moves the cursor only.
+    ctrl.mouse_handler(
+        MouseEvent(
+            position=Point(x=0, y=2), event_type=MouseEventType.MOUSE_MOVE,
+            button=MouseButton.NONE, modifiers=no_mods,
+        )
+    )
+    assert ctrl.current_value == "b"
+    assert selected == []  # hover never selects
+
+    # Left-click row 4 (content index 3 = 'c') — selects it.
+    ctrl.mouse_handler(
+        MouseEvent(
+            position=Point(x=0, y=3), event_type=MouseEventType.MOUSE_DOWN,
+            button=MouseButton.LEFT, modifiers=no_mods,
+        )
+    )
+    assert selected == ["c"]
+    assert ctrl.current_value == "c"
+
+    # A right-click moves the cursor but must NOT select (only left clicks do).
+    ctrl.mouse_handler(
+        MouseEvent(
+            position=Point(x=0, y=1), event_type=MouseEventType.MOUSE_DOWN,
+            button=MouseButton.RIGHT, modifiers=no_mods,
+        )
+    )
+    assert ctrl.current_value == "a"  # cursor moved
+    assert selected == ["c"]  # nothing new selected
+
+    # Header rows are not selectable — hovering one leaves the cursor put
+    # (still on 'a' from the right-click above).
+    ctrl.mouse_handler(
+        MouseEvent(
+            position=Point(x=0, y=0), event_type=MouseEventType.MOUSE_MOVE,
+            button=MouseButton.NONE, modifiers=no_mods,
+        )
+    )
+    assert ctrl.current_value == "a"
+
+    # Scroll events fall through (NotImplemented) so the host Window scrolls.
+    assert (
+        ctrl.mouse_handler(
+            MouseEvent(
+                position=Point(x=0, y=1), event_type=MouseEventType.SCROLL_DOWN,
+                button=MouseButton.NONE, modifiers=no_mods,
+            )
+        )
+        is NotImplemented
+    )
+
+
 def test_pick_provider_builds_items(monkeypatch):
     """pick_provider: offers every registered provider (creds/active markers),
-    a rotate confirm for an existing key, then its models — returns (key, model)."""
+    a rotate confirm for an existing key, then its categorized models — returns
+    (key, model)."""
     from cli import picker, providers
 
-    captured = {"calls": [], "items": []}
+    captured = {"calls": [], "items": [], "sections": []}
 
     async def fake_pick_item(title, items, **kwargs):
         captured["calls"].append(title)
         captured["items"].append(list(items))
-        # Step 1 = provider, step 2 = rotate confirm, step 3 = its models.
+        # Step 1 = provider, step 2 = rotate confirm (the model step now uses
+        # the categorized picker).
         if len(captured["calls"]) == 1:
             return "openai"
-        if len(captured["calls"]) == 2:
-            return "no"  # keep the existing key
-        return "gpt-4o"
+        return "no"  # keep the existing key
+
+    async def fake_pick_categorized(title, sections, **kwargs):
+        captured["calls"].append(title)
+        captured["sections"].append(sections)
+        return "gpt-4o"  # model step
 
     # pick_provider does `from cli.picker import pick_item` at call time.
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     # Key already stored → the rotate confirm is offered (3 picker calls).
     monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-test")
     ctx = CliContext(
@@ -905,12 +1062,11 @@ def test_pick_provider_builds_items(monkeypatch):
     )
     assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
     provider_items = captured["items"][0]
-    model_items = captured["items"][2]
     keys = [v for v, _ in provider_items]
     assert "openai" in keys and "nvidia" in keys and "google" in keys
     labels = " ".join(lbl for _, lbl in provider_items)
     assert "active" in labels  # nvidia marked as the current provider
-    model_ids = [v for v, _ in model_items]
+    model_ids = [v for v, _ in _flatten(captured["sections"][0])]
     assert model_ids[0] == "gpt-5"  # curated default first
     assert "gpt-4o" in model_ids and "o3" in model_ids
     assert len(captured["calls"]) == 3  # provider, rotate confirm, model
@@ -926,9 +1082,10 @@ def test_pick_provider_cancelled_at_model_step_keeps_default(monkeypatch):
 
     async def fake_pick_item(title, items, **kwargs):
         calls.append(title)
-        return "openai" if len(calls) == 1 else None  # cancel the model step
+        return "openai"  # provider step
 
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", _async_val(None))  # cancel model
     monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-test")
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
@@ -1026,30 +1183,34 @@ def test_model_noarg_picker_switches(monkeypatch):
 
 def test_pick_model_offers_only_provider_models(monkeypatch):
     """The model picker must offer only the provider's curated models (no
-    runtime embedding/random ids), styled like the provider picker."""
+    runtime embedding/random ids), grouped under category headers."""
     from cli import picker, providers
 
     captured = {}
 
-    async def fake_pick_item(title, items, **kwargs):
+    async def fake_pick_categorized(title, sections, **kwargs):
         captured["title"] = title
-        captured["items"] = list(items)
+        captured["sections"] = sections
         return "gpt-4o"
 
-    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     ctx = CliContext(
         agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",
         provider_name="openai", model="gpt-4o",
     )
     assert asyncio.run(providers.pick_model(ctx)) == "gpt-4o"
-    models = [v for v, _ in captured["items"]]
+    rows = _flatten(captured["sections"])
+    models = [v for v, _ in rows]
     assert models[0] == "gpt-5"  # curated default first
     assert "gpt-4o" in models and "o3" in models and "gpt-5-mini" in models
     assert len(models) >= 8  # top ~10, not just 3
     assert not any("embedding" in m for m in models)  # no runtime junk
     assert providers._CUSTOM_MODEL_MARKER in models  # custom-id entry offered
-    labels = " ".join(lbl for _, lbl in captured["items"])
+    headers = [h for h, _ in captured["sections"]]
+    assert headers[0].startswith("🧠")  # categorized, not a flat list
+    assert headers[-1] is None  # the custom-id entry has no header
+    labels = " ".join(lbl for _, lbl in rows)
     assert "current" in labels  # current model marked like the provider picker
     assert "custom model id" in labels.lower()
 
@@ -1059,10 +1220,10 @@ def test_pick_model_custom_id_returns_typed_value(monkeypatch):
     as-is — never clamped to the offered list."""
     from cli import picker, providers
 
-    async def fake_pick_item(title, items, **kwargs):
+    async def fake_pick_categorized(title, sections, **kwargs):
         return providers._CUSTOM_MODEL_MARKER  # pick the custom entry
 
-    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     monkeypatch.setattr(providers, "prompt_model_id", _async_val("gpt-99-experimental"))
     ctx = CliContext(
         agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
@@ -1076,10 +1237,10 @@ def test_pick_model_custom_id_cancelled_returns_empty(monkeypatch):
     """Esc on the custom-id prompt cancels → '' (callers use the default)."""
     from cli import picker, providers
 
-    async def fake_pick_item(title, items, **kwargs):
+    async def fake_pick_categorized(title, sections, **kwargs):
         return providers._CUSTOM_MODEL_MARKER
 
-    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     monkeypatch.setattr(providers, "prompt_model_id", _async_val(""))
     ctx = CliContext(
         agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
@@ -1094,10 +1255,10 @@ def test_pick_model_custom_id_rejects_spaces(monkeypatch):
     as the active model (e.g. written to .env)."""
     from cli import picker, providers
 
-    async def fake_pick_item(title, items, **kwargs):
+    async def fake_pick_categorized(title, sections, **kwargs):
         return providers._CUSTOM_MODEL_MARKER
 
-    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     monkeypatch.setattr(providers, "prompt_model_id", _async_val("gpt 5"))
     ctx = CliContext(
         agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
@@ -1117,6 +1278,42 @@ def test_provider_models_capped_at_top_10():
     assert len(provider_models("openai")) == 10
 
 
+def test_pick_model_categorizes_models(monkeypatch):
+    """Models are grouped into ability categories: each id appears exactly
+    once, headers follow priority order, the default model stays first in its
+    category, and the custom-id entry is the headerless last section."""
+    from cli import picker, providers
+
+    captured = {}
+
+    async def fake_pick_categorized(title, sections, **kwargs):
+        captured["sections"] = sections
+        return "gpt-4o"
+
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-5",
+    )
+    assert asyncio.run(providers.pick_model(ctx)) == "gpt-4o"
+    sections = captured["sections"]
+    headers = [h for h, _ in sections]
+    assert headers[0] == "🧠  Reasoning"
+    assert headers[1] == "👁️  Vision"
+    assert headers[-1] is None  # custom-id entry has no category header
+
+    by_header = {h: [v for v, _ in items] for h, items in sections}
+    assert by_header["🧠  Reasoning"][0] == "gpt-5"  # default model first
+    assert "gpt-4o" in by_header["👁️  Vision"]
+    assert "gpt-4.1-mini" in by_header["📜  Long context"]
+    assert "gpt-4o-mini" in by_header["⚡  Fast & light"]
+
+    # Every curated model appears exactly once across all sections (+ custom).
+    all_ids = [v for _, items in sections for v, _ in items]
+    assert len(all_ids) == len(set(all_ids)) == 11  # 10 curated + custom entry
+
+
 def test_pick_model_for_new_provider_marks_default(monkeypatch):
     """Two-step flow: picking models for a provider that is NOT active marks
     its default model (not the old provider's current model)."""
@@ -1124,18 +1321,18 @@ def test_pick_model_for_new_provider_marks_default(monkeypatch):
 
     captured = {}
 
-    async def fake_pick_item(title, items, **kwargs):
-        captured["items"] = list(items)
+    async def fake_pick_categorized(title, sections, **kwargs):
+        captured["sections"] = sections
         return None  # cancel the model step
 
-    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     ctx = CliContext(
         agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",
         provider_name="nvidia", model="some-old-model",
     )
     assert asyncio.run(providers.pick_model(ctx, "openai")) == ""
-    labels = " ".join(lbl for _, lbl in captured["items"])
+    labels = " ".join(lbl for _, lbl in _flatten(captured["sections"]))
     assert "● default" in labels  # openai's default (gpt-5) preselected
     assert "some-old-model" not in labels
 
@@ -1273,12 +1470,12 @@ def test_pick_model_live_title_and_items(monkeypatch):
 
     captured = {}
 
-    async def fake_pick_item(title, items, **kwargs):
+    async def fake_pick_categorized(title, sections, **kwargs):
         captured["title"] = title
-        captured["items"] = list(items)
+        captured["sections"] = sections
         return "gpt-5-live-beta"
 
-    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     monkeypatch.setattr(
         providers, "available_models", _async_val((["gpt-5", "gpt-5-live-beta"], "live"))
     )
@@ -1289,8 +1486,8 @@ def test_pick_model_live_title_and_items(monkeypatch):
     )
     assert asyncio.run(providers.pick_model(ctx)) == "gpt-5-live-beta"
     assert captured["title"].endswith("(live)")
-    # Live ids first, then the custom-id escape hatch at the bottom.
-    assert [v for v, _ in captured["items"]] == [
+    # Live ids first (curated order preserved), then the custom-id escape hatch.
+    assert [v for v, _ in _flatten(captured["sections"])] == [
         "gpt-5", "gpt-5-live-beta", providers._CUSTOM_MODEL_MARKER,
     ]
 
@@ -1403,18 +1600,18 @@ def test_pick_model_rows_show_context_and_tier(monkeypatch):
 
     captured = {}
 
-    async def fake_pick_item(title, items, **kwargs):
-        captured["items"] = list(items)
+    async def fake_pick_categorized(title, sections, **kwargs):
+        captured["sections"] = sections
         return "gpt-4o-mini"
 
-    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(picker, "pick_categorized", fake_pick_categorized)
     ctx = CliContext(
         agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",
         provider_name="openai", model="gpt-4o-mini",
     )
     assert asyncio.run(providers.pick_model(ctx)) == "gpt-4o-mini"
-    rows = {v: lbl for v, lbl in captured["items"]}
+    rows = dict(_flatten(captured["sections"]))
     assert "400k" in rows["gpt-5"] and "$$" in rows["gpt-5"]  # standard tier
     assert "128k" in rows["gpt-4o"] and "$$" in rows["gpt-4o"]
     assert "128k" in rows["gpt-4o-mini"] and "$" in rows["gpt-4o-mini"]  # budget
