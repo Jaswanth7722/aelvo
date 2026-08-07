@@ -1,0 +1,51 @@
+#!/bin/sh
+# Pre-commit hook: block commits unless the identity is aelvolabs.
+#
+# AELVO repo policy: every commit must be authored/committed by the
+# aelvolabs account so the public history is consistent.
+#
+# Allowed author/committer identity:
+#   name  = aelvolabs
+#   email = 313722616+aelvolabs@users.noreply.github.com
+#
+# To temporarily bypass (e.g., an emergency that requires a different
+# identity), set:  AELVO_SKIP_IDENTITY_CHECK=1
+#
+# Install location: this hook lives in .githooks/ (version controlled)
+# and is enabled via `git config core.hooksPath .githooks`.
+
+if [ "${AELVO_SKIP_IDENTITY_CHECK:-}" = "1" ]; then
+    exit 0
+fi
+
+EXPECTED_NAME="aelvolabs"
+EXPECTED_EMAIL="313722616+aelvolabs@users.noreply.github.com"
+
+author_name=$(git config user.name || true)
+author_email=$(git config user.email || true)
+committer_name=$(git config user.name || true)
+committer_email=$(git config user.email || true)
+
+if [ "$author_name" != "$EXPECTED_NAME" ] || \
+   [ "$author_email" != "$EXPECTED_EMAIL" ] || \
+   [ "$committer_name" != "$EXPECTED_NAME" ] || \
+   [ "$committer_email" != "$EXPECTED_EMAIL" ]; then
+    echo "ERROR: Commit blocked by pre-commit hook."
+    echo ""
+    echo "AELVO requires all commits to use the aelvolabs identity:"
+    echo "    user.name  = $EXPECTED_NAME"
+    echo "    user.email = $EXPECTED_EMAIL"
+    echo ""
+    echo "Current identity:"
+    echo "    user.name  = ${author_name:-<unset>}"
+    echo "    user.email = ${author_email:-<unset>}"
+    echo ""
+    echo "Fix with:"
+    echo "    git config user.name 'aelvolabs'"
+    echo "    git config user.email '313722616+aelvolabs@users.noreply.github.com'"
+    echo ""
+    echo "To override this check intentionally, set AELVO_SKIP_IDENTITY_CHECK=1."
+    exit 1
+fi
+
+exit 0
