@@ -787,7 +787,13 @@ class WebBridge:
         })
 
     async def _handle_provider_save_key(self, message: Dict[str, Any], websocket) -> None:
-        """Save an API key for a provider to the encrypted vault."""
+        """Save an API key for a provider to the encrypted vault.
+
+        Goes through the same shared persistence helper as the CLI (stores
+        encrypted, supersedes stale API-key rows so re-saving rotates instead
+        of accumulating duplicates, and syncs ``.env`` when the key was
+        env-sourced) and never reports success when the vault store failed.
+        """
         provider = (message.get("provider") or "").strip().lower()
         api_key = (message.get("api_key") or "").strip()
 
@@ -805,28 +811,26 @@ class WebBridge:
             return
 
         try:
-            import time as _time
-            import uuid
+            from cli.providers import store_api_key
 
-            from auth.types import Credential, CredentialType
-
-            store = self._credential_store()
-            cred = Credential(
-                id=f"key_{provider}_{uuid.uuid4().hex[:8]}",
-                provider=provider,
-                credential_type=CredentialType.API_KEY,
-                value=api_key,
+            saved = store_api_key(
+                provider,
+                getattr(cfg, "name", provider),
+                api_key,
                 label=f"{provider} API key (set from web UI)",
-                created_at=_time.time(),
-                is_valid=True,
-                metadata={"source": "web_ui", "model": getattr(cfg, "default_model", "") or ""},
+                metadata={
+                    "source": "web_ui",
+                    "model": getattr(cfg, "default_model", "") or "",
+                },
             )
-            store.store(cred)
-
-            # Also surface it in the environment so a restart picks it up.
-            env_key = getattr(cfg, "env_key", "") or ""
-            if env_key:
-                os.environ[env_key] = api_key
+            if not saved:
+                await self._send_raw(websocket, self._provider_result(
+                    provider,
+                    False,
+                    "Failed to save the API key securely — the credential vault "
+                    "may be locked or unavailable.",
+                ))
+                return
 
             # Hot-swap: if the app booted without a provider, bring the agent
             # online immediately so chat works without a restart. Only claim
@@ -857,7 +861,12 @@ class WebBridge:
             ))
 
     async def _handle_provider_remove_key(self, message: Dict[str, Any], websocket) -> None:
-        """Remove the stored key for a provider from the encrypted vault."""
+        """Remove every stored API key for a provider from the encrypted vault.
+
+        Deletes all API-key rows (older saves used a fresh id per save, so a
+        single delete could leave stale keys active) but leaves other
+        credential types — e.g. OAuth tokens — untouched.
+        """
         provider = (message.get("provider") or "").strip().lower()
         if not provider:
             await self._send_raw(websocket, self._provider_result(
@@ -867,15 +876,21 @@ class WebBridge:
 
         try:
             store = self._credential_store()
-            cred = store.get_for_provider(provider)
-            if cred is not None:
-                store.delete(cred.id)
+            removed = 0
+            for old in store.list_credentials(provider):
+                if old["credential_type"] == "api_key" and store.delete(old["id"]):
+                    removed += 1
 
-            # Clear the env var if we set it
+            # Clear the env var we set, and scrub any .env line — an
+            # env-sourced key would otherwise win over the vault at resolution
+            # time and survive the removal on restart.
             cfg = self._provider_configs().get(provider)
             env_key = getattr(cfg, "env_key", "") if cfg else ""
             if env_key:
                 os.environ.pop(env_key, None)
+                from cli.providers import remove_env
+
+                remove_env(env_key)
 
             await self._send_raw(websocket, self._provider_result(
                 provider, True, f"API key removed for {provider}.", key_present=False
@@ -884,7 +899,7 @@ class WebBridge:
                 "type": "providers_updated",
                 "source": "web_bridge",
                 "specialist": "",
-                "action": f"API key removed for {provider}",
+                "action": f"API key removed for {provider} ({removed} row(s))",
                 "data": {"provider": provider, "has_key": False},
                 "timestamp": time.time(),
             })

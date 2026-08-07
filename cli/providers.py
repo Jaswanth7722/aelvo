@@ -223,14 +223,25 @@ def api_key_source(provider_key: str, env_key: str) -> str:
     return "vault" if has_api_key(provider_key, env_key) else ""
 
 
-def store_api_key(provider_key: str, display_name: str, api_key: str) -> bool:
+def store_api_key(
+    provider_key: str,
+    display_name: str,
+    api_key: str,
+    *,
+    label: Optional[str] = None,
+    metadata: Optional[dict] = None,
+) -> bool:
     """Persist an API key to the encrypted vault and the current process env.
 
-    The new key supersedes any previously stored row for the provider, so
-    replacing/rotating a key never leaves stale credentials behind. When the
-    provider's env var was already set (an env-sourced key), the new value is
-    also written to ``.env`` so the rotation survives a restart — the env var
-    wins over the vault at resolution time.
+    Shared by the CLI provider flow and the web dashboard's Provider Setup:
+    the new key supersedes any previously stored API-key row for the provider
+    (replacing/rotating never leaves stale credentials behind, and other
+    credential types such as OAuth tokens are untouched). When the provider's
+    env var was already set (an env-sourced key), the new value is also
+    written to ``.env`` so the rotation survives a restart — the env var wins
+    over the vault at resolution time. Returns True when the key was stored.
+
+    ``label``/``metadata`` customise the stored row (defaults match the CLI).
     """
     import time
     import uuid
@@ -256,10 +267,10 @@ def store_api_key(provider_key: str, display_name: str, api_key: str) -> bool:
             provider=provider_key,
             credential_type=CredentialType.API_KEY,
             value=api_key,
-            label=f"{display_name} API key (set from CLI)",
+            label=label or f"{display_name} API key (set from CLI)",
             created_at=time.time(),
             is_valid=True,
-            metadata={"source": "cli"},
+            metadata=metadata or {"source": "cli"},
         )
         ok = store.store(cred)
         if ok:
@@ -314,6 +325,30 @@ def write_env(key: str, value: str) -> bool:
             lines.append(target)
         with open(path, "w", encoding="utf-8") as f:
             f.writelines(lines)
+        return True
+    except Exception as exc:
+        log.warning("Could not update %s: %s", path, exc)
+        return False
+
+
+def remove_env(key: str) -> bool:
+    """Strip a ``key=value`` line from ``.env``; True on success (or when the
+    key was never there).
+
+    Used when removing a provider key: an env-sourced key would otherwise win
+    over the vault at resolution time and survive the removal on restart.
+    """
+    path = _env_path()
+    try:
+        if not os.path.exists(path):
+            return True
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        kept = [ln for ln in lines if not ln.strip().startswith(f"{key}=")]
+        if len(kept) == len(lines):
+            return True  # nothing to strip
+        with open(path, "w", encoding="utf-8") as f:
+            f.writelines(kept)
         return True
     except Exception as exc:
         log.warning("Could not update %s: %s", path, exc)

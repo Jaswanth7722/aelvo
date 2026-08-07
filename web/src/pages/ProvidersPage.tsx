@@ -255,6 +255,8 @@ function ProviderCard({
                   <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   Saving…
                 </>
+              ) : provider.has_key && value.trim() ? (
+                <>Replace key</>
               ) : (
                 <>Save key</>
               )}
