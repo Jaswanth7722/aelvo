@@ -58,20 +58,30 @@ def get_registry() -> dict:
     return MODEL_REGISTRY
 
 
+#: Curated picker list is capped at the provider's top ~10 default models.
+_MAX_DEFAULT_MODELS = 10
+
+#: Sentinel value for the "Custom model id…" entry at the bottom of the model
+#: picker. Real model ids can never collide with this.
+_CUSTOM_MODEL_MARKER = "__aelvo_custom_model__"
+
+
 def provider_models(provider_key: str) -> list:
-    """Curated, provider-scoped model list (default + special cases).
+    """Curated, provider-scoped model list (default + top ~10 special cases).
 
     Uses the same registry as the provider picker (``core.registry.models``)
     so the models offered are exactly the ones the provider supports — never
     the runtime's uncurated catalog, which mixes in non-agent ids such as
-    OpenAI's ``text-embedding-*`` models.
+    OpenAI's ``text-embedding-*`` models. Capped at ``_MAX_DEFAULT_MODELS``
+    so the default list stays a tight top-10; live API models are appended
+    separately.
     """
     cfg = get_registry().get((provider_key or "").lower())
     if cfg is None:
         return []
     ids = [cfg.default_model] + [m.id for m in cfg.special_cases]
     seen = set()
-    return [m for m in ids if not (m in seen or seen.add(m))]
+    return [m for m in ids if not (m in seen or seen.add(m))][:_MAX_DEFAULT_MODELS]
 
 
 #: Vendor prefixes kept when merging OpenRouter's live list (several hundred
@@ -357,20 +367,19 @@ def remove_env(key: str) -> bool:
 
 # ── interactive key prompt ──────────────────────────────────────────────────
 
-async def prompt_api_key(
-    display_name: str,
+async def _prompt_input(
+    title: str,
+    hint: str,
     *,
+    password: bool,
     _input: Any = None,
     _output: Any = None,
 ) -> str:
-    """Prompt for an API key with a hidden field (interactive terminals only).
+    """Inline ``prompt_toolkit`` Application (hidden field when ``password``).
 
-    Uses the same async ``prompt_toolkit`` Application pattern as the pickers:
-    ``prompt_async`` was removed from prompt_toolkit 3.x, so calling it raised
-    ``ImportError`` and the key entry was silently swallowed ("No API key
-    provided"). Enter saves the key, Esc/Ctrl+C cancels (``''``).
-
-    ``_input``/``_output`` inject prompt_toolkit streams for tests (e.g.
+    Enter submits the text, Esc/Ctrl+C cancels (``''``), and non-interactive
+    terminals (pipes, CI, tests) return ``''`` immediately so callers never
+    hang. ``_input``/``_output`` inject prompt_toolkit streams for tests (e.g.
     ``create_pipe_input`` + ``DummyOutput``); ``None`` uses the terminal.
     """
     from cli.picker import is_interactive
@@ -384,7 +393,7 @@ async def prompt_api_key(
         from prompt_toolkit.styles import Style
         from prompt_toolkit.widgets import Label, TextArea
 
-        text_area = TextArea(multiline=False, password=True)
+        text_area = TextArea(multiline=False, password=password)
         kb = KeyBindings()
 
         @kb.add("enter", eager=True)
@@ -399,12 +408,9 @@ async def prompt_api_key(
         layout = Layout(
             HSplit(
                 [
-                    Label(f"API key for {display_name}:", style="class:keyprompt.title"),
+                    Label(title, style="class:keyprompt.title"),
                     text_area,
-                    Label(
-                        "Paste the key · Enter to save · Esc to cancel",
-                        style="class:keyprompt.hint",
-                    ),
+                    Label(hint, style="class:keyprompt.hint"),
                 ]
             )
         )
@@ -425,8 +431,49 @@ async def prompt_api_key(
         )
         return (await app.run_async()).strip()
     except Exception as exc:
-        log.debug("API key prompt failed: %s", exc)
+        log.debug("Inline prompt failed: %s", exc)
         return ""
+
+
+async def prompt_api_key(
+    display_name: str,
+    *,
+    _input: Any = None,
+    _output: Any = None,
+) -> str:
+    """Prompt for an API key with a hidden field (interactive terminals only).
+
+    ``prompt_async`` was removed from prompt_toolkit 3.x, so the original
+    implementation raised ``ImportError`` and key entry silently failed ("No
+    API key provided"). Enter saves the key, Esc/Ctrl+C cancels (``''``).
+    """
+    return await _prompt_input(
+        f"API key for {display_name}:",
+        "Paste the key · Enter to save · Esc to cancel",
+        password=True,
+        _input=_input,
+        _output=_output,
+    )
+
+
+async def prompt_model_id(
+    provider_key: str,
+    *,
+    _input: Any = None,
+    _output: Any = None,
+) -> str:
+    """Prompt for a custom model id (models not in the curated/live lists).
+
+    Enter uses the typed id, Esc/Ctrl+C cancels (``''``). The id is returned
+    as-is — the caller (``pick_model``) passes it through unclamped.
+    """
+    return await _prompt_input(
+        f"Custom model id for {provider_key}:",
+        "Type the exact id the provider accepts · Enter to use · Esc to cancel",
+        password=False,
+        _input=_input,
+        _output=_output,
+    )
 
 
 # ── agent hot-swap ──────────────────────────────────────────────────────────
@@ -603,12 +650,15 @@ async def pick_model(ctx, provider_key: str = "") -> str:
     """Full-screen picker over a provider's models; returns the id or ''.
 
     The list is the provider's live API models merged with the curated
-    catalog (curated when no key / offline) — the title shows ``(live)`` when
-    the live list is in use. With no ``provider_key`` the active provider
-    (``ctx.provider_name``) is used and the current model is preselected and
-    marked ``[● current]``. When called for a *different* provider (the
-    two-step ``/provider`` flow) its default model is preselected and marked
-    ``[● default]``. The result is validated against the offered list, so
+    catalog (curated when no key / offline, capped at the top ~10) — the
+    title shows ``(live)`` when the live list is in use. With no
+    ``provider_key`` the active provider (``ctx.provider_name``) is used and
+    the current model is preselected and marked ``[● current]``. When called
+    for a *different* provider (the two-step ``/provider`` flow) its default
+    model is preselected and marked ``[● default]``.
+
+    A ``✏️  Custom model id…`` entry at the bottom lets you type any id the
+    provider accepts — it is returned as-is (never clamped to the list).
     ``''`` means "cancelled" and callers fall back to the default model.
     """
     from cli.picker import pick_item
@@ -642,13 +692,24 @@ async def pick_model(ctx, provider_key: str = "") -> str:
             items.append((m, f"{m:<28} {meta:<12} {hint:<22} [● {marker}]"))
         else:
             items.append((m, f"{m:<28} {meta:<12} {hint:<22}"))
+    # Escape hatch for models the curated/live lists don't cover.
+    items.append((_CUSTOM_MODEL_MARKER, "✏️  Custom model id…"))
     source_tag = f" ({source})" if source in ("live", "runtime") else ""
     picked = await pick_item(
         f"Select a model · {provider_key}{source_tag}",
         items,
-        subtitle="↑/↓ or j/k move · Enter switches · Esc uses the default",
+        subtitle="↑/↓ or j/k move · Enter switches · Esc uses the default · custom id at the bottom",
         default=current or None,
     )
+    if picked == _CUSTOM_MODEL_MARKER:
+        custom = (await prompt_model_id(provider_key)).strip()
+        if custom and " " not in custom:
+            return custom  # passed through as-is, never clamped
+        if custom:
+            ctx.console.print(
+                Text("Custom model id must not contain spaces.", style="aelvo.err")
+            )
+        return ""
     if picked and picked in available:
         return picked
     return ""

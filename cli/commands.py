@@ -5,6 +5,9 @@ Slash commands are the terminal-native way to drive the agent without burning
 a token on a chat turn: switch workspaces, inspect status, list projects and
 models, clear history, and exit.
 
+Model selection lives in ``/provider`` (provider → its model picker) and
+``/model`` — there is no separate ``/models`` listing command.
+
 A handler returns an optional ``(action, payload)`` tuple the REPL acts on:
     * ``("exit", None)``      — leave the REPL
     * ``("run", prompt)``     — execute a chat turn (used by /ask and /retry)
@@ -33,7 +36,6 @@ _ALIASES = {
     "pwd": "pwd",
     "status": "status", "info": "status",
     "projects": "projects", "list": "projects",
-    "models": "models",
     "provider": "provider", "providers": "provider", "switch": "provider",
     "model": "model",
     "log": "log", "logs": "log",
@@ -50,7 +52,6 @@ _COMMANDS = {
     "pwd": ("Print the active workspace", "/pwd"),
     "status": ("Provider, model, workspace + agent metrics", "/status"),
     "projects": ("List known workspaces", "/projects"),
-    "models": ("List available models", "/models"),
     "provider": ("Pick / switch the LLM provider; keys are asked inline and existing ones can be rotated", "/provider [name] [key]"),
     "model": ("Pick or switch the active model", "/model [name]"),
     "log": ("Tail the AELVO log file", "/log [lines]"),
@@ -149,8 +150,6 @@ async def handle_command(
         _cmd_status(ctx)
     elif name == "projects":
         _cmd_projects(ctx)
-    elif name == "models":
-        await _cmd_models(ctx, arg)
     elif name == "provider":
         from cli.providers import pick_provider, provider_table, switch_provider
         parts = arg.split(maxsplit=1)
@@ -314,30 +313,6 @@ def _cmd_projects(ctx: CliContext) -> None:
         return
     for name, path, last_opened in rows:
         table.add_row(name or "", path or "", str(last_opened or ""))
-    ctx.console.print(table)
-
-
-async def _cmd_models(ctx: CliContext, arg: str) -> None:
-    """List models: the active provider's live API list, else curated, else defaults."""
-    from cli.providers import available_models, get_registry
-
-    if ctx.provider_name:
-        models, source = await available_models(ctx, ctx.provider_name)
-        title = "Available models"
-        if source in ("live", "runtime"):
-            title += f" ({source})"
-    else:
-        # No provider active: show each provider's default model.
-        models = [cfg.default_model for cfg in get_registry().values()]
-        title = "Available models"
-    if not models:
-        ctx.console.print(Text("No models available — configure a provider first.", style="aelvo.dim"))
-        return
-    table = Table(title=title, title_style="aelvo.gold")
-    table.add_column("Model", style="aelvo.snow")
-    table.add_column("Provider", style="aelvo.purple")
-    for m in models:
-        table.add_row(m, ctx.provider_name or "")
     ctx.console.print(table)
 
 

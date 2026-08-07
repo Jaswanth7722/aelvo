@@ -10,7 +10,7 @@ Features:
     * Streaming REPL: Enter submits, Esc+Enter inserts a newline.
     * Live tool activity rendered as it executes (reads, writes, bash, …).
     * Slash commands: /help /exit /clear /workspace /pwd /status /projects
-      /models /retry /ask.
+      /retry /ask.
     * Per-workspace command history + auto-suggest.
     * One-shot mode: ``python main.py --cli --ask "prompt"``.
 """
@@ -99,7 +99,6 @@ def _make_completer() -> NestedCompleter:
             "/pwd": None,
             "/status": None,
             "/projects": None,
-            "/models": None,
             "/provider": None,
             "/switch": None,
             "/model": None,

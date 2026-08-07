@@ -1048,8 +1048,73 @@ def test_pick_model_offers_only_provider_models(monkeypatch):
     assert "gpt-4o" in models and "o3" in models and "gpt-5-mini" in models
     assert len(models) >= 8  # top ~10, not just 3
     assert not any("embedding" in m for m in models)  # no runtime junk
+    assert providers._CUSTOM_MODEL_MARKER in models  # custom-id entry offered
     labels = " ".join(lbl for _, lbl in captured["items"])
     assert "current" in labels  # current model marked like the provider picker
+    assert "custom model id" in labels.lower()
+
+
+def test_pick_model_custom_id_returns_typed_value(monkeypatch):
+    """The ✏️ custom entry prompts for a free-text model id and returns it
+    as-is — never clamped to the offered list."""
+    from cli import picker, providers
+
+    async def fake_pick_item(title, items, **kwargs):
+        return providers._CUSTOM_MODEL_MARKER  # pick the custom entry
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "prompt_model_id", _async_val("gpt-99-experimental"))
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-5",
+    )
+    assert asyncio.run(providers.pick_model(ctx)) == "gpt-99-experimental"
+
+
+def test_pick_model_custom_id_cancelled_returns_empty(monkeypatch):
+    """Esc on the custom-id prompt cancels → '' (callers use the default)."""
+    from cli import picker, providers
+
+    async def fake_pick_item(title, items, **kwargs):
+        return providers._CUSTOM_MODEL_MARKER
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "prompt_model_id", _async_val(""))
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-5",
+    )
+    assert asyncio.run(providers.pick_model(ctx)) == ""
+
+
+def test_pick_model_custom_id_rejects_spaces(monkeypatch):
+    """A custom id containing spaces is rejected — it must never be persisted
+    as the active model (e.g. written to .env)."""
+    from cli import picker, providers
+
+    async def fake_pick_item(title, items, **kwargs):
+        return providers._CUSTOM_MODEL_MARKER
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "prompt_model_id", _async_val("gpt 5"))
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-5",
+    )
+    assert asyncio.run(providers.pick_model(ctx)) == ""  # rejected → default
+
+
+def test_provider_models_capped_at_top_10():
+    """The default curated list is capped to the top ~10 per provider."""
+    from cli.providers import get_registry, provider_models
+
+    for key in get_registry():
+        assert len(provider_models(key)) <= 10, key
+    assert provider_models("openai")[0] == "gpt-5"  # default stays first
+    assert len(provider_models("openai")) == 10
 
 
 def test_pick_model_for_new_provider_marks_default(monkeypatch):
@@ -1224,27 +1289,22 @@ def test_pick_model_live_title_and_items(monkeypatch):
     )
     assert asyncio.run(providers.pick_model(ctx)) == "gpt-5-live-beta"
     assert captured["title"].endswith("(live)")
-    assert [v for v, _ in captured["items"]] == ["gpt-5", "gpt-5-live-beta"]
+    # Live ids first, then the custom-id escape hatch at the bottom.
+    assert [v for v, _ in captured["items"]] == [
+        "gpt-5", "gpt-5-live-beta", providers._CUSTOM_MODEL_MARKER,
+    ]
 
 
-def test_cmd_models_live_title(monkeypatch):
-    """/models reflects the live source in the table title."""
-    from cli import providers
-
-    console = build_console()
-    monkeypatch.setattr(
-        providers, "available_models", _async_val((["gpt-5", "gpt-5-live"], "live"))
-    )
+def test_models_command_removed():
+    """/models no longer exists — model selection lives in /provider and
+    /model, so the command is an unknown-command error, not a crash."""
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
-        console=console, db_path="", workspace_path=".", project="t",
+        console=build_console(), db_path="", workspace_path=".", project="t",
         provider_name="openai", model=None,
     )
-    with console.capture() as cap:
-        asyncio.run(handle_command(ctx, "models", ""))
-    rendered = cap.get()
-    assert "Available models (live)" in rendered
-    assert "gpt-5-live" in rendered
+    result = asyncio.run(handle_command(ctx, "models", ""))
+    assert result is None
 
 
 def test_switch_provider_keeps_explicit_live_model(monkeypatch):

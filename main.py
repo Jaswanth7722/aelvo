@@ -144,7 +144,7 @@ async def shutdown_background_tasks(
     ``asyncio.run`` cancels every task still pending at exit and *waits* for
     them — if a background health monitor, subprocess transport or event bus
     task refuses to finalize, the process hangs (previously 10s–4min stalls
-    after ``/exit``, worst after a live ``/models`` fetch). This helper
+    after ``/exit``, worst after a live model-list fetch). This helper
     cancels and awaits the background tasks while the loop is healthy, so
     teardown is fast and bounded. Every step is guarded — shutdown must never
     raise.
