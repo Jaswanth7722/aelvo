@@ -36,7 +36,6 @@ _ALIASES = {
     "models": "models",
     "provider": "provider", "providers": "provider", "switch": "provider",
     "model": "model",
-    "apikey": "apikey", "key": "apikey", "setkey": "apikey",
     "log": "log", "logs": "log",
     "version": "version", "sysinfo": "version", "ver": "version",
     "retry": "retry",
@@ -52,9 +51,8 @@ _COMMANDS = {
     "status": ("Provider, model, workspace + agent metrics", "/status"),
     "projects": ("List known workspaces", "/projects"),
     "models": ("List available models", "/models"),
-    "provider": ("Pick / switch the LLM provider and set an API key", "/provider [name] [key]"),
+    "provider": ("Pick / switch the LLM provider (its API key is asked inline)", "/provider [name] [key]"),
     "model": ("Pick or switch the active model", "/model [name]"),
-    "apikey": ("Store an API key for the current provider", "/apikey <key>"),
     "log": ("Tail the AELVO log file", "/log [lines]"),
     "version": ("Show version and environment info", "/version"),
     "retry": ("Re-run the previous prompt", "/retry"),
@@ -170,12 +168,10 @@ async def handle_command(
             else:
                 ctx.console.print(provider_table(ctx))
                 ctx.console.print(
-                    Text("Switch with: /provider <name> [api-key]  ·  set a key with: /apikey <key>", style="aelvo.dim")
+                    Text("Switch with: /provider <name> [api-key]  ·  the key is asked when you pick a provider", style="aelvo.dim")
                 )
     elif name == "model":
         await _cmd_model(ctx, arg)
-    elif name == "apikey":
-        _cmd_apikey(ctx, arg)
     elif name == "log":
         _cmd_log(ctx, arg)
     elif name == "version":
@@ -375,31 +371,6 @@ def _apply_model(ctx: CliContext, name: str) -> None:
     write_env("LLM_MODEL", name)
     os.environ["LLM_MODEL"] = name
     ctx.console.print(Text(f"✓ Model set to {name}", style="aelvo.ok"))
-
-
-def _cmd_apikey(ctx: CliContext, arg: str) -> None:
-    """Store an API key for the current provider (encrypted vault)."""
-    key = arg.strip()
-    if not key:
-        ctx.console.print(
-            Text("Usage: /apikey <api-key>  — stores it for the current provider", style="aelvo.err")
-        )
-        return
-    if not ctx.provider_name:
-        ctx.console.print(
-            Text("No provider active — run /provider <name> first.", style="aelvo.err")
-        )
-        return
-    from cli.providers import set_api_key
-
-    if set_api_key(ctx, ctx.provider_name, key):
-        ctx.console.print(
-            Text(f"✓ API key stored for {ctx.provider_name} (encrypted vault)", style="aelvo.ok")
-        )
-    else:
-        ctx.console.print(
-            Text("Could not store the API key — see the log file for details.", style="aelvo.err")
-        )
 
 
 def _cmd_log(ctx: CliContext, arg: str) -> None:

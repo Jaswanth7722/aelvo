@@ -103,7 +103,6 @@ def _make_completer() -> NestedCompleter:
             "/provider": None,
             "/switch": None,
             "/model": None,
-            "/apikey": None,
             "/log": None,
             "/version": None,
             "/retry": None,

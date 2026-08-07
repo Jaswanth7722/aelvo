@@ -61,7 +61,7 @@ def test_parse_command_aliases():
     assert parse_command("/open")[0] == "workspace"
     assert parse_command("/h")[0] == "help"
     assert parse_command("/switch nvidia")[0] == "provider"
-    assert parse_command("/key sk-123")[0] == "apikey"
+    assert parse_command("/providers")[0] == "provider"
     assert parse_command("/sysinfo")[0] == "version"
     assert parse_command("/logs 20")[0] == "log"
     assert parse_command("/model gpt-4o")[0] == "model"
@@ -340,29 +340,218 @@ def test_model_requires_provider():
     assert result is None  # prints an error, no crash
 
 
-def test_apikey_requires_provider():
+def test_apikey_command_removed():
+    """/apikey no longer exists — the key lives inside provider selection."""
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",
     )
     result = asyncio.run(handle_command(ctx, "apikey", "sk-123"))
-    assert result is None  # prints an error, no crash
+    assert result is None  # unknown command → error print, no crash
 
 
-def test_apikey_stores_for_provider(monkeypatch):
+def test_switch_provider_prompts_and_stores_missing_key(monkeypatch):
+    """A provider without a key prompts for it inline and stores it exactly once."""
     from cli import providers
 
     stored = {}
+    monkeypatch.setattr(providers, "prompt_api_key", _async_val("sk-fresh"))
     monkeypatch.setattr(
-        providers, "set_api_key", lambda ctx, key, value: stored.update(key=key, value=value) or True
+        providers, "store_api_key", lambda k, n, v: stored.update(key=k, value=v) or True
+    )
+    monkeypatch.setattr(providers, "build_agent", lambda *a, **k: MagicMock())
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "")
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    ok = asyncio.run(providers.switch_provider(ctx, "nvidia"))
+    assert ok
+    assert stored == {"key": "nvidia", "value": "sk-fresh"}  # prompted, not inline
+    assert ctx.provider_name == "nvidia"
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+
+def test_switch_provider_does_not_restore_existing_key(monkeypatch):
+    """An already-stored key must not be persisted again on every switch
+    (the vault uses INSERT OR REPLACE keyed on a fresh UUID per store)."""
+    from cli import providers
+
+    stored = []
+    agent = MagicMock()
+    monkeypatch.setattr(providers, "build_agent", lambda *a, **k: agent)
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    monkeypatch.setattr(providers, "store_api_key", lambda k, n, v: stored.append(v) or True)
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "sk-from-vault")
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(providers.switch_provider(ctx, "nvidia"))
+    assert stored == []  # never re-stored
+    assert ctx.provider_name == "nvidia"
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+
+def test_switch_provider_cancelled_key_aborts(monkeypatch):
+    """Esc on the inline key prompt cancels the switch (no key, no store)."""
+    from cli import providers
+
+    stored = []
+    monkeypatch.setattr(providers, "prompt_api_key", _async_val(""))  # cancelled
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: stored.append(1) or True)
+    monkeypatch.setattr(providers, "build_agent", lambda *a, **k: MagicMock())
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "")
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert not asyncio.run(providers.switch_provider(ctx, "nvidia"))
+    assert stored == []
+    assert ctx.provider_name is None
+
+
+def test_pick_provider_prompts_and_stores_key_before_model(monkeypatch):
+    """The key is part of provider selection: provider → (prompt + store key) →
+    model, and the stored key powers the model step's live list."""
+    from cli import picker, providers
+
+    calls = []
+    stored = {}
+
+    async def fake_pick_item(title, items, **kwargs):
+        calls.append(title)
+        # Step 1 = provider, step 2 = its models (the key step has no picker).
+        return "google" if len(calls) == 1 else "gemini-2.5-pro"
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "")  # no key anywhere
+    monkeypatch.setattr(providers, "prompt_api_key", _async_val("AIza-fresh-key"))
+    monkeypatch.setattr(
+        providers, "store_api_key", lambda k, n, v: stored.update(key=k, value=v) or True
     )
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",
-        provider_name="nvidia", model=None,
+        provider_name=None, model=None,
     )
-    asyncio.run(handle_command(ctx, "apikey", "sk-new-key"))
-    assert stored == {"key": "nvidia", "value": "sk-new-key"}
+    result = asyncio.run(providers.pick_provider(ctx))
+    assert result == ("google", "gemini-2.5-pro")
+    assert stored == {"key": "google", "value": "AIza-fresh-key"}
+
+
+def test_pick_provider_cancelled_key_aborts(monkeypatch):
+    """Cancelling the inline key prompt stops the whole two-step flow."""
+    from cli import picker, providers
+
+    calls = []
+    stored = []
+
+    async def fake_pick_item(title, items, **kwargs):
+        calls.append(title)
+        return "google"
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "")
+    monkeypatch.setattr(providers, "prompt_api_key", _async_val(""))  # cancelled
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: stored.append(1) or True)
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(providers.pick_provider(ctx)) is None
+    assert stored == []  # nothing stored on cancel
+    assert len(calls) == 1  # never reached the model step
+
+
+def test_provider_flow_stores_key_exactly_once(monkeypatch):
+    """End-to-end /provider two-step flow with a fresh key: the key is prompted
+    and stored exactly once — pick_provider stores it, switch_provider must
+    NOT re-store an existing key (vault rows are keyed on fresh UUIDs)."""
+    from cli import picker, providers
+
+    stores = []
+
+    async def fake_pick_item(title, items, **kwargs):
+        # Step 1 = provider picker, step 2 = model picker.
+        return "openai" if title.startswith("Select a provider") else "gpt-4o"
+
+    def fake_store(key, name, value):
+        stores.append((key, value))
+        return True
+
+    def fake_resolve(key, env_key):
+        # Once pick_provider stores the key, it is visible to switch_provider
+        # (mirrors store_api_key setting os.environ[env_key]).
+        return "sk-e2e" if stores else ""
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "resolve_api_key", fake_resolve)
+    monkeypatch.setattr(providers, "prompt_api_key", _async_val("sk-e2e"))
+    monkeypatch.setattr(providers, "store_api_key", fake_store)
+    monkeypatch.setattr(providers, "build_agent", lambda *a, **k: MagicMock())
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    asyncio.run(handle_command(ctx, "provider", ""))
+    assert ctx.provider_name == "openai"
+    assert ctx.model == "gpt-4o"
+    assert stores == [("openai", "sk-e2e")]  # exactly once across the whole flow
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+
+_KEY_PROMPT_DRIVER = r'''
+import asyncio, sys
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output import DummyOutput
+from cli import picker, providers
+
+picker.is_interactive = lambda: True  # prompt_api_key checks cli.picker.is_interactive
+
+async def _main():
+    with create_pipe_input() as inp:
+        inp.send_text(sys.argv[1])
+        return await providers.prompt_api_key("Test Provider", _input=inp, _output=DummyOutput())
+
+print(repr(asyncio.run(_main())))
+'''
+
+
+def _drive_key_prompt(keys: str) -> str:
+    """Run the hidden key prompt in a fresh interpreter (same isolation trick
+    as the picker tests — prompt_toolkit leaves global loop state behind)."""
+    out = subprocess.run(
+        [sys.executable, "-c", _KEY_PROMPT_DRIVER, keys],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    return out.stdout.strip()
+
+
+def test_prompt_api_key_enter_returns_value():
+    """Enter submits the pasted key (password-masked field)."""
+    assert _drive_key_prompt("sk-test-123\r") == "'sk-test-123'"
+
+
+def test_prompt_api_key_escape_cancels():
+    """Esc cancels the key prompt and returns '' (callers abort the switch)."""
+    assert _drive_key_prompt("\x1b") == "''"
 
 
 def test_log_command_without_file():
@@ -476,6 +665,8 @@ def test_pick_provider_builds_items(monkeypatch):
 
     # pick_provider does `from cli.picker import pick_item` at call time.
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    # Key already stored → the inline key step is skipped (2 picker calls).
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-test")
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",
@@ -506,6 +697,7 @@ def test_pick_provider_cancelled_at_model_step_keeps_default(monkeypatch):
         return "openai" if len(calls) == 1 else None  # cancel the model step
 
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-test")
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",

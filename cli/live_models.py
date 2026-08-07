@@ -162,5 +162,5 @@ async def fetch_live_models_async(
 
 
 def clear_cache() -> None:
-    """Drop all cached live lists (used by tests and ``/apikey`` resets)."""
+    """Drop all cached live lists (used by tests and CLI key changes)."""
     _CACHE.clear()

@@ -1,12 +1,13 @@
 """
 providers.py — LLM provider selection for the AELVO CLI.
 
-Backs the ``/provider``, ``/model`` and ``/apikey`` slash commands:
+Backs the ``/provider`` and ``/model`` slash commands:
 
 * List the registered providers with default models and credential status.
-* Switch the active provider at runtime: resolve (or prompt for) an API key,
-  persist it to the encrypted credential vault, remember the provider in
-  ``.env`` (``LLM_PROVIDER``), and hot-swap the live ``AelvoAgent`` without a
+* Switch the active provider at runtime: the API key is entered as part of
+  provider selection (prompted inline when none is stored), persisted to the
+  encrypted credential vault, the provider is remembered in ``.env``
+  (``LLM_PROVIDER``), and the live ``AelvoAgent`` is hot-swapped without a
   restart.
 * Switch the active model on the current agent and persist ``LLM_MODEL``.
 
@@ -18,7 +19,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 from typing import Any, Optional, Tuple
 
 from rich.table import Table
@@ -278,14 +278,73 @@ def write_env(key: str, value: str) -> None:
 
 # ── interactive key prompt ──────────────────────────────────────────────────
 
-async def prompt_api_key(display_name: str) -> str:
-    """Prompt for an API key with a hidden field (interactive terminals only)."""
-    try:
-        if not (sys.stdin.isatty() and sys.stdout.isatty()):
-            return ""
-        from prompt_toolkit.shortcuts import prompt_async
+async def prompt_api_key(
+    display_name: str,
+    *,
+    _input: Any = None,
+    _output: Any = None,
+) -> str:
+    """Prompt for an API key with a hidden field (interactive terminals only).
 
-        return (await prompt_async(f"API key for {display_name}: ", is_password=True)).strip()
+    Uses the same async ``prompt_toolkit`` Application pattern as the pickers:
+    ``prompt_async`` was removed from prompt_toolkit 3.x, so calling it raised
+    ``ImportError`` and the key entry was silently swallowed ("No API key
+    provided"). Enter saves the key, Esc/Ctrl+C cancels (``''``).
+
+    ``_input``/``_output`` inject prompt_toolkit streams for tests (e.g.
+    ``create_pipe_input`` + ``DummyOutput``); ``None`` uses the terminal.
+    """
+    from cli.picker import is_interactive
+
+    if not is_interactive():
+        return ""
+    try:
+        from prompt_toolkit.application import Application
+        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.layout import HSplit, Layout
+        from prompt_toolkit.styles import Style
+        from prompt_toolkit.widgets import Label, TextArea
+
+        text_area = TextArea(multiline=False, password=True)
+        kb = KeyBindings()
+
+        @kb.add("enter", eager=True)
+        def _submit(event) -> None:
+            event.app.exit(result=text_area.text)
+
+        @kb.add("escape", eager=True)
+        @kb.add("c-c", eager=True)
+        def _cancel(event) -> None:
+            event.app.exit(result="")
+
+        layout = Layout(
+            HSplit(
+                [
+                    Label(f"API key for {display_name}:", style="class:keyprompt.title"),
+                    text_area,
+                    Label(
+                        "Paste the key · Enter to save · Esc to cancel",
+                        style="class:keyprompt.hint",
+                    ),
+                ]
+            )
+        )
+        app = Application(
+            layout=layout,
+            key_bindings=kb,
+            full_screen=False,  # inline prompt — keeps the REPL context visible
+            mouse_support=False,
+            style=Style.from_dict(
+                {
+                    "keyprompt.title": "bold #FFD98E",  # golden white
+                    "keyprompt.hint": "#9B938A",        # dim
+                    "text-area": "#F6F1EA",             # snow body
+                }
+            ),
+            input=_input,
+            output=_output,
+        )
+        return (await app.run_async()).strip()
     except Exception as exc:
         log.debug("API key prompt failed: %s", exc)
         return ""
@@ -328,13 +387,19 @@ async def switch_provider(
         return False
 
     api_key = inline_key.strip() or resolve_api_key(name.lower(), cfg.env_key)
+    key_was_new = False
     if not api_key:
         api_key = await prompt_api_key(cfg.name)
+        key_was_new = bool(api_key)
     if not api_key:
         ctx.console.print(Text("No API key provided — provider not switched.", style="aelvo.err"))
         return False
 
-    store_api_key(name.lower(), cfg.name, api_key)
+    if key_was_new or inline_key.strip():
+        # Persist only a freshly provided key. An existing key (including the
+        # one the two-step picker stored before opening the model list) must
+        # not create a duplicate vault row on every switch.
+        store_api_key(name.lower(), cfg.name, api_key)
     write_env("LLM_PROVIDER", name.lower())
     os.environ["LLM_PROVIDER"] = name.lower()
     os.environ["AELVO_PROVIDER"] = name.lower()
@@ -362,30 +427,27 @@ async def switch_provider(
     ctx.console.print(
         Text(f"✓ Provider switched to {cfg.name} — model {model}", style="aelvo.ok")
     )
-    ctx.console.print(
-        Text("  Key saved to the encrypted vault. Type /status to confirm.", style="aelvo.dim")
-    )
+    if key_was_new or inline_key.strip():
+        ctx.console.print(
+            Text("  Key saved to the encrypted vault. Type /status to confirm.", style="aelvo.dim")
+        )
     return True
-
-
-def set_api_key(ctx, provider_key: str, api_key: str) -> bool:
-    """Store an API key for the current provider (no agent rebuild)."""
-    cfg = get_registry().get(provider_key.lower())
-    display = cfg.name if cfg is not None else provider_key
-    return store_api_key(provider_key.lower(), display, api_key.strip())
 
 
 # ── interactive pickers ──────────────────────────────────────────────────────
 
 async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
-    """Two-step picker: choose a provider, then one of its models.
+    """Three-step picker: provider → (API key if missing) → model.
 
-    Returns ``(provider_key, model)`` after both steps, or ``None`` when the
-    provider step is cancelled (callers fall back to the plain table).
-    Cancelling the model step yields ``(provider_key, default_model)`` — the
-    switch still happens, on the new provider's default model.
-    Non-interactive terminals return ``None`` (``pick_item`` returns None
-    off-tty).
+    1. Pick a provider.
+    2. If no API key exists for it, prompt for one right there (the key is
+       part of provider selection) and persist it — with a fresh key the
+       model step can load the provider's *live* model list.
+    3. Pick a model (Esc = the provider's default model).
+
+    Returns ``(provider_key, model)`` after all steps, or ``None`` when the
+    provider step is cancelled, the key entry is cancelled, or the terminal is
+    non-interactive (callers fall back to the plain table).
     """
     from cli.picker import pick_item
 
@@ -406,11 +468,25 @@ async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
     )
     if not picked:
         return None
+    cfg = get_registry().get(picked)
+    if cfg is None:
+        return None
+
+    # The API key is entered as part of provider selection (before the model
+    # step), so a fresh key also powers the live model list.
+    if not resolve_api_key(picked, cfg.env_key):
+        api_key = await prompt_api_key(cfg.name)
+        if not api_key:
+            ctx.console.print(
+                Text(f"No API key provided for {cfg.name} — provider not switched.", style="aelvo.err")
+            )
+            return None
+        store_api_key(picked, cfg.name, api_key)
+
     model = await pick_model(ctx, picked)
     if not model:
         # Model step cancelled: switch on the provider's default model.
-        cfg = get_registry().get(picked)
-        model = cfg.default_model if cfg is not None else ""
+        model = cfg.default_model
     return picked, model
 
 
