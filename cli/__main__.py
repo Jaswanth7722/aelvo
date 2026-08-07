@@ -188,6 +188,20 @@ async def _run(project: str, workspace_dir: str, one_shot: str) -> None:
     try:
         await run_cli(**backend, one_shot=one_shot)
     finally:
+        # Same deterministic background shutdown as main.main_async: stop the
+        # health monitors / event bus / capability watcher and release the
+        # executor threads so asyncio.run() teardown never stalls (a pending
+        # health-check or subprocess task used to hang the process on exit).
+        try:
+            from main import shutdown_background_tasks
+
+            await shutdown_background_tasks(
+                orchestrator=backend.get("orchestrator"),
+                provider_runtime=backend.get("provider_runtime"),
+                memory_engine=backend.get("memory_engine"),
+            )
+        except Exception:
+            pass
         # Parity with main.main_async's CLI cleanup: close the workspace DB
         # connections (process exit would flush them anyway, but this avoids
         # unclosed-connection warnings when the CLI is embedded in a runner).

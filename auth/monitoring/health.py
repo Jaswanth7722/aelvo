@@ -99,14 +99,18 @@ class HealthMonitor:
         )
 
     async def stop(self) -> None:
-        """Stop all health check loops."""
+        """Stop all health check loops.
+
+        Cancels every check task and waits for them together (bounded by the
+        per-check thread timeouts — see ``_run_health_check``) so teardown is
+        deterministic and ``asyncio.run`` never stalls on a mid-flight probe.
+        """
         self._running = False
-        for task in self._check_tasks.values():
+        tasks = list(self._check_tasks.values())
+        for task in tasks:
             task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError as _ex:
-                log.warning("Silenced exception: %s", _ex)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         self._check_tasks.clear()
 
     async def _check_loop(
@@ -178,22 +182,27 @@ class HealthMonitor:
             except Exception:
                 return False
 
-        # Fallback: guess provider endpoint
+        # Fallback: guess provider endpoint (thread-based sync probe so a
+        # mid-flight check can never leak a Proactor socket connect and stall
+        # asyncio.run()'s teardown — see HealthCheckRunner.connectivity_check).
         try:
             import httpx
 
-            async with httpx.AsyncClient(timeout=policy.timeout) as client:
-                endpoints = policy.endpoints or [
-                    f"https://api.{policy.provider_id}.com/health"
-                ]
-                for endpoint in endpoints:
-                    try:
-                        response = await client.get(endpoint)
-                        if response.status_code < 500:
-                            return True
-                    except Exception:
-                        continue
-                return False
+            def _probe() -> bool:
+                with httpx.Client(timeout=policy.timeout, follow_redirects=True) as client:
+                    endpoints = policy.endpoints or [
+                        f"https://api.{policy.provider_id}.com/health"
+                    ]
+                    for endpoint in endpoints:
+                        try:
+                            response = client.get(endpoint)
+                            if response.status_code < 500:
+                                return True
+                        except Exception:
+                            continue
+                    return False
+
+            return await asyncio.to_thread(_probe)
         except Exception:
             return False
 

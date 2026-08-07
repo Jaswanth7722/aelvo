@@ -47,9 +47,11 @@ class CapabilityRegistry:
         log.info("Capability monitoring stopped")
 
     async def _monitor_loop(self):
+        watcher = None
         try:
             from watchfiles import awatch
-            async for changes in awatch(str(self.workspace_root)):
+            watcher = awatch(str(self.workspace_root))
+            async for changes in watcher:
                 if not self._is_running:
                     break
                 log.info(f"Workspace change detected ({len(changes)} files)")
@@ -60,6 +62,14 @@ class CapabilityRegistry:
                 await asyncio.sleep(30)
                 await self.refresh()
         except asyncio.CancelledError as _ex:
+            # Close the watchfiles thread-watcher deterministically and with a
+            # bound: if it is left open, asyncio.run()'s shutdown_asyncgens()
+            # awaits its aclose() and a hung watcher thread would stall exit.
+            if watcher is not None:
+                try:
+                    await asyncio.wait_for(watcher.aclose(), timeout=2.0)
+                except Exception:
+                    pass
             log.warning("Silenced exception: %s", _ex)
 
     async def refresh(self) -> CapabilitySnapshot:
@@ -71,7 +81,9 @@ class CapabilityRegistry:
         tools_to_check = self._tool_allowlist or ["python", "git", "ruff", "mypy", "pytest", "node", "npm", "tsc", "eslint", "cargo", "go"]
         tools = await self._check_tools(tools_to_check)
 
-        git_state = self._check_git()
+        # Run the (sync subprocess) git probe off the loop so it can never
+        # block event-loop progress or leak a Proactor child watcher.
+        git_state = await asyncio.to_thread(self._check_git)
         mem, disk = self._check_resources()
         permissions = self._check_permissions()
         health = self._classify_health(tools, disk, permissions)
@@ -128,30 +140,47 @@ class CapabilityRegistry:
         return readable, writable
 
     async def _check_tools(self, tool_names: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Probe tool availability via ``--version``.
+
+        Probes run on the default executor with a hard ``subprocess.run``
+        timeout instead of ``asyncio.create_subprocess_exec``: the Proactor
+        event loop's subprocess transports can hang forever on cancellation
+        (a stuck child process leaves ``_connect_pipes`` pending and stalls
+        ``asyncio.run``'s ``_cancel_all_tasks`` teardown). A thread-based
+        probe is bounded by a real timeout and always finishes.
+        """
+        import subprocess as _sp
+
+        def _probe(name: str, path: str) -> Dict[str, Any]:
+            try:
+                proc = _sp.run(
+                    [path, "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5.0,
+                )
+                output = (proc.stdout or proc.stderr or "").strip()
+                if proc.returncode == 0:
+                    version = output.splitlines()[0] if output else "unknown"
+                    return {"status": ToolStatus.AVAILABLE.value, "version": version, "path": path}
+                return {
+                    "status": ToolStatus.BROKEN.value,
+                    "version": None,
+                    "path": path,
+                    "error": output[:200],
+                }
+            except _sp.TimeoutExpired:
+                return {"status": ToolStatus.BROKEN.value, "version": None, "path": path, "error": "timeout"}
+            except Exception as e:
+                return {"status": ToolStatus.BROKEN.value, "version": None, "path": path, "error": str(e)[:200]}
+
         results: Dict[str, Dict[str, Any]] = {}
         for name in tool_names:
             path = shutil.which(name)
             if not path:
                 results[name] = {"status": ToolStatus.MISSING.value, "version": None, "path": None}
                 continue
-
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    path, "--version",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5.0)
-                output = stdout.decode().strip() or stderr.decode().strip()
-                if proc.returncode == 0:
-                    version = output.splitlines()[0] if output else "unknown"
-                    results[name] = {"status": ToolStatus.AVAILABLE.value, "version": version, "path": path}
-                else:
-                    results[name] = {"status": ToolStatus.BROKEN.value, "version": None, "path": path, "error": output[:200]}
-            except asyncio.TimeoutError:
-                results[name] = {"status": ToolStatus.BROKEN.value, "version": None, "path": path, "error": "timeout"}
-            except Exception as e:
-                results[name] = {"status": ToolStatus.BROKEN.value, "version": None, "path": path, "error": str(e)[:200]}
+            results[name] = await asyncio.to_thread(_probe, name, path)
         return results
 
     def _check_git(self) -> Optional[GitState]:

@@ -132,6 +132,68 @@ class _AgentRef:
 _ACTIVE_AGENT = _AgentRef()
 
 
+async def shutdown_background_tasks(
+    orchestrator=None,
+    provider_runtime=None,
+    memory_engine=None,
+    *,
+    timeout: float = 20.0,
+) -> None:
+    """Deterministically stop background runtime work before the loop tears down.
+
+    ``asyncio.run`` cancels every task still pending at exit and *waits* for
+    them — if a background health monitor, subprocess transport or event bus
+    task refuses to finalize, the process hangs (previously 10s–4min stalls
+    after ``/exit``, worst after a live ``/models`` fetch). This helper
+    cancels and awaits the background tasks while the loop is healthy, so
+    teardown is fast and bounded. Every step is guarded — shutdown must never
+    raise.
+    """
+    import asyncio
+
+    # 1. Provider runtime health monitors (per-provider HTTP check loops).
+    if provider_runtime is not None:
+        try:
+            await asyncio.wait_for(
+                provider_runtime.stop_monitoring(), timeout=timeout
+            )
+        except Exception as exc:
+            log.warning("Provider runtime monitoring stop failed: %s", exc)
+
+    # 2. Orchestrator background tasks + capability watcher + runtime bus.
+    if orchestrator is not None:
+        for attr in ("_bus_task", "_registry_task"):
+            try:
+                task = getattr(orchestrator, attr, None)
+                if task is not None and not task.done():
+                    task.cancel()
+            except Exception as exc:
+                log.warning("Background task %s cancel failed: %s", attr, exc)
+        try:
+            registry = getattr(orchestrator, "runtime_registry", None)
+            if registry is not None:
+                await asyncio.wait_for(
+                    registry.stop_monitoring(), timeout=timeout
+                )
+        except Exception as exc:
+            log.warning("Capability monitoring stop failed: %s", exc)
+        try:
+            bus = getattr(orchestrator, "runtime_bus", None)
+            if bus is not None:
+                await asyncio.wait_for(bus.stop(), timeout=timeout)
+        except Exception as exc:
+            log.warning("Runtime bus stop failed: %s", exc)
+
+    # 3. Release the hybrid memory engine's tool executor threads.
+    if memory_engine is not None:
+        try:
+            executor = getattr(memory_engine, "_executor", None)
+            if executor is not None:
+                executor.shutdown(wait=False)
+        except Exception as exc:
+            log.warning("Executor shutdown failed: %s", exc)
+
+
 def init_global_metadata():
     """Ensures the global database for tracking projects is ready."""
     try:
@@ -1210,6 +1272,13 @@ async def main_async():
                 await lhp.shutdown()
             except Exception as _ex:
                 log.warning("Silenced exception: %s", _ex)
+        # Stop background health monitors / bus / watcher tasks deterministically
+        # so ``asyncio.run`` teardown never stalls on a pending task.
+        await shutdown_background_tasks(
+            orchestrator=orchestrator,
+            provider_runtime=provider_runtime,
+            memory_engine=memory_engine,
+        )
         aelvo_kernel.conn.close()
         memory_engine.db.close()
         return
@@ -1247,6 +1316,13 @@ async def main_async():
             await lhp.shutdown()
         except Exception as _ex:
             log.warning("Silenced exception: %s", _ex)
+    # Same deterministic background shutdown as the CLI path (bus, monitors,
+    # watcher tasks, executor threads) so the web process also exits promptly.
+    await shutdown_background_tasks(
+        orchestrator=orchestrator,
+        provider_runtime=provider_runtime,
+        memory_engine=memory_engine,
+    )
     aelvo_kernel.conn.close()
     memory_engine.db.close()
     return

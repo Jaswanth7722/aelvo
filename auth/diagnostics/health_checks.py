@@ -187,12 +187,24 @@ class HealthCheckRunner:
         ]
 
     async def connectivity_check(self, url: str, timeout: float = 5.0) -> bool:
-        """Check if a URL is reachable."""
+        """Check if a URL is reachable.
+
+        Runs the probe on the default executor with a *sync* httpx client.
+        The async (anyio) client opens Proactor socket connects on Windows;
+        cancelling one mid-connect can leave the IOCP registration pending so
+        the task never finalizes — which stalls ``asyncio.run``'s teardown
+        (``_cancel_all_tasks`` waits for it forever). A thread-based probe is
+        bounded by a real timeout and always finishes, making shutdown clean.
+        """
         try:
             import httpx
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.get(url)
-                return response.status_code < 500
+
+            def _probe() -> bool:
+                with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+                    response = client.get(url)
+                    return response.status_code < 500
+
+            return await asyncio.to_thread(_probe)
         except Exception:
             return False
 
