@@ -235,12 +235,6 @@ lifecycle management. The fix was verified with type checks and tests.
 
 ---
 
-## Screenshots
-
-> _The AELVO web dashboard — chat, terminal-style Files browser, and live agent metrics._
-
----
-
 ## License
 
 MIT — see LICENSE for details.
