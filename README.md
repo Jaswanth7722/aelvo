@@ -73,7 +73,7 @@ cp .env.example .env
 # Edit .env with your LLM provider API key:
 #   LLM_PROVIDER=openai
 #   API_KEY=sk-...
-#   MODEL=gpt-4
+#   MODEL=gpt-5
 #
 # Or use NVIDIA:
 #   LLM_PROVIDER=nvidia
@@ -91,7 +91,7 @@ python -m cli
 python -m cli "refactor the auth module to use async sessions"
 
 # Open a folder as the workspace, with an explicit provider/model
-python -m cli -w ./my-project --provider openai --model gpt-4o
+python -m cli -w ./my-project --provider openai --model gpt-5
 
 # Windows: `aelvo` is an alias for `python -m cli` (aelvo.bat)
 aelvo --version

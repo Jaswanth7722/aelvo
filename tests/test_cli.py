@@ -474,7 +474,9 @@ def test_pick_provider_builds_items(monkeypatch):
     assert "openai" in keys and "nvidia" in keys and "google" in keys
     labels = " ".join(lbl for _, lbl in provider_items)
     assert "active" in labels  # nvidia marked as the current provider
-    assert [v for v, _ in model_items] == ["gpt-4o", "o1-preview", "gpt-4"]
+    model_ids = [v for v, _ in model_items]
+    assert model_ids[0] == "gpt-5"  # curated default first
+    assert "gpt-4o" in model_ids and "o3" in model_ids
     assert len(captured["calls"]) == 2  # provider step, then model step
     assert captured["calls"][1] == "Select a model · openai"
 
@@ -495,7 +497,7 @@ def test_pick_provider_cancelled_at_model_step_keeps_default(monkeypatch):
         console=build_console(), db_path="", workspace_path=".", project="t",
         provider_name=None, model=None,
     )
-    assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
+    assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-5")
 
 
 NVIDIA_DEFAULT = "nvidia/nemotron-3-super-120b-a12b"
@@ -545,7 +547,7 @@ def test_provider_noarg_picker_cancelled_model_keeps_default(monkeypatch):
     )
     assert asyncio.run(handle_command(ctx, "provider", "")) is None
     assert ctx.provider_name == "openai"
-    assert ctx.model == "gpt-4o"  # openai's default model
+    assert ctx.model == "gpt-5"  # openai's default model
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
 
@@ -604,7 +606,9 @@ def test_pick_model_offers_only_provider_models(monkeypatch):
     )
     assert asyncio.run(providers.pick_model(ctx)) == "gpt-4o"
     models = [v for v, _ in captured["items"]]
-    assert models == ["gpt-4o", "o1-preview", "gpt-4"]  # curated only
+    assert models[0] == "gpt-5"  # curated default first
+    assert "gpt-4o" in models and "o3" in models and "gpt-5-mini" in models
+    assert len(models) >= 8  # top ~10, not just 3
     assert not any("embedding" in m for m in models)  # no runtime junk
     labels = " ".join(lbl for _, lbl in captured["items"])
     assert "current" in labels  # current model marked like the provider picker
@@ -629,7 +633,7 @@ def test_pick_model_for_new_provider_marks_default(monkeypatch):
     )
     assert asyncio.run(providers.pick_model(ctx, "openai")) == ""
     labels = " ".join(lbl for _, lbl in captured["items"])
-    assert "● default" in labels  # openai's default (gpt-4o) preselected
+    assert "● default" in labels  # openai's default (gpt-5) preselected
     assert "some-old-model" not in labels
 
 
@@ -648,7 +652,7 @@ def test_list_models_for_is_provider_scoped():
         provider_runtime=FakeRuntime(), provider_name="openai", model=None,
     )
     models = providers.list_models_for(ctx, "openai")
-    assert models == ["gpt-4o", "o1-preview", "gpt-4"]
+    assert models[0] == "gpt-5" and "gpt-4o" in models and "o3" in models
     assert "text-embedding-3-large" not in models
     assert "random-model-xyz" not in models
 
