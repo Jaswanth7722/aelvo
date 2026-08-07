@@ -210,6 +210,19 @@ def has_api_key(provider_key: str, env_key: str) -> bool:
         return False
 
 
+def api_key_source(provider_key: str, env_key: str) -> str:
+    """Where the provider's API key lives: ``'env'``, ``'vault'``, or ``''``.
+
+    Resolution order mirrors ``resolve_api_key`` (env first, then the
+    encrypted vault) so ``/status`` can tell the user which source is
+    actually in use without ever revealing the key itself.
+    """
+    if os.environ.get(env_key, "").strip():
+        return "env"
+    # Env was empty and has_api_key is True ⇒ the vault has it.
+    return "vault" if has_api_key(provider_key, env_key) else ""
+
+
 def store_api_key(provider_key: str, display_name: str, api_key: str) -> bool:
     """Persist an API key to the encrypted vault and the current process env."""
     import time

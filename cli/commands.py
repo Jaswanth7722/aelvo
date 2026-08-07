@@ -243,6 +243,21 @@ def _cmd_status(ctx: CliContext) -> None:
     table.add_row("Workspace", ctx.workspace_path or "-")
     table.add_row("Provider", ctx.provider_name or "not configured")
     table.add_row("Model", ctx.model or "-")
+    # Where the active provider's API key lives (env var vs encrypted vault).
+    from cli.providers import api_key_source, get_registry
+
+    if ctx.provider_name:
+        cfg = get_registry().get(ctx.provider_name.lower())
+        if cfg is not None:
+            source = api_key_source(ctx.provider_name.lower(), cfg.env_key)
+            key_label = {"env": "env var", "vault": "encrypted vault"}.get(
+                source, "not configured"
+            )
+        else:
+            key_label = "not configured"
+    else:
+        key_label = "not configured"
+    table.add_row("API key", key_label)
     table.add_row("Turns", str(getattr(ctx.orchestrator, "_turn_counter", 0)))
 
     # System-prompt cache metrics (hits vs regenerations)

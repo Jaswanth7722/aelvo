@@ -573,6 +573,59 @@ def test_version_command_prints():
     assert result is None  # no crash
 
 
+def test_api_key_source_detects_env_vs_vault(monkeypatch):
+    """api_key_source: env var wins over the vault; empty when neither — and
+    the env var name itself is never revealed."""
+    from cli import providers
+
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+    monkeypatch.setattr(providers, "has_api_key", lambda k, e: True)
+    assert providers.api_key_source("nvidia", "NVIDIA_API_KEY") == "vault"
+
+    monkeypatch.setattr(providers, "has_api_key", lambda k, e: False)
+    assert providers.api_key_source("nvidia", "NVIDIA_API_KEY") == ""
+
+    os.environ["NVIDIA_API_KEY"] = "nvapi-test-123"
+    try:
+        assert providers.api_key_source("nvidia", "NVIDIA_API_KEY") == "env"
+    finally:
+        monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+
+
+def test_status_shows_api_key_source(monkeypatch):
+    """/status reports where the active provider's key came from (env vs vault)
+    without leaking the key itself."""
+    from cli import providers
+
+    console = build_console()
+    monkeypatch.setattr(providers, "api_key_source", lambda k, e: "vault")
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=console, db_path="", workspace_path=".", project="t",
+        provider_name="nvidia", model="m",
+    )
+    with console.capture() as cap:
+        asyncio.run(handle_command(ctx, "status", ""))
+    rendered = cap.get()
+    assert "API key" in rendered
+    assert "encrypted vault" in rendered
+
+
+def test_status_no_provider_shows_not_configured():
+    """With no active provider the API key row says not configured (the
+    source lookup is skipped entirely — nothing to resolve)."""
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    with ctx.console.capture() as cap:
+        asyncio.run(handle_command(ctx, "status", ""))
+    rendered = cap.get()
+    assert "API key" in rendered
+    assert "not configured" in rendered
+
+
 # ── interactive pickers (/provider and /model with no args) ────────────────
 
 def _async_val(value):
