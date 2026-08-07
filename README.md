@@ -84,27 +84,37 @@ cp .env.example .env
 ### Launch
 
 ```bash
-# Launch the interactive terminal CLI (default — CodeBuff / Claude Code style)
-python main.py
+# Dedicated terminal CLI — fast lean boot, skips the web platform
+python -m cli
 
 # One-shot CLI — run a single prompt and exit
-python main.py --ask "refactor the auth module to use async sessions"
+python -m cli "refactor the auth module to use async sessions"
+
+# Open a folder as the workspace, with an explicit provider/model
+python -m cli -w ./my-project --provider openai --model gpt-4o
+
+# Windows: `aelvo` is an alias for `python -m cli` (aelvo.bat)
+aelvo --version
+
+# Full boot → CLI (default mode, runs the whole platform first)
+python main.py
 
 # Launch the web dashboard instead
 python main.py --web
-
-# Launch with a specific provider and model
-python main.py --provider openai --model gpt-4
 ```
 
 ---
 
-## Terminal CLI (default — `python main.py`)
+## Terminal CLI (`python -m cli`, or `python main.py`)
 
 A dedicated interactive terminal agent in the spirit of CodeBuff / Claude
-Code, reusing the exact same backend as the web dashboard. Type any natural
-language task — Enter submits, `Esc+Enter` inserts a newline, and tool calls
-(read/write/bash/scrape/memory) render live as the agent works.
+Code, reusing the exact same backend as the web dashboard. `python -m cli`
+boots a **lean** backend (kernel, filesystem, memory, orchestrator, provider
+runtime) and skips the heavy optional subsystems the web boot runs (MCP
+discovery, long-horizon planning, repo scans), so the prompt appears in a
+couple of seconds. Type any natural language task — Enter submits,
+`Esc+Enter` inserts a newline, and tool calls (read/write/bash/scrape/memory)
+render live as the agent works.
 
 ```text
 ❯ refactor the authentication module to use async database sessions
@@ -134,6 +144,11 @@ Force-route to specific specialists with `@SPECIALIST` prefixes:
 | `/status` | Provider, model, workspace + live agent metrics |
 | `/projects` | List known workspaces |
 | `/models` | List available models |
+| `/provider [name] [key]` | List / switch the LLM provider and set an API key |
+| `/model [name]` | Show or switch the active model |
+| `/apikey <key>` | Store an API key for the current provider (encrypted vault) |
+| `/log [lines]` | Tail the AELVO log file |
+| `/version` | Show version and environment info |
 | `/retry` | Re-run the previous prompt |
 | `/ask <prompt>` | Run a prompt without the agent loop |
 
