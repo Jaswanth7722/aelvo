@@ -18,16 +18,14 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List
 
-from rich.console import Console, Group
-from rich.live import Live
-from rich.spinner import Spinner
+from rich.console import Console
 from rich.text import Text
 
 from runtime_next.models.events import EventType as RuntimeEventType
 
-# Tool → emoji icon shown in the live activity feed.
+# Tool → emoji icon shown in the activity transcript.
 TOOL_ICONS = {
     "read_file": "📖",
     "read_file_range": "📖",
@@ -51,70 +49,52 @@ TOOL_ICONS = {
 }
 
 _DEFAULT_ICON = "🔧"
-_THINKING = "AELVO is thinking…"
 
 
 class TerminalSession:
-    """Renders the agent's live activity into a ``rich.Live`` region.
+    """Prints the agent's activity as a plain, scrollable transcript.
+
+    Deliberately avoids in-place redraws (no ``rich.Live``, no spinner): every
+    event is appended as a real line to the terminal, so the terminal's native
+    scrollback (mouse wheel / PgUp) keeps working during and after a turn.
 
     Implements exactly the ``tui_session`` interface the orchestrator's tool
-    loop expects (``emit_system`` / ``emit_tool`` / ``emit_memory``), so the
-    canonical ``execute_turn`` path renders into the terminal unchanged.
+    loop expects (``emit_system`` / ``emit_tool`` / ``emit_memory``).
     """
 
     def __init__(self, console: Console):
         self.console = console
         self._lines: List[Any] = []
-        self._live: Optional[Live] = None
-        self._status_text = _THINKING
+        self._status_text = ""  # kept for interface/tests; always empty now
         self.final_answer = ""
 
     # ── lifecycle ──────────────────────────────────────────────────────────
     def start(self) -> None:
-        self._live = Live(
-            self._renderable(),
-            console=self.console,
-            refresh_per_second=8,  # lower than 12fps → less flicker during turns
-            transient=False,
-        )
-        self._live.start()
+        pass
 
     def finish(self) -> None:
-        if self._live is not None:
-            self._live.stop()
-            self._live = None
+        pass
 
     # ── rendering helpers ──────────────────────────────────────────────────
-    def _renderable(self) -> Any:
-        if self._status_text:
-            return Group(
-                *self._lines,
-                Spinner("dots", text=self._status_text, style="aelvo.brand"),
-            )
-        return Group(*self._lines)
-
-    def _refresh(self) -> None:
-        if self._live is not None:
-            self._live.update(self._renderable())
+    def _append(self, text: Text) -> None:
+        """Record the line and print it to the terminal (real scrollback)."""
+        self._lines.append(text)
+        self.console.print(text)
 
     # ── stream_callback hook (final answer) ────────────────────────────────
     def on_final_answer(self, message: str) -> None:
         """Store the agent's final message; the REPL prints it as Markdown."""
         self.final_answer = message or ""
         self._status_text = ""
-        self._refresh()
 
     # ── orchestrator tui_session hooks ─────────────────────────────────────
     async def emit_system(self, message: str) -> None:
         """System/kernel lines. The orchestrator also echoes the final answer
         here (``AELVO: ...``); the stream_callback hook (``on_final_answer``)
-        is the canonical capture, so only clear the spinner here — no line."""
+        is the canonical capture, so skip that echo entirely."""
         if message.startswith("AELVO:"):
-            self._status_text = ""
-            self._refresh()
             return
-        self._lines.append(Text(f"⚙ {message}", style="aelvo.dim"))
-        self._refresh()
+        self._append(Text(f"⚙ {message}", style="aelvo.dim"))
 
     async def emit_tool(
         self,
@@ -127,19 +107,19 @@ class TerminalSession:
         icon = TOOL_ICONS.get(tool_name, _DEFAULT_ICON)
         preview = str(args_preview or "").strip()
 
+        # Only start lines on completion/failure — keeps the transcript tidy
+        # and each line lands in the scrollback exactly once.
         if event_type == RuntimeEventType.TOOL_STARTED:
-            self._status_text = f"{icon} {tool_name} {preview}"
-        elif event_type == RuntimeEventType.TOOL_FAILED:
-            self._lines.append(
-                Text(f"✗ {icon} {tool_name} {preview}", style="aelvo.err")
+            return
+        if event_type == RuntimeEventType.TOOL_FAILED:
+            self._append(
+                Text(f"✗ {icon} {tool_name} {preview}".rstrip(), style="aelvo.err")
             )
-            self._status_text = _THINKING
-        else:  # TOOL_COMPLETED
-            marker = "✓" if int(exit_code or 0) == 0 else "✗"
-            style = "aelvo.ok" if marker == "✓" else "aelvo.err"
-            self._lines.append(Text(f"{marker} {icon} {tool_name} {preview}", style=style))
-            self._status_text = _THINKING
-        self._refresh()
+            return
+        # TOOL_COMPLETED
+        marker = "✓" if int(exit_code or 0) == 0 else "✗"
+        style = "aelvo.ok" if marker == "✓" else "aelvo.err"
+        self._append(Text(f"{marker} {icon} {tool_name} {preview}".rstrip(), style=style))
 
     async def emit_memory(
         self,
@@ -150,14 +130,11 @@ class TerminalSession:
         score: float = 0.0,
     ) -> None:
         if event_type == RuntimeEventType.MEMORY_STORED:
-            self._lines.append(
-                Text(f"🧠 stored {mem_type}: {query}", style="aelvo.dim")
-            )
+            self._append(Text(f"🧠 stored {mem_type}: {query}", style="aelvo.dim"))
         else:
-            self._lines.append(
+            self._append(
                 Text(f"🧠 retrieved {count} hit(s) for '{query}'", style="aelvo.dim")
             )
-        self._refresh()
 
 
 class SessionRecorder:

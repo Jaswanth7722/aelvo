@@ -125,6 +125,10 @@ def _make_prompt_session(ctx: CliContext) -> PromptSession:
     hist_dir = ctx.workspace_path or "."
     os.makedirs(hist_dir, exist_ok=True)
     history = FileHistory(os.path.join(hist_dir, ".aelvo_history"))
+    # NOTE: no ``mouse_support=True`` here — enabling VT mouse tracking makes
+    # the terminal capture the scroll wheel instead of scrolling native
+    # scrollback, so the user couldn't scroll up through past output. With it
+    # off, the terminal's native wheel/PgUp scrolling and click-to-select work.
     return PromptSession(
         history=history,
         completer=_make_completer(),
@@ -133,7 +137,6 @@ def _make_prompt_session(ctx: CliContext) -> PromptSession:
         auto_suggest=AutoSuggestFromHistory(),
         complete_while_typing=True,
         multiline=True,
-        mouse_support=True,          # click to position the cursor / scroll history
         enable_history_search=True,  # up-arrow searches through past prompts
     )
 
