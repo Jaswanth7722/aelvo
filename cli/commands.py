@@ -51,7 +51,7 @@ _COMMANDS = {
     "status": ("Provider, model, workspace + agent metrics", "/status"),
     "projects": ("List known workspaces", "/projects"),
     "models": ("List available models", "/models"),
-    "provider": ("Pick / switch the LLM provider (its API key is asked inline)", "/provider [name] [key]"),
+    "provider": ("Pick / switch the LLM provider; keys are asked inline and existing ones can be rotated", "/provider [name] [key]"),
     "model": ("Pick or switch the active model", "/model [name]"),
     "log": ("Tail the AELVO log file", "/log [lines]"),
     "version": ("Show version and environment info", "/version"),

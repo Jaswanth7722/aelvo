@@ -475,6 +475,180 @@ def test_pick_provider_cancelled_key_aborts(monkeypatch):
     assert len(calls) == 1  # never reached the model step
 
 
+def test_pick_provider_rotate_replaces_key(monkeypatch):
+    """A provider that already has a key offers replacement: 'Yes' re-prompts
+    and the new key is stored once (superseding the old vault entry)."""
+    from cli import picker, providers
+
+    calls = []
+    stored = []
+
+    async def fake_pick_item(title, items, **kwargs):
+        calls.append(title)
+        if len(calls) == 1:
+            return "openai"   # provider step
+        if len(calls) == 2:
+            return "yes"      # rotate confirm
+        return "gpt-4o"       # model step
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-old")
+    monkeypatch.setattr(providers, "prompt_api_key", _async_val("sk-new"))
+    monkeypatch.setattr(providers, "store_api_key", lambda k, n, v: stored.append((k, v)) or True)
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
+    assert stored == [("openai", "sk-new")]  # exactly one replacement store
+    assert len(calls) == 3
+    assert calls[1].startswith("Replace the stored key for ")
+
+
+def test_pick_provider_rotate_declined_keeps_key(monkeypatch):
+    """'No' on the rotate confirm keeps the existing key — the key prompt is
+    never shown and nothing is stored."""
+    from cli import picker, providers
+
+    calls = []
+    stored = []
+    prompted = []
+
+    async def fake_pick_item(title, items, **kwargs):
+        calls.append(title)
+        if len(calls) == 1:
+            return "openai"
+        if len(calls) == 2:
+            return "no"   # keep the existing key
+        return "gpt-4o"
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-old")
+    monkeypatch.setattr(providers, "prompt_api_key", lambda *a, **k: prompted.append(1) or "")
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: stored.append(1) or True)
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
+    assert prompted == []  # key prompt never shown
+    assert stored == []    # nothing stored
+
+
+def test_pick_provider_rotate_key_prompt_cancelled_keeps_existing(monkeypatch):
+    """'Yes' on the rotate confirm but Esc on the key prompt keeps the
+    existing key — the switch still proceeds with the old key."""
+    from cli import picker, providers
+
+    calls = []
+    stored = []
+
+    async def fake_pick_item(title, items, **kwargs):
+        calls.append(title)
+        if len(calls) == 1:
+            return "openai"
+        if len(calls) == 2:
+            return "yes"   # wants to rotate…
+        return "gpt-4o"
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-old")
+    monkeypatch.setattr(providers, "prompt_api_key", _async_val(""))  # …but Esc
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: stored.append(1) or True)
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
+    assert stored == []  # no replacement stored
+
+
+def test_store_api_key_supersedes_previous_rows(tmp_path, monkeypatch):
+    """Storing a replacement key supersedes stale API-key rows only — rotation
+    overwrites instead of accumulating duplicates, and other credential types
+    (e.g. OAuth tokens) stored under the same provider survive."""
+    import time
+
+    from auth.cred_storage import CredentialStore
+    from auth.types import Credential, CredentialType
+    from cli import providers
+
+    monkeypatch.setattr(providers, "_vault_path", lambda: str(tmp_path / "vault.db"))
+    monkeypatch.setattr(providers, "write_env", lambda k, v: True)
+    monkeypatch.setattr("core.registry.models.get_provider_config", lambda k: None)
+
+    # Seed an unrelated credential type for the same provider (e.g. Google OAuth).
+    seed = CredentialStore(db_path=str(tmp_path / "vault.db"))
+    seed.store(
+        Credential(
+            id="oauth_openai_1", provider="openai",
+            credential_type=CredentialType.OAUTH_TOKEN,
+            value="oauth-token", label="oauth", created_at=time.time(), is_valid=True,
+        )
+    )
+
+    assert providers.store_api_key("openai", "OpenAI", "sk-first")
+    assert providers.store_api_key("openai", "OpenAI", "sk-second")
+
+    store = CredentialStore(db_path=str(tmp_path / "vault.db"))
+    rows = store.list_credentials("openai")
+    api_keys = [r for r in rows if r["credential_type"] == "api_key"]
+    others = [r for r in rows if r["credential_type"] != "api_key"]
+    assert len(api_keys) == 1  # stale API keys superseded
+    assert store.get_for_provider("openai", CredentialType.API_KEY).value == "sk-second"
+    assert len(others) == 1  # the OAuth token survived rotation
+    assert others[0]["credential_type"] == "oauth_token"
+
+
+def test_store_api_key_syncs_env_sourced_key_to_env_file(tmp_path, monkeypatch):
+    """Rotating an env-sourced key persists the new value to .env so the
+    rotation survives a restart (env resolution order wins over the vault)."""
+    from types import SimpleNamespace
+
+    from cli import providers
+
+    monkeypatch.setattr(providers, "_vault_path", lambda: str(tmp_path / "vault.db"))
+    written = {}
+    monkeypatch.setattr(
+        providers, "write_env", lambda k, v: written.update(key=k, value=v) or True
+    )
+    monkeypatch.setattr(
+        "core.registry.models.get_provider_config",
+        lambda k: SimpleNamespace(env_key="OPENAI_API_KEY"),
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-old")
+    try:
+        assert providers.store_api_key("openai", "OpenAI", "sk-new")
+    finally:
+        # store_api_key sets the process env directly — don't let it leak.
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert written == {"key": "OPENAI_API_KEY", "value": "sk-new"}
+
+
+def test_store_api_key_vault_sourced_skips_env_file(tmp_path, monkeypatch):
+    """A vault-sourced key (no env var set) is never written to .env."""
+    from types import SimpleNamespace
+
+    from cli import providers
+
+    monkeypatch.setattr(providers, "_vault_path", lambda: str(tmp_path / "vault.db"))
+    written = []
+    monkeypatch.setattr(providers, "write_env", lambda k, v: written.append((k, v)))
+    monkeypatch.setattr(
+        "core.registry.models.get_provider_config",
+        lambda k: SimpleNamespace(env_key="OPENAI_API_KEY"),
+    )
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    try:
+        assert providers.store_api_key("openai", "OpenAI", "sk-new")
+    finally:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert written == []
+
+
 def test_provider_flow_stores_key_exactly_once(monkeypatch):
     """End-to-end /provider two-step flow with a fresh key: the key is prompted
     and stored exactly once — pick_provider stores it, switch_provider must
@@ -704,8 +878,8 @@ def test_pick_item_jk_navigation():
 
 
 def test_pick_provider_builds_items(monkeypatch):
-    """Two-step pick_provider: offers every registered provider (creds/active
-    markers), then its models, and returns (key, model)."""
+    """pick_provider: offers every registered provider (creds/active markers),
+    a rotate confirm for an existing key, then its models — returns (key, model)."""
     from cli import picker, providers
 
     captured = {"calls": [], "items": []}
@@ -713,12 +887,16 @@ def test_pick_provider_builds_items(monkeypatch):
     async def fake_pick_item(title, items, **kwargs):
         captured["calls"].append(title)
         captured["items"].append(list(items))
-        # Step 1 = provider, step 2 = its models.
-        return "openai" if len(captured["calls"]) == 1 else "gpt-4o"
+        # Step 1 = provider, step 2 = rotate confirm, step 3 = its models.
+        if len(captured["calls"]) == 1:
+            return "openai"
+        if len(captured["calls"]) == 2:
+            return "no"  # keep the existing key
+        return "gpt-4o"
 
     # pick_provider does `from cli.picker import pick_item` at call time.
     monkeypatch.setattr(picker, "pick_item", fake_pick_item)
-    # Key already stored → the inline key step is skipped (2 picker calls).
+    # Key already stored → the rotate confirm is offered (3 picker calls).
     monkeypatch.setattr(providers, "resolve_api_key", lambda k, e: "sk-test")
     ctx = CliContext(
         agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
@@ -727,7 +905,7 @@ def test_pick_provider_builds_items(monkeypatch):
     )
     assert asyncio.run(providers.pick_provider(ctx)) == ("openai", "gpt-4o")
     provider_items = captured["items"][0]
-    model_items = captured["items"][1]
+    model_items = captured["items"][2]
     keys = [v for v, _ in provider_items]
     assert "openai" in keys and "nvidia" in keys and "google" in keys
     labels = " ".join(lbl for _, lbl in provider_items)
@@ -735,8 +913,9 @@ def test_pick_provider_builds_items(monkeypatch):
     model_ids = [v for v, _ in model_items]
     assert model_ids[0] == "gpt-5"  # curated default first
     assert "gpt-4o" in model_ids and "o3" in model_ids
-    assert len(captured["calls"]) == 2  # provider step, then model step
-    assert captured["calls"][1] == "Select a model · openai"
+    assert len(captured["calls"]) == 3  # provider, rotate confirm, model
+    assert captured["calls"][1].startswith("Replace the stored key for ")
+    assert captured["calls"][2] == "Select a model · openai"
 
 
 def test_pick_provider_cancelled_at_model_step_keeps_default(monkeypatch):

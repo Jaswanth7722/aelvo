@@ -224,12 +224,30 @@ def api_key_source(provider_key: str, env_key: str) -> str:
 
 
 def store_api_key(provider_key: str, display_name: str, api_key: str) -> bool:
-    """Persist an API key to the encrypted vault and the current process env."""
+    """Persist an API key to the encrypted vault and the current process env.
+
+    The new key supersedes any previously stored row for the provider, so
+    replacing/rotating a key never leaves stale credentials behind. When the
+    provider's env var was already set (an env-sourced key), the new value is
+    also written to ``.env`` so the rotation survives a restart — the env var
+    wins over the vault at resolution time.
+    """
     import time
     import uuid
 
     from auth.cred_storage import CredentialStore
     from auth.types import Credential, CredentialType
+
+    cfg = None
+    env_was_set = False
+    try:
+        from core.registry.models import get_provider_config
+
+        cfg = get_provider_config(provider_key)
+        if cfg is not None:
+            env_was_set = bool(os.environ.get(cfg.env_key, "").strip())
+    except Exception as exc:
+        log.debug("Provider config lookup failed: %s", exc)
 
     try:
         store = CredentialStore(db_path=_vault_path())
@@ -244,6 +262,14 @@ def store_api_key(provider_key: str, display_name: str, api_key: str) -> bool:
             metadata={"source": "cli"},
         )
         ok = store.store(cred)
+        if ok:
+            # Supersede stale API-key rows for this provider (store the new one
+            # first, then drop older rows — never a window with no key in the
+            # vault). Only API-key rows are touched: other credential types
+            # (e.g. OAuth tokens) stored under the same provider must survive.
+            for old in store.list_credentials(provider_key):
+                if old["id"] != cred.id and old["credential_type"] == cred.credential_type.value:
+                    store.delete(old["id"])
     except Exception as exc:
         log.warning("Credential store failed: %s", exc)
         ok = False
@@ -256,18 +282,21 @@ def store_api_key(provider_key: str, display_name: str, api_key: str) -> bool:
         except Exception as exc:
             log.debug("Live cache clear failed: %s", exc)
         try:
-            from core.registry.models import get_provider_config
-
-            cfg = get_provider_config(provider_key)
             if cfg is not None:
                 os.environ[cfg.env_key] = api_key
+                if env_was_set and not write_env(cfg.env_key, api_key):
+                    log.warning(
+                        "Key rotated for '%s' but .env could not be updated "
+                        "— the change applies to this session only.",
+                        provider_key,
+                    )
         except Exception as exc:
             log.debug("Env key set failed: %s", exc)
     return ok
 
 
-def write_env(key: str, value: str) -> None:
-    """Set ``key=value`` in ``.env``, preserving comments and other lines."""
+def write_env(key: str, value: str) -> bool:
+    """Set ``key=value`` in ``.env`` (preserving comments); True on success."""
     path = _env_path()
     try:
         lines: list = []
@@ -285,8 +314,10 @@ def write_env(key: str, value: str) -> None:
             lines.append(target)
         with open(path, "w", encoding="utf-8") as f:
             f.writelines(lines)
+        return True
     except Exception as exc:
         log.warning("Could not update %s: %s", path, exc)
+        return False
 
 
 # ── interactive key prompt ──────────────────────────────────────────────────
@@ -450,12 +481,13 @@ async def switch_provider(
 # ── interactive pickers ──────────────────────────────────────────────────────
 
 async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
-    """Three-step picker: provider → (API key if missing) → model.
+    """Provider → model picker, with key entry and rotation built in.
 
     1. Pick a provider.
-    2. If no API key exists for it, prompt for one right there (the key is
-       part of provider selection) and persist it — with a fresh key the
-       model step can load the provider's *live* model list.
+    2. Key handling right there: if none is stored, prompt and persist it;
+       if one already exists, offer to replace it (re-prompt + overwrite the
+       vault entry). Either way the fresh key powers the model step's *live*
+       model list.
     3. Pick a model (Esc = the provider's default model).
 
     Returns ``(provider_key, model)`` after all steps, or ``None`` when the
@@ -495,6 +527,35 @@ async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
             )
             return None
         store_api_key(picked, cfg.name, api_key)
+    else:
+        # A key already exists — offer to replace/rotate it right here. Esc or
+        # "No" keeps the current key and continues to the model step.
+        rotate = await pick_item(
+            f"Replace the stored key for {cfg.name}?",
+            [("yes", "Yes — enter a new key"), ("no", "No — keep the existing key")],
+            subtitle="The current key stays in use until you replace it",
+            default="no",
+        )
+        if rotate == "yes":
+            new_key = await prompt_api_key(cfg.name)
+            if new_key and store_api_key(picked, cfg.name, new_key):
+                ctx.console.print(
+                    Text(f"✓ API key for {cfg.name} replaced.", style="aelvo.ok")
+                )
+            elif new_key:
+                ctx.console.print(
+                    Text(
+                        f"Could not store the new key for {cfg.name} — keeping the existing one.",
+                        style="aelvo.err",
+                    )
+                )
+            else:
+                ctx.console.print(
+                    Text(
+                        f"Key rotation cancelled for {cfg.name} — keeping the existing key.",
+                        style="aelvo.dim",
+                    )
+                )
 
     model = await pick_model(ctx, picked)
     if not model:

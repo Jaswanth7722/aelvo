@@ -144,7 +144,7 @@ Force-route to specific specialists with `@SPECIALIST` prefixes:
 | `/status` | Provider, model, workspace + live agent metrics |
 | `/projects` | List known workspaces |
 | `/models` | List available models (live from the provider's API when a key is set; curated catalog as offline fallback) |
-| `/provider [name] [key]` | Two-step interactive picker: choose a provider, then one of its models (or `/provider <name> [key]` directly); the API key is asked inline as part of selection and stored in the encrypted vault |
+| `/provider [name] [key]` | Two-step interactive picker: choose a provider, then one of its models (or `/provider <name> [key]` directly); the API key is asked inline as part of selection — existing keys can be replaced/rotated right in the picker — and stored in the encrypted vault |
 | `/model [name]` | Open an interactive picker to switch the active model (or `/model <name>` directly) |
 | `/log [lines]` | Tail the AELVO log file |
 | `/version` | Show version and environment info |
