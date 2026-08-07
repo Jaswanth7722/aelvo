@@ -51,8 +51,32 @@ def get_registry() -> dict:
     return MODEL_REGISTRY
 
 
+def provider_models(provider_key: str) -> list:
+    """Curated, provider-scoped model list (default + special cases).
+
+    Uses the same registry as the provider picker (``core.registry.models``)
+    so the models offered are exactly the ones the provider supports — never
+    the runtime's uncurated catalog, which mixes in non-agent ids such as
+    OpenAI's ``text-embedding-*`` models.
+    """
+    cfg = get_registry().get((provider_key or "").lower())
+    if cfg is None:
+        return []
+    ids = [cfg.default_model] + [m.id for m in cfg.special_cases]
+    seen = set()
+    return [m for m in ids if not (m in seen or seen.add(m))]
+
+
 def list_models_for(ctx, provider_key: str) -> list:
-    """Models available for a provider: runtime registry first, else defaults."""
+    """Models available for a provider: curated registry first, runtime fallback.
+
+    The curated registry is authoritative for the providers the CLI can
+    switch to; the runtime registry is only consulted for providers that are
+    not in it.
+    """
+    curated = provider_models(provider_key)
+    if curated:
+        return curated
     if ctx.provider_runtime is not None:
         try:
             models = ctx.provider_runtime.list_models(provider_key) or []
@@ -61,11 +85,6 @@ def list_models_for(ctx, provider_key: str) -> list:
                 return strings
         except Exception as exc:
             log.debug("provider_runtime.list_models failed: %s", exc)
-    cfg = get_registry().get(provider_key)
-    if cfg is not None:
-        ids = [cfg.default_model] + [m.id for m in cfg.special_cases]
-        seen = set()
-        return [m for m in ids if not (m in seen or seen.add(m))]
     return []
 
 
@@ -254,6 +273,68 @@ def set_api_key(ctx, provider_key: str, api_key: str) -> bool:
     cfg = get_registry().get(provider_key.lower())
     display = cfg.name if cfg is not None else provider_key
     return store_api_key(provider_key.lower(), display, api_key.strip())
+
+
+# ── interactive pickers ──────────────────────────────────────────────────────
+
+async def pick_provider(ctx) -> str:
+    """Full-screen picker over the registered providers; returns the key or ''.
+
+    Non-interactive terminals fall back to ``''`` so callers can print the
+    plain table instead.
+    """
+    from cli.picker import pick_item
+
+    current = (ctx.provider_name or "").lower()
+    items = []
+    for key, cfg in sorted(get_registry().items()):
+        creds = "✓ key" if has_api_key(key, cfg.env_key) else "no key"
+        marker = " ● active" if key == current else ""
+        label = f"{cfg.name:<20} {cfg.default_model}   [{creds}]{marker}"
+        items.append((key, label))
+    if not items:
+        return ""
+    picked = await pick_item(
+        "Select a provider",
+        items,
+        subtitle="↑/↓ or j/k move · Enter switches · Esc cancels",
+        default=current or None,
+    )
+    return picked or ""
+
+
+async def pick_model(ctx) -> str:
+    """Full-screen picker over the active provider's models; returns the id or ''.
+
+    Only the provider's curated models are offered (``provider_models``), and
+    each row carries the same visual style as the provider picker — model id,
+    ability hints, and a ``[● current]`` marker.
+    """
+    from cli.picker import pick_item
+    from core.registry.models import get_model_manifest
+
+    if not ctx.provider_name:
+        return ""
+    available = provider_models(ctx.provider_name)
+    if not available:
+        return ""
+    current = ctx.model or ""
+    items = []
+    for m in available:
+        manifest = get_model_manifest(ctx.provider_name, m)
+        abilities = ", ".join(a.value.replace("_", " ") for a in manifest.abilities)
+        hint = f"({abilities})" if abilities else ""
+        if m == current:
+            items.append((m, f"{m:<30} {hint:<26} [● current]"))
+        else:
+            items.append((m, f"{m:<30} {hint}"))
+    picked = await pick_item(
+        f"Select a model · {ctx.provider_name}",
+        items,
+        subtitle="↑/↓ or j/k move · Enter switches · Esc cancels",
+        default=current or None,
+    )
+    return picked or ""
 
 
 # ── tables ───────────────────────────────────────────────────────────────────

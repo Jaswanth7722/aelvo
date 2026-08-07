@@ -3,6 +3,7 @@
 import asyncio
 import os
 import sqlite3
+import subprocess
 import sys
 
 import pytest
@@ -367,6 +368,213 @@ def test_version_command_prints():
     )
     result = asyncio.run(handle_command(ctx, "version", ""))
     assert result is None  # no crash
+
+
+# ── interactive pickers (/provider and /model with no args) ────────────────
+
+def _async_val(value):
+    """Return an async function that yields ``value``."""
+    async def _fn(*_a, **_k):
+        return value
+    return _fn
+
+
+def test_pick_item_returns_none_when_not_interactive(monkeypatch):
+    """On non-interactive terminals (pipes, CI, tests) the picker must not
+    launch a full-screen app — it returns None so callers fall back."""
+    from cli import picker
+
+    monkeypatch.setattr(picker, "is_interactive", lambda: False)
+    result = asyncio.run(picker.pick_item("t", [("a", "A"), ("b", "B")]))
+    assert result is None
+
+
+_PICKER_DRIVER = r'''
+import asyncio, sys
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output import DummyOutput
+from cli import picker
+
+picker.is_interactive = lambda: True
+KEYS = sys.argv[1]
+
+async def _main():
+    with create_pipe_input() as inp:
+        inp.send_text(KEYS)
+        return await picker.pick_item(
+            "t", [("a", "A"), ("b", "B"), ("c", "C")],
+            _input=inp,
+            _output=DummyOutput(),
+        )
+
+print(repr(asyncio.run(_main())))
+'''
+
+
+def _drive_picker(keys: str) -> str:
+    """Run one pick_item in a fresh interpreter.
+
+    prompt_toolkit leaves global loop/input state behind after an
+    ``asyncio.run`` exits, so a second full-screen Application in the same
+    process can hang on Windows. Each run gets its own process instead.
+    """
+    out = subprocess.run(
+        [sys.executable, "-c", _PICKER_DRIVER, keys],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    return out.stdout.strip()
+
+
+def test_pick_item_enter_selects_default():
+    """Pressing Enter (CR, the terminal's enter byte) selects the first item."""
+    assert _drive_picker("\r") == "'a'"
+
+
+def test_pick_item_arrow_down_then_enter():
+    """Down arrow moves the cursor; Enter selects the second item."""
+    assert _drive_picker("\x1b[B\r") == "'b'"
+
+
+def test_pick_item_escape_cancels():
+    """Esc cancels the picker and returns None."""
+    assert _drive_picker("\x1b") == "None"
+
+
+def test_pick_item_jk_navigation():
+    """Vi-style j/k navigation works too."""
+    assert _drive_picker("j\r") == "'b'"
+
+
+def test_pick_provider_builds_items(monkeypatch):
+    """pick_provider must offer every registered provider with creds/active
+    markers and return the chosen key."""
+    from cli import picker, providers
+
+    captured = {}
+
+    async def fake_pick_item(title, items, **kwargs):
+        captured["title"] = title
+        captured["items"] = list(items)
+        return "openai"
+
+    # pick_provider does `from cli.picker import pick_item` at call time.
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="nvidia", model=None,
+    )
+    assert asyncio.run(providers.pick_provider(ctx)) == "openai"
+    keys = [v for v, _ in captured["items"]]
+    assert "openai" in keys and "nvidia" in keys and "google" in keys
+    labels = " ".join(lbl for _, lbl in captured["items"])
+    assert "active" in labels  # nvidia marked as the current provider
+
+
+def test_provider_noarg_picker_switches_provider(monkeypatch):
+    """Selecting a provider in the picker runs the switch (key from vault)."""
+    from cli import providers
+
+    agent = MagicMock()
+    monkeypatch.setattr(providers, "pick_provider", _async_val("nvidia"))
+    monkeypatch.setattr(providers, "build_agent", lambda *a, **k: agent)
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: True)
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "sk-from-vault")
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    assert asyncio.run(handle_command(ctx, "provider", "")) is None
+    assert ctx.provider_name == "nvidia"
+    assert ctx.agent is agent
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+
+def test_provider_noarg_cancelled_falls_back_to_table(monkeypatch):
+    """Cancelling the picker (or non-tty) prints the plain provider table."""
+    from cli import providers
+
+    console = build_console()
+    monkeypatch.setattr(providers, "pick_provider", _async_val(""))
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=console, db_path="", workspace_path=".", project="t",
+    )
+    with console.capture() as cap:
+        result = asyncio.run(handle_command(ctx, "provider", ""))
+    assert result is None
+    assert "Available providers" in cap.get()
+
+
+def test_model_noarg_picker_switches(monkeypatch):
+    """Selecting a model in the picker applies it to the live agent + env."""
+    from cli import providers
+
+    monkeypatch.setattr(providers, "pick_model", _async_val("gpt-4o"))
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    agent = MagicMock()
+    agent.model = "old-model"
+    ctx = CliContext(
+        agent=agent, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="old-model",
+    )
+    assert asyncio.run(handle_command(ctx, "model", "")) is None
+    assert ctx.model == "gpt-4o"
+    assert agent.model == "gpt-4o"
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+
+def test_pick_model_offers_only_provider_models(monkeypatch):
+    """The model picker must offer only the provider's curated models (no
+    runtime embedding/random ids), styled like the provider picker."""
+    from cli import picker, providers
+
+    captured = {}
+
+    async def fake_pick_item(title, items, **kwargs):
+        captured["title"] = title
+        captured["items"] = list(items)
+        return "gpt-4o"
+
+    monkeypatch.setattr(picker, "pick_item", fake_pick_item)
+    ctx = CliContext(
+        agent=MagicMock(), orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-4o",
+    )
+    assert asyncio.run(providers.pick_model(ctx)) == "gpt-4o"
+    models = [v for v, _ in captured["items"]]
+    assert models == ["gpt-4o", "o1-preview", "gpt-4"]  # curated only
+    assert not any("embedding" in m for m in models)  # no runtime junk
+    labels = " ".join(lbl for _, lbl in captured["items"])
+    assert "current" in labels  # current model marked like the provider picker
+
+
+def test_list_models_for_is_provider_scoped():
+    """list_models_for must prefer the curated per-provider list even when a
+    provider_runtime exists (which would offer uncurated ids)."""
+    from cli import providers
+
+    class FakeRuntime:
+        def list_models(self, provider_key):
+            return ["gpt-4o", "text-embedding-3-large", "random-model-xyz"]
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_runtime=FakeRuntime(), provider_name="openai", model=None,
+    )
+    models = providers.list_models_for(ctx, "openai")
+    assert models == ["gpt-4o", "o1-preview", "gpt-4"]
+    assert "text-embedding-3-large" not in models
+    assert "random-model-xyz" not in models
 
 
 # ── main.py --cli / --ask wiring ────────────────────────────────────────────

@@ -52,8 +52,8 @@ _COMMANDS = {
     "status": ("Provider, model, workspace + agent metrics", "/status"),
     "projects": ("List known workspaces", "/projects"),
     "models": ("List available models", "/models"),
-    "provider": ("List / switch the LLM provider and set an API key", "/provider [name] [key]"),
-    "model": ("Show or switch the active model", "/model [name]"),
+    "provider": ("Pick / switch the LLM provider and set an API key", "/provider [name] [key]"),
+    "model": ("Pick or switch the active model", "/model [name]"),
     "apikey": ("Store an API key for the current provider", "/apikey <key>"),
     "log": ("Tail the AELVO log file", "/log [lines]"),
     "version": ("Show version and environment info", "/version"),
@@ -154,19 +154,24 @@ async def handle_command(
     elif name == "models":
         _cmd_models(ctx)
     elif name == "provider":
-        from cli.providers import provider_table, switch_provider
+        from cli.providers import pick_provider, provider_table, switch_provider
         parts = arg.split(maxsplit=1)
         pname = parts[0].strip().lower() if parts else ""
         pkey = parts[1].strip() if len(parts) > 1 else ""
         if pname:
             await switch_provider(ctx, pname, pkey)
         else:
-            ctx.console.print(provider_table(ctx))
-            ctx.console.print(
-                Text("Switch with: /provider <name> [api-key]  ·  set a key with: /apikey <key>", style="aelvo.dim")
-            )
+            # Interactive: open the picker; cancel or non-tty falls back to the table.
+            picked = await pick_provider(ctx)
+            if picked:
+                await switch_provider(ctx, picked)
+            else:
+                ctx.console.print(provider_table(ctx))
+                ctx.console.print(
+                    Text("Switch with: /provider <name> [api-key]  ·  set a key with: /apikey <key>", style="aelvo.dim")
+                )
     elif name == "model":
-        _cmd_model(ctx, arg)
+        await _cmd_model(ctx, arg)
     elif name == "apikey":
         _cmd_apikey(ctx, arg)
     elif name == "log":
@@ -300,35 +305,37 @@ def _cmd_projects(ctx: CliContext) -> None:
 
 
 def _cmd_models(ctx: CliContext) -> None:
-    models: list = []
-    if ctx.provider_runtime is not None:
-        try:
-            models = ctx.provider_runtime.list_models() or []
-        except Exception as exc:
-            log.debug("provider_runtime.list_models failed: %s", exc)
-    if not models:
-        try:
-            from core.registry import MODEL_REGISTRY
+    """List models: the active provider's curated models, else provider defaults."""
+    from cli.providers import get_registry, list_models_for
 
-            models = list(MODEL_REGISTRY.keys())
-        except Exception as exc:
-            log.debug("MODEL_REGISTRY unavailable: %s", exc)
+    if ctx.provider_name:
+        models = list_models_for(ctx, ctx.provider_name)
+    else:
+        # No provider active: show each provider's default model.
+        models = [cfg.default_model for cfg in get_registry().values()]
     if not models:
-        ctx.console.print(Text("No model registry available.", style="aelvo.dim"))
+        ctx.console.print(Text("No models available — configure a provider first.", style="aelvo.dim"))
         return
     table = Table(title="Available models", title_style="aelvo.gold")
     table.add_column("Model", style="aelvo.snow")
+    table.add_column("Provider", style="aelvo.purple")
     for m in models:
-        table.add_row(str(m))
+        table.add_row(m, ctx.provider_name or "")
     ctx.console.print(table)
 
 
-def _cmd_model(ctx: CliContext, arg: str) -> None:
-    """Show the active model or switch it on the live agent."""
-    from cli.providers import list_models_for, write_env
+async def _cmd_model(ctx: CliContext, arg: str) -> None:
+    """Show the active model, or open the picker / switch it on the live agent."""
+    from cli.providers import list_models_for, pick_model
 
     name = arg.strip()
     if not name:
+        # Interactive: open the picker; cancel or non-tty falls back to a list.
+        if ctx.agent is not None and ctx.provider_name:
+            picked = await pick_model(ctx)
+            if picked:
+                _apply_model(ctx, picked)
+                return
         table = Table(title="Model", title_style="aelvo.gold")
         table.add_column("Key", style="aelvo.purple")
         table.add_column("Value", style="aelvo.snow")
@@ -349,7 +356,15 @@ def _cmd_model(ctx: CliContext, arg: str) -> None:
             Text("No active provider — set one first with /provider.", style="aelvo.err")
         )
         return
-    ctx.agent.model = name
+    _apply_model(ctx, name)
+
+
+def _apply_model(ctx: CliContext, name: str) -> None:
+    """Apply a model switch: live agent + ctx + .env + process env."""
+    from cli.providers import write_env
+
+    if ctx.agent is not None:
+        ctx.agent.model = name
     ctx.model = name
     write_env("LLM_MODEL", name)
     os.environ["LLM_MODEL"] = name

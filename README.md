@@ -144,8 +144,8 @@ Force-route to specific specialists with `@SPECIALIST` prefixes:
 | `/status` | Provider, model, workspace + live agent metrics |
 | `/projects` | List known workspaces |
 | `/models` | List available models |
-| `/provider [name] [key]` | List / switch the LLM provider and set an API key |
-| `/model [name]` | Show or switch the active model |
+| `/provider [name] [key]` | Open an interactive picker to switch the LLM provider (or `/provider <name> [key]` directly); missing keys are prompted and stored in the encrypted vault |
+| `/model [name]` | Open an interactive picker to switch the active model (or `/model <name>` directly) |
 | `/apikey <key>` | Store an API key for the current provider (encrypted vault) |
 | `/log [lines]` | Tail the AELVO log file |
 | `/version` | Show version and environment info |
