@@ -12,8 +12,6 @@ Exercises the full Mode B collaboration workflow:
   8. All events flow through runtime EventBus and UI bridge
 """
 
-import asyncio
-import pytest
 
 
 # ══════════════════════════════════════════════════════════════════════

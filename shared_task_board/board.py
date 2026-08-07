@@ -238,10 +238,21 @@ class SharedTaskBoard:
         task_id: str,
         result: Optional[Dict[str, Any]] = None,
     ) -> Task:
-        """Mark a REVIEWING task as COMPLETED with optional result."""
+        """Mark a task as COMPLETED with an optional result.
+
+        The state machine requires REVIEWING -> COMPLETED, so IN_PROGRESS
+        tasks are first auto-submitted for review (IN_PROGRESS -> REVIEWING)
+        before completing. Callers that finish work directly therefore don't
+        need to remember the intermediate review hop.
+        """
         task = self.get_task(task_id)
         if result:
             task.result = result
+        if task.status == TaskStatus.IN_PROGRESS:
+            self._transition_and_persist(
+                task, TaskStatus.REVIEWING,
+                reason="Auto-submitted for review (completion shortcut)",
+            )
         self._transition_and_persist(
             task, TaskStatus.COMPLETED,
             reason="Task completed successfully",

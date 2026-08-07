@@ -409,7 +409,6 @@ def _cmd_log(ctx: CliContext, arg: str) -> None:
 def _cmd_version(ctx: CliContext) -> None:
     """Show AELVO + environment version info."""
     import platform
-    import sys
 
     table = Table(title="AELVO environment", title_style="aelvo.gold")
     table.add_column("Key", style="aelvo.purple")

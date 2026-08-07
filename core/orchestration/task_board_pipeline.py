@@ -681,9 +681,7 @@ class TaskBoardPipeline:
 
             entry_id = sentinel.approve_implementation(
                 blackboard=blackboard,
-                implementation_summary=review_summary,
-                approved_by="SENTINEL",
-                notes="Mode B — security review with challenge workflow",
+                summary=review_summary,
             )
         else:
             entry_id = sentinel.reject_implementation(
@@ -1070,8 +1068,8 @@ class TaskBoardPipeline:
             terminus.publish_failure_report(
                 blackboard=blackboard,
                 command=picked_task.description[:100],
+                error_message=gate_message,
                 exit_code=-1,
-                stderr=gate_message,
                 task_id=task_id,
             )
             task_board.fail_task(

@@ -266,6 +266,13 @@ class TestTaskBoardPipelineExecution:
         # by the architect decision gate (no APPROVE decision)
         assert result is not None
 
+        # Regression: the gate-block failure must surface the gate message,
+        # NOT a TypeError from wrong kwargs on publish_failure_report.
+        joined_failures = " ".join(msg for _, msg in result.failures)
+        if joined_failures:
+            assert "TypeError" not in joined_failures
+            assert "Execution gate blocked" in joined_failures
+
     @pytest.mark.asyncio
     async def test_full_pipeline_produces_report(self, task_board_pipeline, task_board, blackboard):
         """Full pipeline produces a final report on the blackboard."""
@@ -332,6 +339,53 @@ class TestTaskBoardPipelineExecution:
             blackboard=blackboard,
         )
         assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_full_pipeline_no_phase_failures(
+        self, task_board_pipeline, task_board, blackboard,
+    ):
+        """Regression: research + implement + security + report completes with ZERO phase failures.
+
+        Previously every phase failed at ``task_board.complete_task`` (state machine
+        forbids IN_PROGRESS -> COMPLETED) and the SECURITY phase crashed calling
+        ``approve_implementation(implementation_summary=...)`` with wrong kwargs.
+        """
+        result = await task_board_pipeline.run(
+            user_input="@MODE_B research and implement a new auth handler with security review",
+            agent=MagicMock(),
+            conversation_history=[],
+            task_board=task_board,
+            blackboard=blackboard,
+        )
+        assert result is not None
+        assert result.success is True, f"pipeline failed: {result.failures}"
+        assert len(result.failures) == 0, f"unexpected phase failures: {result.failures}"
+
+        # SECURITY phase must have run and produced an approval entry.
+        phase_names = [p.value for p in result.phases_executed]
+        assert "security" in phase_names or "security_review" in phase_names
+        approvals = blackboard.read(slot_name="reviews")
+        assert len(approvals) >= 1
+
+        # Every created task must have reached a terminal state (no in_progress stragglers).
+        counts = task_board.count_by_status()
+        assert counts.get("completed", 0) >= 4, f"tasks not completed: {counts}"
+        assert counts.get("in_progress", 0) == 0, f"stuck in_progress tasks: {counts}"
+
+    def test_complete_task_from_in_progress_routes_through_review(self, task_board):
+        """Regression: complete_task() auto-routes IN_PROGRESS -> REVIEWING -> COMPLETED."""
+        from shared_task_board.task import TaskStatus, TaskType
+
+        task = task_board.create_task(task_type=TaskType.RESEARCH, title="T")
+        task_board.assign_task(task.id, specialist="ORACLE")
+        task_board.start_task(task.id)
+        assert task_board.get_task(task.id).status == TaskStatus.IN_PROGRESS
+
+        done = task_board.complete_task(task.id, result={"ok": True})
+        assert done.status == TaskStatus.COMPLETED
+        hops = [(h["from"], h["to"]) for h in done.history]
+        assert ("in_progress", "reviewing") in hops, hops
+        assert ("reviewing", "completed") in hops, hops
 
 
 # =========================================================================
