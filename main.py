@@ -1250,6 +1250,63 @@ async def main_async():
     aelvo_kernel.conn.close()
     memory_engine.db.close()
     return
+_LOG_FILE_PATH = os.path.join(os.path.dirname(__file__), ".aelvo_runtime", "aelvo.log")
+_QUIET_THIRD_PARTY_LOGGERS = (
+    "chromadb", "httpx", "httpcore", "openai", "anthropic", "urllib3",
+    "scrapy", "twisted", "playwright", "asyncio", "watchfiles",
+    "uvicorn", "websockets", "google.auth", "aiohttp",
+    "aiohttp.access", "aiohttp.server", "aiohttp.web",
+)
+
+
+def _resolve_console_level() -> int:
+    """Map ``AELVO_LOG_LEVEL`` to a logging level (default ERROR).
+
+    The console stays quiet by default so ``python main.py`` boots straight
+    into the UI without a wall of log lines. Set ``AELVO_LOG_LEVEL``
+    (e.g. ``info``/``debug``) to see verbose logs on the terminal.
+    """
+    raw = os.environ.get("AELVO_LOG_LEVEL", "").strip().upper()
+    if raw:
+        level = getattr(logging, raw, None)
+        if isinstance(level, int):
+            return level
+    return logging.ERROR
+
+
+def _configure_logging() -> None:
+    """Centralized logging setup: quiet console, full INFO+ diagnostics to file.
+
+    - Console handler emits ERROR+ by default (override with ``AELVO_LOG_LEVEL``).
+    - File handler captures everything INFO+ under ``.aelvo_runtime/aelvo.log``
+      (gitignored) so debugging info is never lost.
+    - Noisy third-party loggers (chromadb, httpx, openai, …) are silenced.
+    """
+    root = logging.getLogger()
+    fmt = logging.Formatter("%(asctime)s - [%(levelname)s] - %(name)s - %(message)s")
+
+    # File handler: full diagnostics, always INFO+.
+    try:
+        os.makedirs(os.path.dirname(_LOG_FILE_PATH), exist_ok=True)
+        file_handler = logging.FileHandler(_LOG_FILE_PATH, encoding="utf-8")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(fmt)
+    except Exception as _ex:
+        log.warning("Could not create log file %s: %s", _LOG_FILE_PATH, _ex)
+        file_handler = None
+
+    # Console handler: quiet by default (ERROR+), verbose on request.
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(_resolve_console_level())
+    console_handler.setFormatter(fmt)
+
+    root.handlers = [h for h in (file_handler, console_handler) if h is not None]
+    root.setLevel(logging.DEBUG)
+
+    for name in _QUIET_THIRD_PARTY_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 def main():
     # ── Argument Parsing ──
     import argparse
@@ -1258,6 +1315,8 @@ def main():
         description="AELVO is a web-based AI agent that plans and executes complex software engineering tasks using seven specialized sub-agents.",
         epilog="Example: python main.py --provider openai --model gpt-4"
     )
+    parser.add_argument("--log-level", type=str, default=None,
+                        help="Console log verbosity: debug|info|warning|error (default: error, quiet)")
     parser.add_argument("--provider", type=str, default=None, help="Select LLM provider (e.g., openai, anthropic, groq)")
     parser.add_argument("--model", type=str, default=None, help="Override model selection (e.g., gpt-4, claude-3-opus)")
     parser.add_argument("--project", type=str, default=None, help="Select workspace (default: most recently used)")
@@ -1269,6 +1328,9 @@ def main():
     parser.add_argument("--ask", type=str, default=None, help="CLI one-shot: run a single prompt and exit (implies --cli)")
     parser.add_argument("--web", action="store_true", help="Launch the web dashboard instead of the terminal CLI")
     args, _ = parser.parse_known_args()
+    if args.log_level:
+        os.environ["AELVO_LOG_LEVEL"] = args.log_level
+    _configure_logging()
     # Store parsed args in env for main_async to pick up
     if args.provider:
         os.environ["LLM_PROVIDER"] = args.provider

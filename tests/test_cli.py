@@ -45,6 +45,11 @@ def test_parse_command_aliases():
     assert parse_command("/cd")[0] == "workspace"
     assert parse_command("/open")[0] == "workspace"
     assert parse_command("/h")[0] == "help"
+    assert parse_command("/switch nvidia")[0] == "provider"
+    assert parse_command("/key sk-123")[0] == "apikey"
+    assert parse_command("/sysinfo")[0] == "version"
+    assert parse_command("/logs 20")[0] == "log"
+    assert parse_command("/model gpt-4o")[0] == "model"
 
 
 def test_unknown_command_returns_none():
@@ -211,6 +216,157 @@ def test_retry_returns_run_action():
     )
     ctx.state["last_prompt"] = "hello agent"
     assert asyncio.run(handle_command(ctx, "retry", "")) == ("run", "hello agent")
+
+
+# ── provider / model / apikey / log / version commands ──────────────────────
+
+from unittest.mock import MagicMock  # noqa: E402
+
+
+def test_provider_table_lists_registry():
+    from cli.providers import provider_table
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="nvidia", model="m",
+    )
+    themed = build_console()
+    with themed.capture() as cap:
+        themed.print(provider_table(ctx))
+    rendered = cap.get()
+    assert "openai" in rendered
+    assert "nvidia" in rendered
+    assert "active" in rendered
+
+
+def test_provider_switch_unknown_provider():
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+    )
+    result = asyncio.run(handle_command(ctx, "provider", "no_such_provider_xyz"))
+    assert result is None  # prints an error, no crash
+
+
+def test_provider_switch_builds_agent(monkeypatch):
+    from cli import providers
+
+    built = {}
+
+    def fake_build(provider_key, cfg, api_key, model, pr):
+        built["key"] = provider_key
+        built["api_key"] = api_key
+        agent = MagicMock()
+        agent.model = model
+        return agent
+
+    monkeypatch.setattr(providers, "build_agent", fake_build)
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: True)
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "")
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name=None, model=None,
+    )
+    asyncio.run(handle_command(ctx, "provider", "nvidia sk-test-123"))
+    assert ctx.provider_name == "nvidia"
+    assert ctx.agent is not None
+    assert built["key"] == "nvidia"
+    assert built["api_key"] == "sk-test-123"
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+
+def test_provider_switch_reuses_vault_key(monkeypatch):
+    from cli import providers
+
+    agent = MagicMock()
+    monkeypatch.setattr(providers, "build_agent", lambda *a, **k: agent)
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: True)
+    monkeypatch.setattr(providers, "_vault_key", lambda k: "sk-from-vault")
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+    )
+    asyncio.run(handle_command(ctx, "provider", "nvidia"))
+    assert ctx.provider_name == "nvidia"
+    assert ctx.agent is agent
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+
+def test_model_switch_updates_agent(monkeypatch):
+    from cli import providers
+
+    monkeypatch.setattr(providers, "write_env", lambda k, v: None)
+    agent = MagicMock()
+    agent.model = "old-model"
+    ctx = CliContext(
+        agent=agent, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="nvidia", model="old-model",
+    )
+    asyncio.run(handle_command(ctx, "model", "gpt-4o"))
+    assert ctx.model == "gpt-4o"
+    assert agent.model == "gpt-4o"
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+
+def test_model_requires_provider():
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+    )
+    result = asyncio.run(handle_command(ctx, "model", "gpt-4o"))
+    assert result is None  # prints an error, no crash
+
+
+def test_apikey_requires_provider():
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+    )
+    result = asyncio.run(handle_command(ctx, "apikey", "sk-123"))
+    assert result is None  # prints an error, no crash
+
+
+def test_apikey_stores_for_provider(monkeypatch):
+    from cli import providers
+
+    stored = {}
+    monkeypatch.setattr(
+        providers, "set_api_key", lambda ctx, key, value: stored.update(key=key, value=value) or True
+    )
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="nvidia", model=None,
+    )
+    asyncio.run(handle_command(ctx, "apikey", "sk-new-key"))
+    assert stored == {"key": "nvidia", "value": "sk-new-key"}
+
+
+def test_log_command_without_file():
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+    )
+    result = asyncio.run(handle_command(ctx, "log", ""))
+    assert result is None  # no crash
+
+
+def test_version_command_prints():
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="nvidia", model="m",
+    )
+    result = asyncio.run(handle_command(ctx, "version", ""))
+    assert result is None  # no crash
 
 
 # ── main.py --cli / --ask wiring ────────────────────────────────────────────

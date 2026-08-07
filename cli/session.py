@@ -74,7 +74,7 @@ class TerminalSession:
         self._live = Live(
             self._renderable(),
             console=self.console,
-            refresh_per_second=12,
+            refresh_per_second=8,  # lower than 12fps → less flicker during turns
             transient=False,
         )
         self._live.start()

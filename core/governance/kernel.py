@@ -16,7 +16,10 @@ try:
 except ImportError:
     chromadb = None
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+# NOTE: Do NOT call logging.basicConfig() at import time here. It hijacks the
+# root logger globally (every aelvo.* module then prints INFO to the console,
+# flooding the terminal when main.py boots). Logging is configured explicitly
+# by main.py (_configure_logging) — console quiet by default, INFO+ to a file.
 
 
 class LocalMemoryCollection:

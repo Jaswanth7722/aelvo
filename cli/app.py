@@ -64,6 +64,10 @@ def _print_banner(console, ctx: CliContext) -> None:
     console.print(
         Text(f"  workspace: {ctx.workspace_path}", style="aelvo.dim")
     )
+    if not ctx.provider_name:
+        console.print(
+            Text("  ⚠ no LLM provider — type /provider to configure one", style="aelvo.err")
+        )
     console.print()
 
 
@@ -96,6 +100,12 @@ def _make_completer() -> NestedCompleter:
             "/status": None,
             "/projects": None,
             "/models": None,
+            "/provider": None,
+            "/switch": None,
+            "/model": None,
+            "/apikey": None,
+            "/log": None,
+            "/version": None,
             "/retry": None,
             "/ask": None,
         }
@@ -123,6 +133,8 @@ def _make_prompt_session(ctx: CliContext) -> PromptSession:
         auto_suggest=AutoSuggestFromHistory(),
         complete_while_typing=True,
         multiline=True,
+        mouse_support=True,          # click to position the cursor / scroll history
+        enable_history_search=True,  # up-arrow searches through past prompts
     )
 
 
@@ -190,6 +202,8 @@ async def _run_turn(ctx: CliContext, user_input: str) -> None:
         recorder.save(ctx.db_path)
 
     if turn is None:
+        # Leave a blank line so the next prompt isn't glued to the activity feed.
+        ctx.console.print()
         return
 
     answer = (turn.get("output") or "").strip()
