@@ -430,7 +430,14 @@ class AelvoAgent:
             "first_call": 0,
             "hash_mismatch": 0,
             "ttl_expired": 0,
+            "mode_changed": 0,
         }
+
+        # Low effort mode (plain chat) uses a chat-only system prompt with NO
+        # tool protocol — so a tiny local model answers "hi" conversationally
+        # instead of emitting tool JSON. The orchestrator flips this before
+        # direct turns; _call_llm regenerates the cached prompt on change.
+        self.chat_only = False
 
         # Bounded HTTP timeouts. The SDKs default to a 600s request timeout
         # with 2 automatic retries — a slow/queued upstream (e.g. OpenRouter
@@ -480,6 +487,11 @@ class AelvoAgent:
             regen_reason = "first_call"
         elif getattr(self, "_last_hash", "") != current_hash:
             regen_reason = "hash_mismatch"
+        elif getattr(self, "_last_prompt_mode", "full") != ("chat" if self.chat_only else "full"):
+            # Low/chat mode is a DIFFERENT prompt from the full agent prompt.
+            # Flip mid-session (e.g. /mode low) must regenerate immediately,
+            # not serve the stale tool-heavy prompt from the cache.
+            regen_reason = "mode_changed"
         elif time.time() - getattr(self, "_cache_time", 0) > self._resolve_prompt_cache_ttl():
             regen_reason = "ttl_expired"
 
@@ -489,8 +501,11 @@ class AelvoAgent:
                 if m.get("role") == "user":
                     user_query = m.get("content", "")
                     break
-            self._cached_system_prompt = get_system_prompt(user_query)
+            self._cached_system_prompt = get_system_prompt(
+                user_query, chat_only=self.chat_only
+            )
             self._last_hash = current_hash
+            self._last_prompt_mode = "chat" if self.chat_only else "full"
             self._cache_time = time.time()
             self._record_prompt_cache_miss(regen_reason)
         else:

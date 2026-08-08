@@ -104,6 +104,37 @@ class TestPromptStructure:
         assert "what is this project" in prompt
         assert "Do not reply" in prompt
 
+    def test_chat_only_prompt_has_no_tool_protocol(self):
+        """The chat-only variant (low effort mode) must NOT contain the tool
+        protocol — a tiny model must answer "hi" conversationally instead of
+        emitting tool JSON."""
+        prompt = get_system_prompt(chat_only=True)
+        # It is a plain-chat prompt.
+        assert "LOW effort mode" in prompt
+        assert "CHAT MODE RULES" in prompt
+        # ZERO tool-call protocol: no JSON array instructions, no tools.
+        assert "JSON array" not in prompt
+        assert "tool_calls" not in prompt
+        assert "FORMAT 1" not in prompt
+        assert "list_files" not in prompt
+        assert "bash_exec" not in prompt
+        # Explicitly forbids emitting JSON/tool calls.
+        assert "NEVER output JSON" in prompt
+
+    def test_chat_only_prompt_still_has_context(self):
+        """The chat-only variant keeps the identity + workspace + date."""
+        prompt = get_system_prompt(chat_only=True)
+        assert "AELVO" in prompt
+        assert "Workspace Jail" in prompt
+        assert "CURRENT DATE & TIME" in prompt
+
+    def test_chat_only_does_not_leak_into_full_prompt(self):
+        """The default (full) prompt is unchanged — still tool-heavy."""
+        full = get_system_prompt()
+        chat = get_system_prompt(chat_only=True)
+        assert "FORMAT 1" in full and "FORMAT 1" not in chat
+        assert "JSON array" in full and "JSON array" not in chat
+
 
 class TestConfigurePaths:
     """configure_paths() updates where the prompt reads state and anchors."""

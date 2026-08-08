@@ -64,6 +64,49 @@ class TestSystemPromptCaching:
             agent._call_llm([{"role": "user", "content": "hello again"}])
             assert mock_get.call_count == 1, "Should NOT regenerate within TTL"
 
+    def test_chat_only_flip_regenerates_prompt(self, agent):
+        """Flipping chat_only (low mode) mid-session must regenerate the
+        prompt immediately — never serve the stale tool-heavy prompt."""
+        with patch("main.get_system_prompt") as mock_get:
+            def _side(user_query="", chat_only=False):
+                return "chat" if chat_only else "full"
+
+            mock_get.side_effect = _side
+
+            # Full prompt first (default chat_only=False).
+            agent._call_llm([{"role": "user", "content": "hi"}])
+            assert mock_get.call_count == 1
+            assert agent._cached_system_prompt == "full"
+
+            # Flip to low/chat mode → must regenerate with chat_only=True.
+            agent.chat_only = True
+            agent._call_llm([{"role": "user", "content": "hi"}])
+            assert mock_get.call_count == 2
+            assert agent._cached_system_prompt == "chat"
+            assert mock_get.call_args.kwargs.get("chat_only") is True
+
+            # Same mode again → cache hit.
+            agent._call_llm([{"role": "user", "content": "hi again"}])
+            assert mock_get.call_count == 2
+
+            # Flip back to full mode → regenerates to the full prompt.
+            agent.chat_only = False
+            agent._call_llm([{"role": "user", "content": "hi"}])
+            assert mock_get.call_count == 3
+            assert agent._cached_system_prompt == "full"
+
+    def test_chat_only_flip_tracks_mode_changed_reason(self, agent):
+        """The mode flip miss is recorded with reason 'mode_changed'."""
+        with patch("main.get_system_prompt") as mock_get:
+            mock_get.return_value = "prompt"
+            agent._call_llm([{"role": "user", "content": "a"}])  # first_call
+            agent.chat_only = True
+            agent._call_llm([{"role": "user", "content": "b"}])  # mode_changed
+
+        stats = agent.prompt_cache_stats()
+        assert stats["regen_reasons"]["mode_changed"] == 1
+        assert stats["regen_reasons"]["first_call"] == 1
+
     def test_cache_regenerates_after_ttl(self, agent):
         """After TTL expires, the cache is regenerated."""
         agent.SYSTEM_PROMPT_CACHE_TTL = 0.1  # 100 ms

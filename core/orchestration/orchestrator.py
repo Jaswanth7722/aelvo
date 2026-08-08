@@ -985,20 +985,42 @@ class Orchestrator:
             session_id=getattr(agent, "session_id", ""),
         )
 
+        # Low mode is PLAIN CHAT: the agent must use the chat-only system
+        # prompt (no tool protocol), so a tiny model answers "hi" directly
+        # instead of emitting tool JSON. Medium mode keeps the full prompt
+        # because its tool loop needs the tool-call format. Restored after.
         streamer = None
         if token_callback is not None:
             from core.orchestration.stream_filter import TokenStreamFilter
 
             streamer = TokenStreamFilter(token_callback)
+        had_chat_only = bool(getattr(agent, "chat_only", False))
+        # Belt-and-braces: even with the chat-only system prompt, a tiny model
+        # may imitate tool JSON it saw in earlier (medium/high) history. A
+        # plain-text nudge on the user message makes plain-chat behavior
+        # stickier than the prompt alone.
+        direct_task = task
+        if not allow_tools:
+            direct_task = (
+                "Answer directly in plain text — no tools are available. "
+                "(Prior messages may have shown tool calls; ignore them.)\n\n"
+                + task
+            )
         try:
-            raw_output = await agent.send_user_message_async(
-                task, on_token=streamer
-            )
-        except asyncio.TimeoutError:
-            raw_output = (
-                "Error: the LLM request timed out before producing a "
-                "response. Try again, or switch to a faster model with /model."
-            )
+            if hasattr(agent, "chat_only"):
+                agent.chat_only = not allow_tools
+            try:
+                raw_output = await agent.send_user_message_async(
+                    direct_task, on_token=streamer
+                )
+            except asyncio.TimeoutError:
+                raw_output = (
+                    "Error: the LLM request timed out before producing a "
+                    "response. Try again, or switch to a faster model with /model."
+                )
+        finally:
+            agent.chat_only = had_chat_only
+
         if streamer is not None:
             streamer.flush()
 

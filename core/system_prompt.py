@@ -44,10 +44,46 @@ def configure_paths(db_path=None, anchor_path=None, workspace_path=None):
         WORKSPACE_PATH = workspace_path
 
 
-def get_system_prompt(user_query=""):
-    """Generate system prompt with live date, anchor constraints, and kernel state."""
+def _chat_only_prompt(now, workspace) -> str:
+    """A plain conversational system prompt for low effort mode.
+
+    The full agent prompt is tool-heavy — its FORMAT 1 section instructs the
+    model to "output a JSON array of tool calls", which even a tiny local
+    model dutifully does for a plain "hi". Low mode is plain chat, so it gets
+    a prompt with ZERO tool protocol: the model is told to answer directly in
+    plain text and never emit JSON, which makes "hi" produce a real greeting
+    instead of a "tools are disabled" fallback.
+    """
+    return f"""You are AELVO, a friendly, direct AI assistant running on the user's local machine.
+You are currently in LOW effort mode: plain chat with no tools.
+
+**SYSTEM CONTEXT**:
+- Workspace Jail: {os.path.abspath(workspace)}
+
+**CURRENT DATE & TIME**: {now.strftime('%Y-%m-%d %H:%M')} (today)
+
+**CHAT MODE RULES**:
+1. Reply directly in plain conversational text — like a helpful chat assistant.
+2. NEVER output JSON, tool calls, or code blocks unless the user explicitly asks for code.
+3. You have NO tools available in this mode. Do not mention tools, do not offer to
+   use them, and do not try to call them.
+4. Be concise, warm, and genuinely helpful. Answer the user's question.
+"""
+
+
+def get_system_prompt(user_query="", *, chat_only: bool = False):
+    """Generate system prompt with live date, anchor constraints, and kernel state.
+
+    ``chat_only=True`` returns the plain-chat variant used by low effort mode
+    (no tool protocol — the model answers conversationally instead of emitting
+    tool JSON for trivial queries).
+    """
     now = datetime.datetime.now()
     yesterday = now - timedelta(days=1)
+
+    # --- CHAT-ONLY VARIANT (low effort mode) ---
+    if chat_only:
+        return _chat_only_prompt(now, WORKSPACE_PATH)
 
     # --- KERNEL ANCHOR & STATE (The "Active" Consciousness) ---
     # We only inject LOCKED constraints and active state.

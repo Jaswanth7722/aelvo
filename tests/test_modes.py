@@ -136,6 +136,8 @@ class _FakeAgent:
         self.calls: list = []
         self.conversation_history: list = []
         self.session_id = "s1"
+        # Mirrors AelvoAgent.chat_only — the direct turn flips it.
+        self.chat_only = False
 
     def feed_result(self, outcome):
         pass
@@ -164,6 +166,15 @@ def _make_direct_orch():
 def test_direct_turn_low_returns_plain_answer():
     orch = _make_direct_orch()
     agent = _FakeAgent("hi there!")
+    seen_chat_only = []
+    seen_msg = []
+
+    async def _record_call(msg, on_token=None):
+        seen_chat_only.append(agent.chat_only)
+        seen_msg.append(msg)
+        return agent.reply
+
+    agent.send_user_message_async = _record_call
     result = asyncio.run(
         orch._execute_direct_turn(
             agent, "hi", "t1", allow_tools=False,
@@ -178,8 +189,37 @@ def test_direct_turn_low_returns_plain_answer():
     # Dict-shape parity with the pipeline path (web bridge indexes this).
     assert result["pipeline_result"] is None
     assert result["architect_plan_used"] is False
-    # Exactly one direct LLM call — no follow-ups, no tool loop.
-    assert agent.calls == ["hi"]
+    # Low mode ran with the chat-only system prompt flag on, then restored it.
+    assert seen_chat_only == [True]
+    assert agent.chat_only is False  # restored after the turn
+    # The plain-text nudge is prepended (belt-and-braces vs history priming)
+    # but the original query is still passed through.
+    assert "Answer directly in plain text" in seen_msg[0]
+    assert seen_msg[0].endswith("hi")
+
+
+def test_direct_turn_medium_keeps_full_prompt_flag():
+    """Medium mode must NOT flip chat_only (its tool loop needs the full
+    tool-call prompt)."""
+    orch = _make_direct_orch()
+    agent = _FakeAgent('[{"tool": "bash_exec", "args": {"command": "ls"}}]')
+    seen_chat_only = []
+
+    async def _record_call(msg, on_token=None):
+        seen_chat_only.append(agent.chat_only)
+        return agent.reply
+
+    agent.send_user_message_async = _record_call
+    result = asyncio.run(
+        orch._execute_direct_turn(
+            agent, "list files", "t1", allow_tools=True,
+            session_tracker=None, tui_session=None,
+            stream_callback=None, token_callback=None,
+            mcp_cli=None, db_path=":memory:",
+        )
+    )
+    assert result["output"] == "tooled answer"
+    assert seen_chat_only == [False]  # full prompt during medium turns
 
 
 def test_direct_turn_low_extracts_respond_message():
