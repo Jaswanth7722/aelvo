@@ -27,7 +27,7 @@ import asyncio
 import os
 import platform
 
-__version__ = "2.1.0"
+from cli.version import __version__
 
 
 def parse_args(argv=None) -> argparse.Namespace:

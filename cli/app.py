@@ -68,6 +68,16 @@ def _print_banner(console, ctx: CliContext) -> None:
         console.print(
             Text("  ⚠ no LLM provider — type /provider to configure one", style="aelvo.err")
         )
+    # Non-blocking update reminder: cache-only (refresh=False), so boot never
+    # touches the network — /version does the live registry check.
+    try:
+        from cli.update_check import reminder
+
+        hint = reminder(refresh=False)
+        if hint:
+            console.print(Text(hint, style="aelvo.gold"))
+    except Exception:
+        pass
     console.print()
 
 

@@ -17,9 +17,11 @@ A handler returns an optional ``(action, payload)`` tuple the REPL acts on:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import sys
 from typing import Any, Optional, Tuple
 
 from rich.table import Table
@@ -164,7 +166,7 @@ async def handle_command(
     elif name == "log":
         _cmd_log(ctx, arg)
     elif name == "version":
-        _cmd_version(ctx)
+        await _cmd_version(ctx)
     elif name == "retry":
         last = ctx.state.get("last_prompt", "")
         if not last:
@@ -323,13 +325,16 @@ def _cmd_log(ctx: CliContext, arg: str) -> None:
         ctx.console.print(Text(line.rstrip("\n"), style="aelvo.dim"))
 
 
-def _cmd_version(ctx: CliContext) -> None:
-    """Show AELVO + environment version info."""
+async def _cmd_version(ctx: CliContext) -> None:
+    """Show AELVO + environment version info (live update check in the REPL)."""
     import platform
+
+    from cli.version import __version__
 
     table = Table(title="AELVO environment", title_style="aelvo.gold")
     table.add_column("Key", style="aelvo.purple")
     table.add_column("Value", style="aelvo.snow")
+    table.add_row("AELVO CLI", __version__)
     table.add_row("Python", platform.python_version())
     table.add_row("Platform", platform.platform())
     table.add_row("Provider", ctx.provider_name or "not configured")
@@ -343,3 +348,16 @@ def _cmd_version(ctx: CliContext) -> None:
         except Exception:
             table.add_row(mod_name, "not installed")
     ctx.console.print(table)
+
+    # Live npm update check — interactive sessions only, so piped runs
+    # (tests, CI) stay hermetic and never touch the network. The registry
+    # fetch runs in a worker thread so the async REPL loop never blocks.
+    try:
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            from cli.update_check import reminder
+
+            hint = await asyncio.to_thread(reminder, refresh=True)
+            if hint:
+                ctx.console.print(Text(hint, style="aelvo.gold"))
+    except Exception:
+        pass

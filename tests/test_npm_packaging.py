@@ -22,7 +22,7 @@ def test_package_json_exists_and_names_bin():
         pkg = json.load(f)
 
     assert pkg["name"].lower() == "aelvo"
-    assert pkg["version"] == "2.2.1"
+    assert pkg["version"] == "2.3.0"
     bins = pkg.get("bin", {})
     # The activation word the user asked for — case-insensitive npm lookup
     # resolves `npm install -g Aelvo` to the published `aelvo` package.
