@@ -230,12 +230,14 @@ default interface; add `--no-browser` to run the server headless.
 ## Example Workflow
 
 ```text
-$ python main.py
-AELVO — the automated engineering & logic-verification agent
+$ cd ~/projects/my-app          # open any folder — no workspace setup needed
+$ Aelvo
+AELVO
 ────────────────────────────────────────────────────────────────
-  project: default   provider: nvidia   model: nvidia/nemotron-3-super
-  workspace: D:/aelvo/workspace/default
+  project: my-app   provider: nvidia   model: nvidia/nemotron-3-super
+  folder: C:/Users/you/projects/my-app
 
+type /help for commands · Esc+Enter for a newline · Ctrl+C to exit
 ❯ Fix the race condition in the worker pool module
 
 [Thinking] ⠋
@@ -257,6 +259,17 @@ AELVO — the automated engineering & logic-verification agent
 [AELVO] Fixed the race condition in worker_pool.py by replacing the
 shared mutable state with an asyncio.Queue and adding proper worker
 lifecycle management. The fix was verified with type checks and tests.
+```
+
+AELVO never litters your project — all per-folder state lives in a hidden
+`.aelvo/` directory inside the opened folder, so `git status` stays clean:
+
+```text
+$ ls -a ~/projects/my-app
+.  ..  .aelvo  worker_pool.py
+
+$ ls ~/projects/my-app/.aelvo
+anchor.md    backups/    history    memory.db
 ```
 
 ---
