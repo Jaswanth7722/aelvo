@@ -139,9 +139,19 @@ def _merge_models(provider_key: str, curated: list, live: list) -> list:
     OpenRouter's live list is huge, so only its known vendor-prefixed routing
     families are appended; other providers are capped at ``_MAX_LIVE_EXTRAS``
     fresh ids as a safety net.
+
+    For local runtimes the live list is authoritative — it is literally what
+    the local server has installed. Curated catalog entries that are NOT in
+    the live list are dropped, so the picker never offers a model that would
+    404 on selection (e.g. ``ollama`` curated ``llama3.2`` while only
+    ``qwen2.5-coder:0.5b`` is pulled).
     """
-    if (provider_key or "").lower() == "openrouter":
+    key = (provider_key or "").lower()
+    if key == "openrouter":
         live = [m for m in live if m.startswith(_OPENROUTER_PREFIXES)]
+    if _is_local(key):
+        installed = set(live)
+        curated = [m for m in curated if m in installed]
     seen = set(curated)
     merged = list(curated)
     for m in live:

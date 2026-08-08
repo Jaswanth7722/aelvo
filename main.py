@@ -69,12 +69,16 @@ from runtime_next.monitoring.dashboard import RuntimeDashboard
 
 log = logging.getLogger(__name__)
 
-def _format_llm_error(exc: Exception) -> str:
+def _format_llm_error(exc: Exception, *, provider_name: str = "", model: str = "") -> str:
     """Turn a raw provider exception into a short, human-readable line.
 
     Provider SDKs (openai/anthropic) raise exceptions that embed the full
     HTTP error JSON; printing that raw text buries the actionable detail.
     Map the common status codes to a clear message and keep the rest short.
+
+    ``provider_name``/``model`` let local-runtime errors (ollama / LM Studio /
+    vLLM / llama.cpp) say exactly how to fix a missing model: the most common
+    cause of a 404 there is a model that was never pulled/loaded.
     """
     status = getattr(exc, "status_code", None)
     if status == 429:
@@ -87,6 +91,18 @@ def _format_llm_error(exc: Exception) -> str:
         return ("the provider rejected the request for billing reasons "
                 "(HTTP 402). Check your account balance with the provider.")
     if status == 404:
+        local_hint = {
+            "ollama": "pull it with: ollama pull <model>",
+            "lm_studio": "load the model in LM Studio first",
+            "vllm": "serve the model from your vLLM server first",
+            "llama_cpp": "load the model in llama.cpp first",
+        }.get((provider_name or "").lower())
+        if local_hint:
+            return (
+                f"the model '{model or '?'}' is not installed on your local "
+                f"runtime (HTTP 404) — {local_hint}, then retry or pick a "
+                "model from the /model list."
+            )
         return ("the model was not found (HTTP 404). Verify the model id with "
                 "/model.")
     msg = getattr(exc, "message", None) or str(exc)
@@ -549,7 +565,9 @@ class AelvoAgent:
                         log.error("OpenAI response contained no choices")
             except Exception as e:
                 log.error("OpenAI/OpenRouter request failed: %s", e)
-                raise RuntimeError(_format_llm_error(e)) from e
+                raise RuntimeError(_format_llm_error(
+                    e, provider_name=self.provider_name, model=self.model,
+                )) from e
 
         elif self.sdk_type == "anthropic":
             # Anthtopic handles system separately
