@@ -86,10 +86,7 @@ class AelvoFileSystem:
     def _invoke_rust_sandbox(self, action: str, write_mode: bool, params: dict) -> dict:
         """Invoke the compiled Rust sandbox core binary with a JSON-RPC request."""
         # Locate the compiled Rust sandbox executable
-        binary_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
-            "sandbox_core", "target", "release", "sandbox_core.exe"
-        )
+        binary_path = self._sandbox_binary_path()
         
         request_data = {
             "action": action,
@@ -133,9 +130,19 @@ class AelvoFileSystem:
     def _validate_path(self, user_path: str, read_only: bool = False) -> Path:
         """Validate and resolve a path through the Rust Sandbox's path jailing.
 
-        FAILS CLOSED: if the Rust sandbox is unavailable or returns an error,
-        we raise a SecurityError rather than falling back to local resolution.
+        Security model:
+        - If the Rust sandbox binary is present and answers, its decision is
+          authoritative: policy denials (traversal, containment violations,
+          unknown actions) fail CLOSED and raise PermissionError.
+        - If the binary is MISSING entirely (fresh clone without a Rust
+          toolchain), fall back to a pure-Python jail check that mirrors the
+          Rust policy (reject ``..`` / URL-encoded traversal, null bytes, and
+          anything outside the workspace jail). This keeps the agent usable
+          on machines where the sandbox was never compiled.
         """
+        if not os.path.exists(self._sandbox_binary_path()):
+            return self._validate_path_python(user_path)
+
         params = {"path": user_path}
         res = self._invoke_rust_sandbox("resolve_path", False, params)
         if res.get("success"):
@@ -146,10 +153,65 @@ class AelvoFileSystem:
                     resolved = resolved[4:]
                 return Path(resolved)
 
-        # Fail closed: if sandbox binary is unavailable or validation fails,
+        # Fail closed: if the sandbox binary is present but validation fails,
         # we deny the operation rather than silently falling back.
         msg = res.get("logs", "Sandbox unavailable")
         raise PermissionError(f"Path validation denied by sandbox: {msg}")
+
+    def _sandbox_binary_path(self) -> str:
+        """Absolute path of the compiled Rust sandbox executable."""
+        return os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "sandbox_core", "target", "release", "sandbox_core.exe",
+        )
+
+    def _validate_path_python(self, user_path: str) -> Path:
+        """Pure-Python path jail used only when the Rust sandbox is absent.
+
+        Mirrors sandbox_core's policy for path validation:
+        - reject empty/whitespace-only paths
+        - reject ``..`` and URL-encoded traversal (``%2e%2e``, ``..%2f``, …)
+        - reject null bytes
+        - the resolved path must live inside the workspace jail
+        """
+        if not user_path or not user_path.strip():
+            raise PermissionError(
+                f"Path validation denied by sandbox: Path is empty: {user_path!r}"
+            )
+        lower = user_path.lower()
+        if (
+            ".." in lower
+            or "%2e%2e" in lower
+            or "..%2f" in lower
+            or "..%5c" in lower
+        ):
+            raise PermissionError(
+                f"Path validation denied by sandbox: Path traversal detected in {user_path!r}"
+            )
+        if "\0" in user_path:
+            raise PermissionError(
+                "Path validation denied by sandbox: Path contains null byte."
+            )
+
+        candidate = Path(user_path)
+        if not candidate.is_absolute():
+            candidate = self.base_path / candidate
+        try:
+            resolved = candidate.resolve()
+        except Exception as exc:
+            raise PermissionError(
+                f"Path validation denied by sandbox: cannot resolve {user_path!r}: {exc}"
+            )
+
+        # Containment: the resolved path must stay inside the jail.
+        jail = self.base_path.resolve()
+        if not (
+            resolved == jail or jail in resolved.parents
+        ):
+            raise PermissionError(
+                f"Path validation denied by sandbox: {resolved} escapes the jail {jail}"
+            )
+        return resolved
 
     def chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> list:
         chunks = []

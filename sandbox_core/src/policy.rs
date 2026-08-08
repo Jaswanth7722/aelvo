@@ -140,8 +140,12 @@ impl PolicyEngine {
     /// Evaluate a complete action request against policy.
     pub fn evaluate(&self, req: &Request, jail: &FsJail) -> PolicyDecision {
         match req.action.as_str() {
-            "read_file" | "read_file_range" | "grep_file" => {
-                // Read operations: path must be within jail
+            "read_file" | "read_file_range" | "grep_file"
+            | "resolve_path" | "list_directory" => {
+                // Read/path-resolution operations: the resolved path must stay
+                // within the jail. resolve_path/list_directory only canonicalize
+                // and verify a path (no data is read), so they are treated the
+                // same as read operations for policy purposes.
                 let path = req.params.get("path")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
@@ -438,5 +442,43 @@ mod tests {
             .join("evil.exe");
         let d = e.evaluate_path_operation(outside.to_str().unwrap(), jail, false);
         assert!(!d.is_allowed(), "outside path must be denied");
+    }
+
+    #[test]
+    fn resolve_path_and_list_directory_are_allowed_in_jail() {
+        let tj = make_jail();
+        let jail = &tj.jail;
+        let e = engine();
+        for action in ["resolve_path", "list_directory"] {
+            let req = crate::Request {
+                action: action.to_string(),
+                workspace_root: jail.workspace_root().to_string_lossy().to_string(),
+                repo_root: jail.workspace_root().to_string_lossy().to_string(),
+                write_mode: false,
+                params: serde_json::json!({ "path": "." }),
+            };
+            let d = e.evaluate(&req, jail);
+            assert!(
+                d.is_allowed(),
+                "expected {action} allowed for in-jail path: {}",
+                d.reason()
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_path_rejects_traversal() {
+        let tj = make_jail();
+        let jail = &tj.jail;
+        let e = engine();
+        let req = crate::Request {
+            action: "resolve_path".to_string(),
+            workspace_root: jail.workspace_root().to_string_lossy().to_string(),
+            repo_root: jail.workspace_root().to_string_lossy().to_string(),
+            write_mode: false,
+            params: serde_json::json!({ "path": "../etc/passwd" }),
+        };
+        let d = e.evaluate(&req, jail);
+        assert!(!d.is_allowed(), "resolve_path traversal must be denied");
     }
 }

@@ -1336,28 +1336,45 @@ _QUIET_THIRD_PARTY_LOGGERS = (
 
 
 def _resolve_console_level() -> int:
-    """Map ``AELVO_LOG_LEVEL`` to a logging level (default ERROR).
+    """Map ``AELVO_LOG_LEVEL`` to a logging level (default CRITICAL).
 
-    The console stays quiet by default so ``python main.py`` boots straight
-    into the UI without a wall of log lines. Set ``AELVO_LOG_LEVEL``
-    (e.g. ``info``/``debug``) to see verbose logs on the terminal.
+    The console stays fully quiet by default so ``python main.py`` boots
+    straight into the UI with zero log noise (the TUI renders its own
+    status/output). All diagnostics still go to the log file at INFO+.
+    Set ``AELVO_LOG_LEVEL`` (e.g. ``info``/``debug``/``error``) to see
+    verbose logs on the terminal.
     """
     raw = os.environ.get("AELVO_LOG_LEVEL", "").strip().upper()
     if raw:
         level = getattr(logging, raw, None)
         if isinstance(level, int):
             return level
-    return logging.ERROR
+    return logging.CRITICAL
 
 
 def _configure_logging() -> None:
     """Centralized logging setup: quiet console, full INFO+ diagnostics to file.
 
-    - Console handler emits ERROR+ by default (override with ``AELVO_LOG_LEVEL``).
+    - Console handler emits CRITICAL+ by default (override with ``AELVO_LOG_LEVEL``).
     - File handler captures everything INFO+ under ``.aelvo_runtime/aelvo.log``
       (gitignored) so debugging info is never lost.
     - Noisy third-party loggers (chromadb, httpx, openai, …) are silenced.
+    - The deprecated ``google.generativeai`` package's FutureWarning banner
+      is filtered so it never corrupts the TUI.
     """
+    import warnings as _warnings
+
+    # The deprecated google.generativeai package emits a FutureWarning at
+    # import time; the google provider will migrate to google.genai. Filter
+    # the banner so it never corrupts the interactive TUI.
+    _warnings.filterwarnings(
+        "ignore",
+        # The warning text is dedented and starts with newlines, and
+        # ``re.match`` anchors at the string start — so allow leading
+        # whitespace before matching the deprecation banner.
+        message=r"\s*All support for the .*google\.generativeai.*package has ended.*",
+        category=FutureWarning,
+    )
     root = logging.getLogger()
     fmt = logging.Formatter("%(asctime)s - [%(levelname)s] - %(name)s - %(message)s")
 
@@ -1392,7 +1409,7 @@ def main():
         epilog="Example: python main.py --provider openai --model gpt-4"
     )
     parser.add_argument("--log-level", type=str, default=None,
-                        help="Console log verbosity: debug|info|warning|error (default: error, quiet)")
+                        help="Console log verbosity: debug|info|warning|error (default: critical, fully quiet)")
     parser.add_argument("--provider", type=str, default=None, help="Select LLM provider (e.g., openai, anthropic, groq)")
     parser.add_argument("--model", type=str, default=None, help="Override model selection (e.g., gpt-4, claude-3-opus)")
     parser.add_argument("--project", type=str, default=None, help="Select workspace (default: most recently used)")

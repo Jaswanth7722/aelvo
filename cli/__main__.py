@@ -70,7 +70,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument(
         "--log-level",
         default="",
-        help="console log verbosity: debug|info|warning|error (default: error)",
+        help="console log verbosity: debug|info|warning|error (default: critical, fully quiet)",
     )
     parser.add_argument(
         "--list-providers",

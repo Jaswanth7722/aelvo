@@ -94,3 +94,76 @@ def test_cli_workspace_argument():
     with patch("main.main_async", mock_async):
         main.main()
         assert mock_async.called
+
+
+# ==============================================================================
+# Logging: the console must stay fully quiet by default
+# ==============================================================================
+
+def test_console_level_defaults_to_critical(monkeypatch):
+    """Console log level defaults to CRITICAL so the TUI shows zero log noise.
+
+    Regression: the console handler previously defaulted to ERROR, which
+    spilled ``[ERROR] ... aelvo.orchestrator - Tool ... failed`` lines into
+    the interactive prompt_toolkit UI on every tool hiccup.
+    """
+    monkeypatch.delenv("AELVO_LOG_LEVEL", raising=False)
+    assert main._resolve_console_level() == logging.CRITICAL
+
+
+def test_console_level_respects_env_override(monkeypatch):
+    """AELVO_LOG_LEVEL still opts into verbose console logging."""
+    monkeypatch.setenv("AELVO_LOG_LEVEL", "debug")
+    assert main._resolve_console_level() == logging.DEBUG
+    monkeypatch.setenv("AELVO_LOG_LEVEL", "error")
+    assert main._resolve_console_level() == logging.ERROR
+
+
+def test_console_level_ignores_bad_env(monkeypatch):
+    """Invalid AELVO_LOG_LEVEL values fall back to the quiet default."""
+    monkeypatch.setenv("AELVO_LOG_LEVEL", "banana")
+    assert main._resolve_console_level() == logging.CRITICAL
+
+
+def test_configure_logging_keeps_file_and_silences_console(monkeypatch, tmp_path):
+    """_configure_logging must keep full file diagnostics while the console
+    handler stays at CRITICAL — so ERROR records reach the log file only."""
+    import logging as _logging
+
+    # Point the file log into a temp dir and reconfigure.
+    monkeypatch.setattr(main, "_LOG_FILE_PATH", str(tmp_path / "aelvo.log"))
+    monkeypatch.delenv("AELVO_LOG_LEVEL", raising=False)
+
+    captured = []
+    original_handler = _logging.StreamHandler
+
+    class _CaptureStreamHandler(original_handler):
+        def emit(self, record):
+            captured.append(record)
+            super().emit(record)
+
+    monkeypatch.setattr(_logging, "StreamHandler", _CaptureStreamHandler)
+
+    main._configure_logging()
+
+    root = _logging.getLogger()
+    file_h = next((h for h in root.handlers if isinstance(h, _logging.FileHandler)), None)
+    # FileHandler subclasses StreamHandler, so pick the non-file stream handler.
+    console = next(
+        (h for h in root.handlers
+         if isinstance(h, _logging.StreamHandler) and not isinstance(h, _logging.FileHandler)),
+        None,
+    )
+
+    assert file_h is not None, "file handler must exist"
+    assert file_h.level <= _logging.INFO, "file handler must capture INFO+"
+    assert console is not None, "console handler must exist"
+    assert console.level == _logging.CRITICAL, "console handler must be CRITICAL"
+
+    # An ERROR record must reach the FILE but NOT the console handler.
+    probe = _logging.LogRecord(
+        name="aelvo.orchestrator", level=_logging.ERROR,
+        pathname=__file__, lineno=1, msg="probe", args=(), exc_info=None,
+    )
+    assert console.level > probe.levelno, "console would show ERROR — too loud"
+    assert file_h.level <= probe.levelno, "file would drop ERROR — too quiet"

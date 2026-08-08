@@ -464,8 +464,111 @@ async def test_execute_turn_returns_expected_structure(shared_orchestrator, mock
 
 
 # ==============================================================================
-# Test 11: MemoryEngine.execute_turn() is NOT called during unified path
+# Test 12: search_memory with hits + tui_session must not crash on emit_memory
 # ==============================================================================
+
+class _FakeTuiSession:
+    """Minimal stand-in for the CLI TUI session used by the orchestrator.
+
+    Records the events the orchestrator emits so tests can assert on them
+    without a real prompt_toolkit app.
+    """
+
+    def __init__(self):
+        self.tool_events = []
+        self.memory_events = []
+        self.system_msgs = []
+
+    async def emit_tool(self, event_type, tool_name, args_display, status, exit_code=0):
+        self.tool_events.append((str(event_type), tool_name, args_display, status, exit_code))
+
+    async def emit_memory(self, event_type, mem_type, query, count, score):
+        self.memory_events.append((str(event_type), mem_type, query, count, score))
+
+    async def emit_system(self, msg):
+        self.system_msgs.append(msg)
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.asyncio
+async def test_search_memory_emit_path_does_not_crash(shared_orchestrator, monkeypatch):
+    """A successful search_memory with hits must not raise 'str' has no 'get'.
+
+    Regression: the emit_memory branch formatted the query via
+    ``str(tool_args).get("query", "")`` — str() of a dict yields a plain
+    string, so ``.get`` crashed with ``'str' object has no attribute 'get'``
+    right after a successful search (seen in production logs).
+    """
+    # Register a search_memory that returns hits so the emit_memory branch runs.
+    def _mock_search_with_hits(query="", **kwargs):
+        return {
+            "status": "success",
+            "logs": f"Searched: {query}",
+            "executed": {"retrieved_ids": ["mem1", "mem2"], "hit_count": 2},
+        }
+
+    monkeypatch.setitem(
+        shared_orchestrator.memory_engine.tools, "search_memory",
+        {"fn": _mock_search_with_hits},
+    )
+
+    tui = _FakeTuiSession()
+    raw_output = json.dumps([
+        {"tool": "search_memory", "args": {"query": "greeting preferences"}},
+        {"tool": "respond", "args": {"message": "Done."}},
+    ])
+
+    final = await shared_orchestrator._execute_tool_loop(
+        MockAgent(), raw_output, tui_session=tui,
+    )
+
+    assert "Done" in final
+    # emit_memory must have been called with the actual query string.
+    memory_queries = [e[2] for e in tui.memory_events]
+    assert "greeting preferences" in memory_queries, tui.memory_events
+    assert any(e[3] == 2 for e in tui.memory_events), tui.memory_events
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.asyncio
+async def test_search_memory_with_string_args_does_not_crash(shared_orchestrator, monkeypatch):
+    """search_memory with args passed as a JSON string must degrade gracefully.
+
+    Some LLMs emit tool args as a JSON string instead of an object. The tool
+    loop must not raise AttributeError when formatting the emit_memory query
+    (the fix: never call ``.get`` on the ``str()`` of the args dict).
+    """
+    def _mock_search_with_hits(query="", **kwargs):
+        return {
+            "status": "success",
+            "logs": f"Searched: {query}",
+            "executed": {"retrieved_ids": ["mem1"], "hit_count": 1},
+        }
+
+    monkeypatch.setitem(
+        shared_orchestrator.memory_engine.tools, "search_memory",
+        {"fn": _mock_search_with_hits},
+    )
+
+    tui = _FakeTuiSession()
+    # Properly double-encoded: args is a JSON *string* holding the object.
+    raw_output = json.dumps([
+        {
+            "tool": "search_memory",
+            "args": json.dumps({"query": "greeting preferences"}),
+        },
+        {"tool": "respond", "args": {"message": "Done."}},
+    ])
+
+    final = await shared_orchestrator._execute_tool_loop(
+        MockAgent(), raw_output, tui_session=tui,
+    )
+
+    # The loop must complete without raising; a string arg either executes
+    # with a formatted fallback query or fails gracefully — never a crash.
+    assert isinstance(final, str)
+    assert len(tui.tool_events) >= 1, tui.tool_events
+
 
 @pytest.mark.timeout(30)
 @pytest.mark.asyncio

@@ -137,3 +137,87 @@ def test_set_base_path_rejects_missing_and_files(sandbox_env):
     assert os.path.normcase(str(fs.base_path)) == os.path.normcase(
         os.path.abspath(env["folder_a"])
     )
+
+
+@pytest.mark.skipif(
+    not os.path.exists(SANDBOX_BINARY),
+    reason="Rust sandbox binary not built (run cargo build in sandbox_core)",
+)
+def test_resolve_path_action_allowed_by_policy(sandbox_env):
+    """resolve_path must be accepted by the sandbox policy.
+
+    Regression: policy.rs had no rule for the ``resolve_path``/``list_directory``
+    actions, so every file tool that validated its path (list_files, hash_file,
+    python_exec, project_tree) failed with:
+        Policy denied: Unknown action 'resolve_path'. No policy rule applies.
+    """
+    env = sandbox_env
+    fs = AelvoFileSystem(base_path=env["folder_a"], kernel=env["kernel"])
+
+    # _validate_path routes through resolve_path — must succeed now.
+    resolved = fs._validate_path(".")
+    assert resolved.is_dir()
+    assert os.path.normcase(str(resolved)) == os.path.normcase(
+        os.path.abspath(env["folder_a"])
+    )
+
+    # list_files wrapper (main.py) depends on _validate_path + iterdir.
+    import main
+
+    reg = main.build_tool_registry(fs, env["kernel"], None)
+    listing = reg["list_files"]["fn"](path=".")
+    assert listing.get("status") == "success", listing
+    names = [e["name"] for e in listing.get("data", [])]
+    assert "a.txt" in names, names
+
+    # hash_file also validates the path first — must not be denied either.
+    hashed = reg["hash_file"]["fn"](path="a.txt")
+    assert hashed.get("status") == "success", hashed
+
+
+def test_python_fallback_when_binary_missing(sandbox_env, monkeypatch):
+    """Without the Rust binary, a pure-Python jail check keeps file tools usable.
+
+    Regression: on a fresh clone (no compiled sandbox) every path-validating
+    tool failed closed. The fallback mirrors the Rust policy — same in-jail
+    resolution, same traversal/containment denials.
+    """
+    env = sandbox_env
+    fs = AelvoFileSystem(base_path=env["folder_a"], kernel=env["kernel"])
+
+    monkeypatch.setattr(fs, "_sandbox_binary_path", lambda: "C:/does/not/exist.exe")
+
+    # In-jail paths still resolve.
+    resolved = fs._validate_path(".")
+    assert resolved.is_dir()
+    assert os.path.normcase(str(resolved)) == os.path.normcase(
+        os.path.abspath(env["folder_a"])
+    )
+
+    # Traversal still denied by the Python fallback.
+    with pytest.raises(PermissionError):
+        fs._validate_path("../projB/b.txt")
+    with pytest.raises(PermissionError):
+        fs._validate_path(os.path.abspath(env["folder_b"]))
+
+    # list_files wrapper works through the fallback too.
+    import main
+
+    reg = main.build_tool_registry(fs, env["kernel"], None)
+    listing = reg["list_files"]["fn"](path=".")
+    assert listing.get("status") == "success", listing
+
+
+@pytest.mark.skipif(
+    not os.path.exists(SANDBOX_BINARY),
+    reason="Rust sandbox binary not built (run cargo build in sandbox_core)",
+)
+def test_resolve_path_still_denies_traversal(sandbox_env):
+    """Allowing resolve_path must not weaken the jail: traversal stays denied."""
+    env = sandbox_env
+    fs = AelvoFileSystem(base_path=env["folder_a"], kernel=env["kernel"])
+
+    with pytest.raises(PermissionError):
+        fs._validate_path("../projB/b.txt")
+    with pytest.raises(PermissionError):
+        fs._validate_path(os.path.abspath(env["folder_b"]))

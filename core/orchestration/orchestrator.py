@@ -1394,7 +1394,7 @@ class Orchestrator:
                                 await tui_session.emit_memory(
                                     EventType.MEMORY_RETRIEVED,
                                     "semantic",
-                                    str(tool_args).get("query", "")[:40] if isinstance(tool_args, dict) else str(tool_args)[:40],
+                                    str(tool_args.get("query", ""))[:40] if isinstance(tool_args, dict) else str(tool_args)[:40],
                                     len(outcome["executed"]["retrieved_ids"]),
                                     0.0
                                 )
