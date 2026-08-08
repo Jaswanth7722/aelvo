@@ -89,6 +89,21 @@ class TestPromptStructure:
         assert "(empty)" in prompt
         assert "(none)" in prompt
 
+    def test_prompt_has_codebase_understanding_protocol(self):
+        """Codebase questions must trigger folder mapping + entry-file reads,
+        never a generic "please provide more details" reply."""
+        prompt = get_system_prompt()
+        assert "CODEBASE QUESTIONS" in prompt
+        assert "list_files" in prompt
+        assert "project_tree" in prompt
+        assert "README" in prompt
+        assert "package.json" in prompt
+        # The protocol names the user-facing trigger phrases and explicitly
+        # bans the anti-pattern the transcript showed (the generic reply).
+        assert "present the folder" in prompt
+        assert "what is this project" in prompt
+        assert "Do not reply" in prompt
+
 
 class TestConfigurePaths:
     """configure_paths() updates where the prompt reads state and anchors."""

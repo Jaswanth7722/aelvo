@@ -76,6 +76,39 @@ SESSION_SUMMARY_INTERVAL = 50
 _FORCE_ROUTE_RE = re.compile(r"^\s*((?:@[A-Z]+\s+)+)", re.IGNORECASE)
 
 
+def _render_tool_results(tool_outcomes) -> str:
+    """Render executed tool outcomes into a readable block.
+
+    Weak (often small local) models close their tool work with a ``respond``
+    whose ``message`` is empty — printing nothing would leave the user staring
+    at a blank screen even though the tools actually ran (e.g. ``list_files``
+    on a folder). This renders what the tools returned so the user always
+    gets a visible answer.
+    """
+    lines = []
+    for tool_name, outcome in tool_outcomes:
+        if not isinstance(outcome, dict):
+            continue
+        mark = "✓" if outcome.get("status") == "success" else "✗"
+        lines.append(f"{mark} {tool_name}")
+        data = outcome.get("data")
+        if data is None:
+            executed = outcome.get("executed") or {}
+            data = executed.get("data")
+        if tool_name == "list_files" and isinstance(data, list):
+            for entry in data[:50]:
+                if isinstance(entry, dict):
+                    kind = "📁" if entry.get("type") == "dir" else "📄"
+                    lines.append(f"    {kind} {entry.get('name', '')}")
+            if len(data) > 50:
+                lines.append(f"    … and {len(data) - 50} more")
+        else:
+            logs = outcome.get("logs")
+            if logs:
+                lines.append(f"    {str(logs)[:200]}")
+    return "\n".join(lines)
+
+
 class Orchestrator:
     """The central coordinator of AELVO OMEGA.
 
@@ -1408,6 +1441,9 @@ class Orchestrator:
             #: again — the user sees a long wall of ✗ marks and gives up.
             MAX_CONSECUTIVE_FAILURES = 3
             consecutive_failures = 0
+            #: Tool outcomes executed this turn — used to render a visible
+            #: answer when the model closes with an empty ``respond`` message.
+            tool_outcomes = []
 
             for step in range(MAX_STEPS):
                 if batch_complete:
@@ -1419,6 +1455,18 @@ class Orchestrator:
 
                     if tool_name == "respond":
                         msg = tool_args.get("message", "")
+                        if not msg and tool_outcomes:
+                            # Tiny models sometimes close tool work with an
+                            # empty respond — never show a blank answer.
+                            # Render what the tools actually returned instead.
+                            rendered = _render_tool_results(tool_outcomes)
+                            msg = (
+                                "(The model finished without a written summary — "
+                                "here is what its tools found:)\n\n"
+                                + rendered
+                            )
+                        elif not msg:
+                            msg = "(The model returned an empty response.)"
                         final_answer = msg
                         if tui_session:
                             await tui_session.emit_system(f"AELVO: {msg[:80]}")
@@ -1583,6 +1631,7 @@ class Orchestrator:
                         log.error("Tool %s failed: %s", tool_name, e)
 
                     agent.feed_result(outcome)
+                    tool_outcomes.append((tool_name, outcome))
                     if session_tracker:
                         session_tracker.record_tool(tool_name, tool_args, outcome.get("status", "error").lower())
                         session_tracker.save(db_path)

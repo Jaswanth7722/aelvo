@@ -19,14 +19,22 @@ from io import StringIO
 
 # ── circuit breaker ──────────────────────────────────────────────────────────
 
-def _make_orchestrator(tool_outcome_fn):
-    """A bare Orchestrator wired with an always-failing / always-ok tool."""
+def _make_orchestrator(tool_outcome_fn, extra_tools=None):
+    """A bare Orchestrator wired with an always-failing / always-ok tool.
+
+    ``extra_tools`` maps extra tool names to outcome functions (e.g.
+    ``{"list_files": ...}``) for tests that drive other tools through the loop.
+    """
     from core.orchestration.orchestrator import Orchestrator
 
     orch = object.__new__(Orchestrator)
 
+    tool_map = {"bash_exec": {"fn": tool_outcome_fn}}
+    for name, fn in (extra_tools or {}).items():
+        tool_map[name] = {"fn": fn}
+
     class _Tools:
-        tools = {"bash_exec": {"fn": tool_outcome_fn}}
+        tools = tool_map
 
     class _Runner:
         def __init__(self):
@@ -164,6 +172,175 @@ def test_tool_loop_breaker_emits_failure_reason_to_terminal():
         )
     )
     assert "command failed: not found" in emitted["preview"]
+
+
+# ── empty-respond fallback ───────────────────────────────────────────────────
+
+def test_tool_loop_empty_respond_renders_tool_results():
+    """A respond with an EMPTY message after successful tool work must not
+    produce a blank screen — the loop renders what the tools returned."""
+    from core.orchestration.orchestrator import _render_tool_results
+
+    outcomes = [
+        ("list_files", {
+            "status": "success",
+            "logs": "Listed 2 items",
+            "data": [
+                {"name": "src", "type": "dir"},
+                {"name": "README.md", "type": "file"},
+            ],
+        }),
+    ]
+    rendered = _render_tool_results(outcomes)
+    assert "list_files" in rendered
+    assert "src" in rendered and "README.md" in rendered
+    assert "✓" in rendered
+
+
+def test_tool_loop_empty_respond_no_outcomes_has_placeholder():
+    """Even with zero tool outcomes an empty respond gets a visible line."""
+    from core.orchestration.orchestrator import _render_tool_results
+
+    assert _render_tool_results([]) == ""
+
+
+def test_tool_loop_empty_respond_after_failed_tool_shows_error():
+    """A failed tool in the fallback renders with an ✗ marker and its log."""
+    from core.orchestration.orchestrator import _render_tool_results
+
+    rendered = _render_tool_results([
+        ("bash_exec", {"status": "error", "logs": "command not found", "executed": {}}),
+    ])
+    assert "✗" in rendered
+    assert "command not found" in rendered
+
+
+def test_tool_loop_empty_respond_after_list_files_returns_visible_answer():
+    """End-to-end: agent runs list_files, then closes with an empty respond —
+    the final answer must contain the folder listing, not a blank line."""
+
+    def _list_ok(**kw):
+        return {
+            "status": "success",
+            "logs": "Listed 1 items",
+            "data": [{"name": "app.py", "type": "file"}],
+        }
+
+    orch = _make_orchestrator(_fail, extra_tools={"list_files": _list_ok})
+
+    class _SeqAgent:
+        """First reply: list_files call. Second (follow-up): empty respond."""
+
+        def __init__(self):
+            self.follow_ups = 0
+
+        def feed_result(self, outcome):
+            pass
+
+        async def send_user_message_async(self, msg, on_token=None):
+            self.follow_ups += 1
+            # The initial batch already carries the list_files call; the first
+            # follow-up closes with an EMPTY respond — the exact transcript bug.
+            return json.dumps([{"tool": "respond", "args": {"message": ""}}])
+
+    agent = _SeqAgent()
+    streamed: list = []
+    answer = asyncio.run(
+        orch._execute_tool_loop(
+            agent,
+            json.dumps([{"tool": "list_files", "args": {"path": "."}}]),
+            session_tracker=None,
+            tui_session=None,
+            stream_callback=streamed.append,
+            token_callback=None,
+            mcp_cli=None,
+            db_path=":memory:",
+        )
+    )
+    assert agent.follow_ups == 1
+    assert "app.py" in answer
+    assert answer.strip()  # never blank
+    assert streamed and "app.py" in streamed[-1]
+
+
+def test_tool_loop_empty_respond_no_prior_tools_gets_placeholder():
+    """Loop-level: an empty respond with ZERO prior tool outcomes still gets
+    a visible placeholder line (never a blank answer)."""
+    orch = _make_orchestrator(_fail)
+
+    class _EmptyAgent:
+        def __init__(self):
+            self.follow_ups = 0
+
+        def feed_result(self, outcome):
+            pass
+
+        async def send_user_message_async(self, msg, on_token=None):
+            self.follow_ups += 1
+            return json.dumps([{"tool": "respond", "args": {"message": ""}}])
+
+    agent = _EmptyAgent()
+    streamed: list = []
+    answer = asyncio.run(
+        orch._execute_tool_loop(
+            agent,
+            json.dumps([{"tool": "respond", "args": {"message": ""}}]),
+            session_tracker=None,
+            tui_session=None,
+            stream_callback=streamed.append,
+            token_callback=None,
+            mcp_cli=None,
+            db_path=":memory:",
+        )
+    )
+    assert agent.follow_ups == 0  # respond in the first batch → never follow up
+    assert "empty response" in answer
+    assert answer.strip()
+
+
+def test_tool_loop_same_batch_tools_then_empty_respond_renders():
+    """The classic tiny-model pattern: tools + an empty respond in ONE batch.
+    Tools must execute first, then the respond renders their results."""
+
+    def _list_ok(**kw):
+        return {
+            "status": "success",
+            "logs": "Listed 1 items",
+            "data": [{"name": "src", "type": "dir"}],
+        }
+
+    orch = _make_orchestrator(_fail, extra_tools={"list_files": _list_ok})
+
+    class _BatchAgent:
+        def __init__(self):
+            self.follow_ups = 0
+
+        def feed_result(self, outcome):
+            pass
+
+        async def send_user_message_async(self, msg, on_token=None):
+            self.follow_ups += 1
+            return json.dumps([{"tool": "respond", "args": {"message": ""}}])
+
+    agent = _BatchAgent()
+    answer = asyncio.run(
+        orch._execute_tool_loop(
+            agent,
+            json.dumps([
+                {"tool": "list_files", "args": {"path": "."}},
+                {"tool": "respond", "args": {"message": ""}},
+            ]),
+            session_tracker=None,
+            tui_session=None,
+            stream_callback=None,
+            token_callback=None,
+            mcp_cli=None,
+            db_path=":memory:",
+        )
+    )
+    assert agent.follow_ups == 0  # respond in the first batch closes the turn
+    assert "src" in answer
+    assert "list_files" in answer
 
 
 # ── tiny-model hint ─────────────────────────────────────────────────────────
