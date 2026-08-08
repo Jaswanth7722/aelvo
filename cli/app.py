@@ -54,10 +54,12 @@ def _print_banner(console, ctx: CliContext) -> None:
         Text("the automated engineering & logic-verification agent", style="aelvo.gold")
     )
     console.print(Rule(style="aelvo.brand"))
+    from cli.modes import read_mode
+
     console.print(
         Text(
             f"  project: {ctx.project}   provider: {ctx.provider_name or '—'}   "
-            f"model: {ctx.model or '—'}",
+            f"model: {ctx.model or '—'}   mode: {read_mode(ctx)}",
             style="aelvo.dim",
         )
     )
@@ -108,6 +110,7 @@ def _make_completer() -> NestedCompleter:
             "/provider": None,
             "/switch": None,
             "/model": None,
+            "/mode": None,
             "/log": None,
             "/version": None,
             "/retry": None,
@@ -149,18 +152,24 @@ def _make_prompt_session(ctx: CliContext) -> PromptSession:
 
 
 def _toolbar(ctx: CliContext):
+    from cli.modes import read_mode
+
     return [
         ("class:aelvo.toolbar", f"  AELVO {ctx.project} | "),
         ("class:aelvo.toolbar", ctx.workspace_path or "?"),
         ("class:aelvo.toolbar", f" | {ctx.provider_name or 'no-provider'}"),
         ("class:aelvo.toolbar", f"/{ctx.model or '-'}"),
+        ("class:aelvo.toolbar", f" | mode:{read_mode(ctx)}"),
     ]
 
 
 async def _execute_turn_task(ctx, user_input: str, recorder, terminal):
+    from cli.modes import read_mode
+
     return await ctx.orchestrator.execute_turn(
         ctx.agent,
         user_input,
+        mode=read_mode(ctx),
         session_tracker=recorder,
         tui_session=terminal,
         stream_callback=terminal.on_final_answer,

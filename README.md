@@ -159,6 +159,20 @@ Force-route to specific specialists with `@SPECIALIST` prefixes:
 | `/status` | Provider, model, folder + live agent metrics |
 | `/provider [name] [key]` | Two-step interactive picker: choose a provider, then one of its models (or `/provider <name> [key]` directly); the API key is asked inline as part of selection — existing keys can be replaced/rotated right in the picker — and stored in the encrypted vault |
 | `/model [name]` | Open an interactive picker to switch the active model (or `/model <name>` directly) |
+| `/mode [low\|medium\|high\|max]` | Dial the agent effort: `low` plain chat, `medium` chat + tools, `high` full agent pipeline (default), `max` collaborative Mode B |
+
+### Effort Modes
+
+Small messages don't need the whole multi-agent ceremony. Use `/mode` (or
+set `AELVO_MODE` in the environment) to pick how much machinery runs per
+turn:
+
+| Mode | What runs |
+|---|---|
+| `low` | One direct answer — no tools, no specialists, no plan. Fastest |
+| `medium` | Direct answer, but tools are available when needed (Claude Code style) |
+| `high` | Full consolidated pipeline: HERMES → ARCHITECT → FORGE → … → HERALD (default) |
+| `max` | Collaborative task-board pipeline with decomposition, consensus, verification, recovery |
 
 There is no workspace registry or `/workspace` command — `aelvo` opens any
 folder directly (the current directory by default, or `aelvo <folder>`), and

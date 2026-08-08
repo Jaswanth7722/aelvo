@@ -560,14 +560,25 @@ class Orchestrator:
     # ------------------------------------------------------------------
     # Turn execution
     # ------------------------------------------------------------------
-    async def execute_turn(self, agent, user_input: str, session_tracker=None, tui_session=None, stream_callback=None, token_callback=None, mcp_cli=None, db_path=None) -> Dict[str, Any]:
+    async def execute_turn(self, agent, user_input: str, session_tracker=None, tui_session=None, stream_callback=None, token_callback=None, mcp_cli=None, db_path=None, mode: str = "high") -> Dict[str, Any]:
         """Main orchestrator turn runner.
 
         Now delegates to the canonical RuntimePipeline which enforces:
             HERMES → ARCHITECT → ORACLE → FORGE → SENTINEL → TERMINUS → HERALD
 
         Falls back to force-route dispatch for manual specialist pinning.
+
+        ``mode`` — the agent effort dial (default ``high``):
+            * ``low``    — one direct LLM call, no pipeline, no tools
+            * ``medium`` — one direct LLM call + tool loop (tools when needed)
+            * ``high``   — full consolidated pipeline (default)
+            * ``max``    — collaborative Mode B task-board pipeline
         """
+        # Coerce the effort mode; anything unknown falls back to ``high``
+        # (the canonical full pipeline).
+        effort_mode = (mode or "high").strip().lower()
+        if effort_mode not in ("low", "medium", "high", "max"):
+            effort_mode = "high"
         self._turn_counter += 1
         self.session_manager.increment_turn()
         self.runtime_runner.agent = agent
@@ -595,7 +606,27 @@ class Orchestrator:
         forced, stripped_input = self._parse_force_route(input_for_routing)
         effective_input = stripped_input if forced else input_for_routing
 
-        # 2. Create HermesContext — Immutable Global Cognition
+        # 2. Fast paths — skip the whole pipeline ceremony (HermesContext
+        #    LLM analysis, Architect, specialists, memory) when the user
+        #    asked for a light effort mode. An explicit @MODE_A/@MODE_B
+        #    prefix or a @SPECIALIST force route always wins over the dial.
+        #    `_execute_direct_turn` builds its own cheap local HermesContext.
+        if effort_mode in ("low", "medium") and not has_explicit_mode and not forced:
+            log.info("Effort mode '%s' — direct path (no pipeline)", effort_mode)
+            return await self._execute_direct_turn(
+                agent,
+                effective_input,
+                task_id,
+                allow_tools=(effort_mode == "medium"),
+                session_tracker=session_tracker,
+                tui_session=tui_session,
+                stream_callback=stream_callback,
+                token_callback=token_callback,
+                mcp_cli=mcp_cli,
+                db_path=db_path,
+            )
+
+        # 3. Create HermesContext — Immutable Global Cognition
         #    Created BEFORE the force-route check so that even
         #    @SPECIALIST dispatches carry global cognition context.
         #    Per Amendment 4: Hermes is NOT preprocessing.
@@ -605,7 +636,7 @@ class Orchestrator:
             agent=agent,
         )
 
-        # 3. Handle forced routes — use legacy specialist dispatch
+        # 4. Handle forced routes — use legacy specialist dispatch
         #    HermesContext is available via self.hermes_context for
         #    the forced route handler to pass to graph context.
         if forced:
@@ -628,8 +659,12 @@ class Orchestrator:
 
         # ── Dual-Mode Selection ────────────────────────────────────
         # If no explicit @MODE_A/@MODE_B prefix, let the Architect
-        # evaluate the HermesContext and decide the best mode.
-        if not has_explicit_mode:
+        # evaluate the HermesContext and decide the best mode. The
+        # ``max`` effort dial forces the collaborative task board.
+        if not has_explicit_mode and effort_mode == "max":
+            detected_mode = MODE_B_CONST
+            log.info("Effort mode 'max' — forcing collaborative (Mode B) pipeline")
+        if not has_explicit_mode and effort_mode != "max":
             architect_mode = self._evaluate_mode_with_architect(
                 self.hermes_context,
             )
@@ -888,6 +923,110 @@ class Orchestrator:
         except Exception as e:
             log.error("Tool %s execution failed: %s", tool_name, e)
             return {"status": "error", "logs": str(e), "executed": {}}
+
+    async def _execute_direct_turn(
+        self,
+        agent,
+        task: str,
+        task_id: str,
+        allow_tools: bool = False,
+        session_tracker=None,
+        tui_session=None,
+        stream_callback=None,
+        token_callback=None,
+        mcp_cli=None,
+        db_path=None,
+    ) -> Dict[str, Any]:
+        """Fast path for the low/medium effort modes.
+
+        One direct LLM call — no HermesContext LLM analysis, no Architect
+        plan, no specialist ceremony, no memory consolidation. When
+        ``allow_tools`` (medium mode) the output still runs through the
+        tool loop so the model can use tools it genuinely needs; low mode
+        returns the raw answer as-is.
+        """
+        # A cheap, local HermesContext (no LLM call) keeps downstream code
+        # that reads self.hermes_context safe during this fast path.
+        self.hermes_context = HermesContext.create(
+            task=task,
+            session_id=getattr(agent, "session_id", ""),
+        )
+
+        streamer = None
+        if token_callback is not None:
+            from core.orchestration.stream_filter import TokenStreamFilter
+
+            streamer = TokenStreamFilter(token_callback)
+        try:
+            raw_output = await agent.send_user_message_async(
+                task, on_token=streamer
+            )
+        except asyncio.TimeoutError:
+            raw_output = (
+                "Error: the LLM request timed out before producing a "
+                "response. Try again, or switch to a faster model with /model."
+            )
+        if streamer is not None:
+            streamer.flush()
+
+        if allow_tools:
+            final_answer = await self._execute_tool_loop(
+                agent,
+                raw_output,
+                session_tracker=session_tracker,
+                tui_session=tui_session,
+                stream_callback=stream_callback,
+                token_callback=token_callback,
+                mcp_cli=mcp_cli,
+                db_path=db_path,
+            )
+        else:
+            # Low mode never executes tools. If the model still emitted a
+            # tool-call batch, surface just the ``respond`` message (when
+            # present) instead of raw JSON; otherwise keep the text as-is.
+            from core.orchestration.parser import parse_llm_output
+
+            final_answer = raw_output
+            out_type, payload = parse_llm_output(raw_output)
+            if out_type == "tool_calls":
+                final_answer = ""
+                for call in payload:
+                    if call.get("tool") == "respond":
+                        final_answer = call.get("args", {}).get("message", "")
+                        break
+                if not final_answer:
+                    # Tool JSON with no respond message — never surface raw
+                    # JSON in low mode. Say tools were skipped instead.
+                    final_answer = (
+                        "(The model wanted to use tools, which are disabled "
+                        "in low mode — switch to /mode medium or higher if "
+                        "tools are needed.)"
+                    )
+            if not tui_session:
+                print(f"\n[AELVO] {final_answer}\n")
+            if stream_callback:
+                stream_callback(final_answer)
+            if session_tracker:
+                session_tracker.record_answer(final_answer)
+                session_tracker.save(db_path)
+
+        self._notify_ui_task_completed(task_id, True)
+        return {
+            "status": "success",
+            "output": final_answer,
+            "specialists_active": [],
+            "audit_traces": [
+                "[ORCHESTRATOR] Direct path (low/medium effort mode) — no pipeline phases."
+            ],
+            "turn": self._turn_counter,
+            "forced_route": False,
+            "session_summary": None,
+            "architect_plan_used": False,
+            "plan_display": None,
+            # Shape parity with the pipeline path — callers that index this
+            # key directly (e.g. the web bridge) never KeyError on a fast turn.
+            "pipeline_result": None,
+        }
 
     async def _execute_forced_route(
         self, agent, forced_names: List[str], task: str, task_id: str,

@@ -38,6 +38,7 @@ _ALIASES = {
     "status": "status", "info": "status",
     "provider": "provider", "providers": "provider", "switch": "provider",
     "model": "model",
+    "mode": "mode", "modes": "mode", "effort": "mode",
     "log": "log", "logs": "log",
     "version": "version", "sysinfo": "version", "ver": "version",
     "retry": "retry",
@@ -52,6 +53,7 @@ _COMMANDS = {
     "status": ("Provider, model, folder + agent metrics", "/status"),
     "provider": ("Pick / switch the LLM provider; keys are asked inline and existing ones can be rotated", "/provider [name] [key]"),
     "model": ("Pick or switch the active model", "/model [name]"),
+    "mode": ("Set agent effort: low | medium | high | max", "/mode [low|medium|high|max]"),
     "log": ("Tail the AELVO log file", "/log [lines]"),
     "version": ("Show version and environment info", "/version"),
     "retry": ("Re-run the previous prompt", "/retry"),
@@ -163,6 +165,8 @@ async def handle_command(
                 )
     elif name == "model":
         await _cmd_model(ctx, arg)
+    elif name == "mode":
+        await _cmd_mode(ctx, arg)
     elif name == "log":
         _cmd_log(ctx, arg)
     elif name == "version":
@@ -203,6 +207,10 @@ def _cmd_status(ctx: CliContext) -> None:
     table.add_row("Folder", ctx.workspace_path or "-")
     table.add_row("Provider", ctx.provider_name or "not configured")
     table.add_row("Model", ctx.model or "-")
+    # Agent effort mode (low/medium/high/max) — /mode to change it.
+    from cli.modes import read_mode
+
+    table.add_row("Mode", read_mode(ctx))
     # Where the active provider's API key lives (env var vs encrypted vault).
     from cli.providers import api_key_source, get_registry
 
@@ -298,6 +306,52 @@ def _apply_model(ctx: CliContext, name: str) -> None:
     write_env("LLM_MODEL", name)
     os.environ["LLM_MODEL"] = name
     ctx.console.print(Text(f"✓ Model set to {name}", style="aelvo.ok"))
+
+
+async def _cmd_mode(ctx: CliContext, arg: str) -> None:
+    """Show the active effort mode, or open the picker / set it directly."""
+    from cli.modes import (
+        AGENT_MODES,
+        mode_table,
+        pick_mode,
+        write_mode,
+    )
+
+    name = arg.strip().lower()
+    if name:
+        if name not in AGENT_MODES:
+            ctx.console.print(
+                Text(
+                    f"Unknown mode: {name} — use low, medium, high or max",
+                    style="aelvo.err",
+                )
+            )
+            return
+        write_mode(ctx, name)
+        ctx.console.print(
+            Text(f"✓ Mode set to {name} ({AGENT_MODES[name][0]})", style="aelvo.ok")
+        )
+        return
+
+    # No argument: open the picker when interactive; fall back to the table.
+    picked = await pick_mode(ctx)
+    if picked:
+        write_mode(ctx, picked)
+        ctx.console.print(
+            Text(
+                f"✓ Mode set to {picked} ({AGENT_MODES[picked][0]})",
+                style="aelvo.ok",
+            )
+        )
+        return
+
+    ctx.console.print(mode_table(ctx))
+    ctx.console.print(
+        Text(
+            "Switch with: /mode <low|medium|high|max>  ·  low=chat, medium=chat+tools, high=full agent, max=collaborative",
+            style="aelvo.dim",
+        )
+    )
 
 
 def _cmd_log(ctx: CliContext, arg: str) -> None:
