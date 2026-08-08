@@ -81,6 +81,75 @@ def test_unknown_command_returns_none():
     assert asyncio.run(handle_command(ctx, "nope", "")) is None
 
 
+# ── /clear screen clearing ───────────────────────────────────────────────────
+
+def test_clear_uses_prompt_toolkit_output(monkeypatch):
+    """Regression: /clear must wipe through prompt_toolkit's output API
+    (erase_screen + cursor home + flush). rich's raw ANSI escape fights the
+    REPL renderer's screen buffer, which is what made /clear look like a
+    'shift to top' instead of an actual clear."""
+    from unittest.mock import Mock
+
+    from cli import commands
+
+    monkeypatch.setattr(commands, "is_interactive", lambda: True)
+    out = Mock()
+    monkeypatch.setattr(commands, "create_output", lambda: out)
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+    )
+    result = asyncio.run(handle_command(ctx, "clear", ""))
+    assert result is None
+    out.erase_screen.assert_called_once_with()
+    out.cursor_goto.assert_called_once_with(0, 0)
+    out.flush.assert_called_once_with()
+
+
+def test_clear_history_resets_conversation(monkeypatch):
+    """/clear history wipes the agent's conversation history and the retry
+    buffer (and never crashes when no agent is configured)."""
+    from cli import commands
+
+    monkeypatch.setattr(commands, "is_interactive", lambda: False)  # no ANSI in tests
+    agent = MagicMock()
+    agent.conversation_history = ["user: hi", "assistant: hello"]
+    ctx = CliContext(
+        agent=agent, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+    )
+    ctx.state["last_prompt"] = "hi"
+    assert asyncio.run(handle_command(ctx, "clear", "history")) is None
+    assert agent.conversation_history == []
+    assert ctx.state["last_prompt"] == ""
+
+    # aliases reset the history too
+    for alias in ("all", "reset", "memory"):
+        agent.conversation_history = ["x"]
+        asyncio.run(handle_command(ctx, "clear", alias))
+        assert agent.conversation_history == []
+
+
+def test_clear_non_tty_falls_back_to_console(monkeypatch):
+    """On non-interactive stdin (pipes, CI, line REPL) the prompt_toolkit
+    clear is skipped and rich's clear is used (which itself no-ops off-tty)."""
+    from unittest.mock import Mock
+
+    from cli import commands
+
+    monkeypatch.setattr(commands, "is_interactive", lambda: False)
+    console = build_console()
+    spy = Mock()
+    monkeypatch.setattr(console, "clear", spy)
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=console, db_path="", workspace_path=".", project="t",
+    )
+    assert asyncio.run(handle_command(ctx, "clear", "")) is None
+    spy.assert_called_once_with()
+
+
 # ── TerminalSession live rendering ──────────────────────────────────────────
 
 def _session():

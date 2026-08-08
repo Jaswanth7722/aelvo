@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 
 #: Fallback used only when package.json cannot be read.
-_FALLBACK_VERSION = "2.4.3"
+_FALLBACK_VERSION = "2.4.4"
 
 
 def _package_json_path() -> Path | None:

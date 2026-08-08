@@ -24,8 +24,11 @@ import os
 import sys
 from typing import Any, Optional, Tuple
 
+from prompt_toolkit.output import create_output
 from rich.table import Table
 from rich.text import Text
+
+from cli.theme import is_interactive
 
 log = logging.getLogger("aelvo.cli")
 
@@ -186,8 +189,34 @@ async def handle_command(
 
 # ── individual commands ─────────────────────────────────────────────────────
 
+def _clear_screen(ctx: CliContext) -> None:
+    """Clear the terminal without fighting the prompt_toolkit renderer.
+
+    rich's ``Console.clear()`` writes a raw ANSI escape that clashes with
+    prompt_toolkit's own screen buffer — the next REPL render redraws the old
+    content, so ``/clear`` looked like a jump instead of a wipe. Clearing
+    through prompt_toolkit's output API erases the screen and homes the cursor
+    for real; the next ``prompt_async`` paints a fresh prompt on a clean
+    screen.
+    """
+    if not is_interactive():
+        # Piped / non-interactive context (line REPL, tests, CI): never emit
+        # ANSI escapes into non-terminal output.
+        ctx.console.clear()
+        return
+    try:
+        out = create_output()
+        out.erase_screen()
+        out.cursor_goto(0, 0)
+        out.flush()
+    except Exception:
+        # Win32/VT output can fail on odd consoles — fall back to rich's clear
+        # (which no-ops when not interactive).
+        ctx.console.clear()
+
+
 def _cmd_clear(ctx: CliContext, arg: str) -> None:
-    ctx.console.clear()
+    _clear_screen(ctx)
     if arg.lower() in ("history", "all", "reset", "memory"):
         if ctx.agent is not None:
             ctx.agent.conversation_history = []

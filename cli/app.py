@@ -42,7 +42,7 @@ from cli.commands import (
     parse_command,
 )
 from cli.session import SessionRecorder, TerminalSession
-from cli.theme import build_console
+from cli.theme import build_console, is_interactive
 
 log = logging.getLogger("aelvo.cli")
 
@@ -177,14 +177,6 @@ async def _execute_turn_task(ctx, user_input: str, recorder, terminal):
         mcp_cli=ctx.mcp_cli,
         db_path=ctx.db_path,
     )
-
-
-def _is_interactive() -> bool:
-    """True when both stdin and stdout are real terminals."""
-    try:
-        return bool(sys.stdin.isatty() and sys.stdout.isatty())
-    except Exception:
-        return False
 
 
 async def _run_turn(ctx: CliContext, user_input: str) -> None:
@@ -356,7 +348,7 @@ async def run_cli(
         return
 
     console.print(Text("type /help for commands · Esc+Enter for a newline · Ctrl+C to exit", style="aelvo.dim"))
-    if _is_interactive():
+    if is_interactive():
         await _repl(ctx)
     else:
         console.print(Text("(non-interactive stdin — line mode)", style="aelvo.dim"))

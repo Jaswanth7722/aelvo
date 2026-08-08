@@ -23,6 +23,14 @@ GREEN = "#8CE99A"     # success
 DIM = "#9B938A"       # muted / system lines
 
 
+def is_interactive() -> bool:
+    """True when both stdin and stdout are real terminals."""
+    try:
+        return bool(sys.stdin.isatty() and sys.stdout.isatty())
+    except Exception:
+        return False
+
+
 def build_console() -> Console:
     """Build a ``rich`` console with the AELVO brand theme."""
     # Windows consoles default stdout to cp1252, which cannot encode the emoji
