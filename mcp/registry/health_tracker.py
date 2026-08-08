@@ -20,7 +20,7 @@ class HealthSnapshot(BaseModel):
     error_rate: float = 0.0
     last_ping: Optional[datetime] = None
     diagnostics: List[str] = Field(default_factory=list)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class HealthTracker:

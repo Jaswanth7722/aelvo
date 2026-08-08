@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Dict, List, Optional, Set, Any
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class ToolStatus(str, Enum):
@@ -28,7 +28,7 @@ class GitState(BaseModel):
 
 
 class CapabilitySnapshot(BaseModel):
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     workspace_path: str
     readable_files: Set[str] = Field(default_factory=set)
     writable_files: Set[str] = Field(default_factory=set)

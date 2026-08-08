@@ -20,10 +20,6 @@ try:
     from selectolax.parser import HTMLParser
 except ImportError:
     HTMLParser = None
-try:
-    import markdownify
-except ImportError:
-    markdownify = None
 
 
 def html_to_text(html: str) -> str:

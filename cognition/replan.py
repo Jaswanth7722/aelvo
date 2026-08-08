@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from pydantic import BaseModel, Field
@@ -44,7 +44,7 @@ class ReplanResult(BaseModel):
     added_node_ids: List[str] = Field(default_factory=list)
     removed_node_ids: List[str] = Field(default_factory=list)
     requires_consensus: bool = False
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class DynamicReplanningEngine:

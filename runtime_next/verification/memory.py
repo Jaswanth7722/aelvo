@@ -68,7 +68,7 @@ class RecoveryMemoryEntry(BaseModel):
     duration_ms: float = Field(
         default=0.0, description="How long recovery took"
     )
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 

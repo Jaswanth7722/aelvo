@@ -2,7 +2,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, Optional, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class EventType(str, Enum):
@@ -55,7 +55,7 @@ class EventType(str, Enum):
 class BaseEvent(BaseModel):
     id: str
     type: EventType
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     payload: Dict[str, Any] = Field(default_factory=dict)
 
 

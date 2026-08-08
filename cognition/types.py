@@ -127,7 +127,7 @@ class UncertaintyClass(str, Enum):
 class Provenance(BaseModel):
     source_type: ProvenanceType
     source_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     evidence_chain: List[str] = Field(default_factory=list)
 
@@ -148,8 +148,8 @@ class Goal(BaseModel):
     sub_goals: List["SubGoal"] = Field(default_factory=list)
     constraints: List[str] = Field(default_factory=list)
     prerequisites: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     deadline: Optional[datetime] = None
     owner: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -165,7 +165,7 @@ class SubGoal(BaseModel):
     status: GoalStatus = GoalStatus.PENDING
     order: int = 0
     dependencies: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class PlanStep(BaseModel):
@@ -184,7 +184,7 @@ class PlanStep(BaseModel):
     estimated_cost: int = 1
     estimated_effort: int = 1
     actual_cost: int = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     completed_at: Optional[datetime] = None
     error: Optional[str] = None
 
@@ -204,7 +204,7 @@ class BlackboardEntry(BaseModel):
     entry_type: EntryType
     provenance: Provenance
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     expires_at: Optional[datetime] = None
     superseded_by: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
@@ -251,7 +251,7 @@ class ConsensusEvent(BaseModel):
     votes: Dict[str, str] = Field(default_factory=dict)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     summary: str = ""
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     governance_applied: bool = False
     vetoed: bool = False
     veto_reason: Optional[str] = None
@@ -267,7 +267,7 @@ class ConflictRecord(BaseModel):
     resolved: bool = False
     resolved_at: Optional[datetime] = None
     resolution_notes: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class ResearchEvidence(BaseModel):
@@ -276,7 +276,7 @@ class ResearchEvidence(BaseModel):
     source: str
     relevance: float = Field(default=0.5, ge=0.0, le=1.0)
     reliability: float = Field(default=0.5, ge=0.0, le=1.0)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     content: str = ""
 
 
@@ -288,7 +288,7 @@ class ResearchHypothesis(BaseModel):
     refuting_evidence: List[ResearchEvidence] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     proposed_by: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     tags: List[str] = Field(default_factory=list)
 
     def compute_confidence(self) -> float:
@@ -307,7 +307,7 @@ class ResearchFinding(BaseModel):
     conclusion: str
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     evidence_summary: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class StrategicMemoryEntry(BaseModel):
@@ -316,8 +316,8 @@ class StrategicMemoryEntry(BaseModel):
     content: str
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
     consolidation_count: int = 0
-    last_accessed: datetime = Field(default_factory=datetime.utcnow)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_accessed: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     source_goal_id: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     embedding: Optional[List[float]] = None
@@ -329,13 +329,13 @@ class ConsolidationRecord(BaseModel):
     consolidated_content: str
     memory_type: MemoryType
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class UncertaintyModel(BaseModel):
     uncertain_areas: Dict[str, List[UncertaintyClass]] = Field(default_factory=dict)
     evidence_quality: Dict[str, float] = Field(default_factory=dict)
-    last_updated: datetime = Field(default_factory=datetime.utcnow)
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def register_uncertainty(self, area: str, uc: UncertaintyClass) -> None:
         if area not in self.uncertain_areas:
@@ -362,7 +362,7 @@ class ExecutionHypothesis(BaseModel):
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     evidence: List[str] = Field(default_factory=list)
     status: HypothesisStatus = HypothesisStatus.PROPOSED
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class BlockedPath(BaseModel):
@@ -371,7 +371,7 @@ class BlockedPath(BaseModel):
     reason: str
     blocker_type: str = ""
     suggested_alternatives: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     resolved: bool = False
     resolved_at: Optional[datetime] = None
 
@@ -398,7 +398,7 @@ class EvidenceTimeline(BaseModel):
     Records when key lifecycle events occurred for audit and reporting.
     All timestamps are optional — they populate as the evidence progresses.
     """
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="When the evidence was created")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), description="When the evidence was created")
     verified_at: Optional[datetime] = Field(default=None, description="When the evidence was verified")
     consumed_at: Optional[datetime] = Field(default=None, description="When the evidence was first consumed")
     archived_at: Optional[datetime] = Field(default=None, description="When the evidence was archived")
@@ -474,7 +474,7 @@ class CollaborationEvidence(BaseModel):
     """
     id: str = Field(..., description="Unique evidence identifier (e.g. F-001, I-042)")
     owner_agent: str = Field(..., description="Specialist that produced this evidence (ORACLE, FORGE, SENTINEL, etc.)")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the evidence was created")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), description="When the evidence was created")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Confidence in the evidence (0.0–1.0)")
     source: str = Field(default="", description="Provenance source (repository_analysis, code_review, security_scan, etc.)")
     evidence_type: str = Field(..., description="Type: finding, implementation, review, challenge, decision, execution_result, report")
@@ -564,7 +564,7 @@ class CollaborationEvidence(BaseModel):
 
 class CognitiveStateSnapshot(BaseModel):
     id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     active_goals: List[Goal] = Field(default_factory=list)
     completed_goals: List[str] = Field(default_factory=list)
     blocked_paths: List[BlockedPath] = Field(default_factory=list)

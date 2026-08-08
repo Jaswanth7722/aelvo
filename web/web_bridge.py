@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import websockets
-from websockets.server import WebSocketServerProtocol
+from websockets.asyncio.server import ServerConnection
 
 from runtime_next.models.events import BaseEvent
 
@@ -144,7 +144,7 @@ class WebBridge:
         self._host = host
         self._port = port
         self._server: websockets.WebSocketServer | None = None
-        self._connections: Set[WebSocketServerProtocol] = set()
+        self._connections: Set[ServerConnection] = set()
         self._runtime_bus = None
         self._running = False
         self._agent = None
@@ -503,7 +503,7 @@ class WebBridge:
         })
 
     async def _handle_connection(
-        self, websocket: WebSocketServerProtocol
+        self, websocket: ServerConnection
     ) -> None:
         """Handle a new WebSocket client connection."""
         client_info = f"{websocket.remote_address}"
@@ -600,7 +600,7 @@ class WebBridge:
             return
 
         message = json.dumps(payload, default=str)
-        dead_connections: Set[WebSocketServerProtocol] = set()
+        dead_connections: Set[ServerConnection] = set()
 
         for ws in self._connections:
             try:
@@ -615,7 +615,7 @@ class WebBridge:
             self._connections -= dead_connections
 
     async def _send_raw(
-        self, websocket: WebSocketServerProtocol, payload: Dict[str, Any]
+        self, websocket: ServerConnection, payload: Dict[str, Any]
     ) -> None:
         """Send a raw payload to a specific client."""
         try:

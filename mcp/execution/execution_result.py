@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,6 @@ class MCPExecutionResult(BaseModel):
     recovery_attempted: bool = False
     recovery_successful: bool = False
     trust_level_at_execution: str = ""
-    completed_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     raw_response: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)

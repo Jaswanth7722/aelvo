@@ -6,7 +6,7 @@ EventBus via the event_publisher module.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
@@ -16,7 +16,7 @@ from .event_schemas import DiscoverySource, DisconnectReason
 class MCPEvent(BaseModel):
     """Base class for all MCP Platform events."""
     event_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     payload: Dict[str, Any] = Field(default_factory=dict)
 
 

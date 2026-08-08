@@ -344,8 +344,8 @@ class StrategicMemory:
         Returns:
             Number of entries decayed (negative = net removal).
         """
-        # Use naive UTC datetime to match StrategicMemoryEntry defaults (datetime.utcnow)
-        now = datetime.utcnow()
+        # Use naive UTC datetime to match StrategicMemoryEntry defaults (datetime.now(timezone.utc))
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         cutoff = now - timedelta(days=stale_days)
         decayed = 0
         pruned: List[str] = []

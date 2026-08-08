@@ -54,7 +54,7 @@ class LearningEntry(BaseModel):
     applicable_strategy_classes: List[str] = Field(default_factory=list)
     recommendation: str = ""
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     times_applied: int = 0
     effectiveness_score: float = 0.5
 
@@ -81,7 +81,7 @@ class PlanOutcome(BaseModel):
     total_duration_ms: float
     success: bool
     deviations: List[LearningEntry] = Field(default_factory=list)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class CalibrationAdjustment(BaseModel):

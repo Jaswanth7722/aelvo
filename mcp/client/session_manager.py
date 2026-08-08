@@ -18,8 +18,8 @@ class SessionInfo(BaseModel):
     server_id: str
     protocol_version: str = "unknown"
     negotiated_capabilities: CapabilityProfile = Field(default_factory=lambda: CapabilityProfile(server_id=""))
-    connected_at: datetime = Field(default_factory=datetime.utcnow)
-    last_activity: datetime = Field(default_factory=datetime.utcnow)
+    connected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    last_activity: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     pending_requests: int = 0
     completed_requests: int = 0
     failed_requests: int = 0

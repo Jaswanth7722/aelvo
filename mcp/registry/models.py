@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class TransportType(str, Enum):
@@ -112,7 +112,7 @@ class MCPServerRecord(BaseModel):
     enabled: bool = True
     health_state: HealthState = HealthState.UNKNOWN
     capabilities: CapabilityProfile = Field(default_factory=lambda: CapabilityProfile(server_id=""))
-    registered_at: datetime = Field(default_factory=datetime.utcnow)
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     last_seen: Optional[datetime] = None
     tags: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)

@@ -87,18 +87,24 @@ class RecoveryNodeInjector:
         try:
             if hasattr(graph, "inject_node"):
                 # Legacy ExecutionGraph API
-                graph.inject_node(
+                result = graph.inject_node(
                     node_properties,
                     dependencies=[action.node_id],
                 )
+                if asyncio.iscoroutine(result):
+                    await result
                 log.info(
                     f"Injected recovery node {inject_id} "
                     f"into graph (legacy API)"
                 )
             elif hasattr(graph, "add_node") and hasattr(graph, "add_edge"):
                 # Generic graph API
-                graph.add_node(inject_id, node_properties)
-                graph.add_edge(action.node_id, inject_id)
+                result = graph.add_node(inject_id, node_properties)
+                if asyncio.iscoroutine(result):
+                    await result
+                result = graph.add_edge(action.node_id, inject_id)
+                if asyncio.iscoroutine(result):
+                    await result
                 log.info(
                     f"Injected recovery node {inject_id} into graph"
                 )
@@ -165,10 +171,14 @@ class RecoveryNodeInjector:
 
         try:
             if hasattr(graph, "add_node"):
-                graph.add_node(rollback_id, node_properties)
+                result = graph.add_node(rollback_id, node_properties)
+                if asyncio.iscoroutine(result):
+                    await result
                 for nid in nodes_affected:
                     if hasattr(graph, "add_edge"):
-                        graph.add_edge(rollback_id, nid)
+                        result = graph.add_edge(rollback_id, nid)
+                        if asyncio.iscoroutine(result):
+                            await result
 
             log.info(
                 f"Injected rollback node {rollback_id} "

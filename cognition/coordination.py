@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from pydantic import BaseModel, Field
@@ -29,7 +29,7 @@ class DelegationRecord(BaseModel):
     specialist_name: str
     confidence: float = 0.0
     mode: DelegationMode
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     result: Optional[str] = None
     error: Optional[str] = None
     duration_ms: Optional[float] = None

@@ -7,7 +7,7 @@ Trust changes are audited and may require human acknowledgment for escalations.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field
@@ -48,7 +48,7 @@ class TrustAuditEntry(BaseModel):
     new_level: TrustLevel
     reason: TrustChangeReason
     triggered_by: str = "system"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     details: str = ""
 
 

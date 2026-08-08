@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 from pydantic import BaseModel, Field
 
@@ -25,7 +25,7 @@ class MCPExecutionRequest(BaseModel):
     trust_requirement: TrustLevel = TrustLevel.SANDBOXED  # Minimum trust level
     priority: ExecutionPriority = ExecutionPriority.NORMAL
     metadata: Dict[str, Any] = Field(default_factory=dict)  # Tracing, correlation IDs
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     created_by: str = ""
 
     def model_post_init(self, __context: Any) -> None:

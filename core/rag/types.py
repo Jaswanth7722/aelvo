@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class ChunkingStrategy(str, Enum):
@@ -39,7 +39,7 @@ class Document:
     content: str
     metadata: Dict[str, Any] = field(default_factory=dict)
     source: str = ""
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 @dataclass

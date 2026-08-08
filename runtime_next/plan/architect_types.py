@@ -13,7 +13,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ===========================================================================
@@ -641,8 +641,8 @@ class ArchitectPlan(BaseModel):
     id: str = Field(..., description="Unique plan identifier")
     title: str = Field(default="", description="Short plan title")
     status: PlanStatus = Field(default=PlanStatus.DRAFT)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     # The 10 sections
     objective: ObjectiveSection

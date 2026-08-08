@@ -20,7 +20,6 @@ chromadb>=0.4.0
 scrapy
 scrapy-playwright
 selectolax
-markdownify
 urllib3
 
 # Utilities
@@ -33,6 +32,9 @@ prompt_toolkit>=3.0.0
 
 # File Watching
 watchfiles>=0.20.0
+
+# Testing
+pytest-timeout>=2.3.0
 
 # Additional utilities
 typing-extensions

@@ -46,7 +46,6 @@ class TestChallengeToConsensusPipeline:
         slot = bb.get_slot('research_findings')
         assert slot is not None
         assert len(slot.active_entries()) == 1
-        return bb, entry
 
     def test_2_challenge_findings(self):
         """SENTINEL challenges low-confidence findings."""
@@ -77,7 +76,6 @@ class TestChallengeToConsensusPipeline:
         # Verify challenge exists on blackboard via get_challenges()
         challenges = bb.get_challenges()
         assert len(challenges) >= 1
-        return bb, entry, challenged
 
     def test_3_consensus_resolution(self):
         """ExtendedConsensusEngine resolves challenges with positions from specialists."""
@@ -139,7 +137,6 @@ class TestChallengeToConsensusPipeline:
 
         print(f"  Consensus outcome: {outcome.outcome.value} "
               f"(confidence={outcome.confidence:.2f})")
-        return bb, request, outcome
 
     def test_4_architect_decision(self):
         """ARCHITECT reviews consensus and makes binding decisions."""

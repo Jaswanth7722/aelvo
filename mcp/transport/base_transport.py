@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 
@@ -20,7 +20,7 @@ class MCPMessage(BaseModel):
     result: Optional[Any] = None
     error: Optional[Dict[str, Any]] = None
     jsonrpc: str = "2.0"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class BaseTransport(ABC):

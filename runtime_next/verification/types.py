@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ============================================================================
@@ -201,7 +201,7 @@ class VerificationResult(BaseModel):
         ..., description="Type of verification performed"
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         description="When verification was performed",
     )
     duration_ms: float = Field(
@@ -370,7 +370,7 @@ class RecoveryAction(BaseModel):
         description="If a recovery node was injected, its ID",
     )
     success: bool = Field(default=False, description="Did recovery succeed")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     duration_ms: float = Field(default=0.0)
     result: Dict[str, Any] = Field(default_factory=dict)
 
@@ -467,7 +467,7 @@ class ConsistencyResult(BaseModel):
     capability_freshness: bool = Field(default=True)
     event_ordering: bool = Field(default=True)
     dependency_validity: bool = Field(default=True)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     duration_ms: float = Field(default=0.0)
 
 

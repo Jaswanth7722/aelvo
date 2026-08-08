@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .types import (
     VerificationType,
@@ -23,7 +23,7 @@ class VerificationStartedEvent(BaseModel):
     """Emitted when a verification begins."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     node_id: str = Field(..., description="Node being verified")
     verification_type: VerificationType = Field(
         ..., description="Type of verification"
@@ -39,7 +39,7 @@ class VerificationCompletedEvent(BaseModel):
     """Emitted when a verification completes successfully."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     node_id: str = Field(..., description="Node that was verified")
     verification_type: VerificationType = Field(
         ..., description="Type of verification"
@@ -53,7 +53,7 @@ class VerificationFailedEvent(BaseModel):
     """Emitted when a verification fails."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     node_id: str = Field(..., description="Node that failed verification")
     verification_type: VerificationType = Field(
         ..., description="Type of verification"
@@ -71,7 +71,7 @@ class FailureClassifiedEvent(BaseModel):
     """Emitted when a failure has been classified."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     node_id: str = Field(..., description="Node that failed")
     classification: ClassificationResult = Field(
         ..., description="Full classification result"
@@ -84,7 +84,7 @@ class RecoveryInjectedEvent(BaseModel):
     """Emitted when a recovery node is injected into the execution graph."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     node_id: str = Field(..., description="Original failing node")
     injected_node_id: str = Field(
         ..., description="ID of the injected recovery node"
@@ -104,7 +104,7 @@ class RetryBlockedEvent(BaseModel):
     """Emitted when retry is blocked by the Retry Safety Engine."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     node_id: str = Field(..., description="Node whose retry was blocked")
     classification: FailureClassification = Field(
         ..., description="Failure classification"
@@ -120,7 +120,7 @@ class GraphRollbackEvent(BaseModel):
     """Emitted when the graph state is rolled back to a checkpoint."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     plan_id: str = Field(..., description="Plan that was rolled back")
     checkpoint_path: str = Field(
         default="", description="Path to the checkpoint used"
@@ -137,7 +137,7 @@ class ReplayDivergenceEvent(BaseModel):
     """Emitted when replay consistency check detects divergence."""
 
     event_id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     expected_hash: str = Field(
         default="", description="Expected state hash from previous run"
     )

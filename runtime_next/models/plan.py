@@ -182,7 +182,7 @@ class ExecutionNode(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     history: List[Dict[str, Any]] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def add_history(self, event: str, detail: str = ""):
         self.history.append({
@@ -204,7 +204,7 @@ class ExecutionPlan(BaseModel):
     critical_path: List[str] = Field(default_factory=list)
     parallel_branches: List[List[str]] = Field(default_factory=list)
     pattern_source: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def add_node(self, node: ExecutionNode):
         self.nodes[node.id] = node
@@ -308,7 +308,7 @@ class ExecutionPattern(BaseModel):
     failure_count: int = 0
     total_steps_avg: float = 0.0
     importance: float = 0.7
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     last_used: Optional[datetime] = None
 
     def similarity_to(self, task_signature: str) -> float:
