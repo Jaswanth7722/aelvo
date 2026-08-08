@@ -104,6 +104,70 @@ def _close_backend(backend):
             pass
 
 
+class TestResolveBootFolder:
+    """Web/full boot (main_async) must share the CLI's folder semantics."""
+
+    def test_default_is_cwd(self, tmp_path, monkeypatch):
+        import main as _main
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("AELVO_FOLDER", raising=False)
+        monkeypatch.delenv("AELVO_PROJECT", raising=False)
+        assert _main._resolve_boot_folder() == os.getcwd()
+
+    def test_aelvo_folder_env_wins(self, tmp_path, monkeypatch):
+        import main as _main
+
+        folder = tmp_path / "proj"
+        folder.mkdir()
+        monkeypatch.setenv("AELVO_FOLDER", str(folder))
+        monkeypatch.setenv("AELVO_PROJECT", str(tmp_path))  # ignored: FOLDER wins
+        assert _main._resolve_boot_folder() == os.path.abspath(str(folder))
+
+    def test_aelvo_project_used_as_folder_path(self, tmp_path, monkeypatch):
+        import main as _main
+
+        folder = tmp_path / "proj"
+        folder.mkdir()
+        monkeypatch.delenv("AELVO_FOLDER", raising=False)
+        monkeypatch.setenv("AELVO_PROJECT", str(folder))
+        assert _main._resolve_boot_folder() == os.path.abspath(str(folder))
+
+    def test_missing_folder_falls_back_to_cwd(self, tmp_path, monkeypatch):
+        import main as _main
+
+        monkeypatch.delenv("AELVO_FOLDER", raising=False)
+        monkeypatch.setenv("AELVO_PROJECT", str(tmp_path / "does_not_exist"))
+        monkeypatch.chdir(tmp_path)
+        assert _main._resolve_boot_folder() == os.getcwd()
+
+    def test_main_async_uses_folder_state(self, tmp_path, monkeypatch):
+        """main_async resolves to the folder and scaffolds .aelvo/ state."""
+        from unittest.mock import patch as _patch
+
+        folder = tmp_path / "webproj"
+        folder.mkdir()
+        monkeypatch.delenv("AELVO_FOLDER", raising=False)
+        monkeypatch.setenv("AELVO_PROJECT", str(folder))
+        monkeypatch.chdir(tmp_path)
+
+        # Stub the heavy boot pieces; assert only the folder resolution + state.
+        import main as _main
+
+        with _patch("core.startup.detect_provider", return_value=(None, None, None, None)), \
+             _patch("main.init_provider_runtime", new=AsyncMock(return_value=None)), \
+             _patch("core.registry.MODEL_REGISTRY", {}):
+            # main_async is huge; directly verify the same helpers it now uses.
+            target = _main._resolve_boot_folder()
+            assert target == os.path.abspath(str(folder))
+            _ws = os.path.basename(os.path.normpath(target))
+            _main._scaffold_folder_state(target, _ws)
+            assert (folder / ".aelvo" / "anchor.md").exists()
+            assert os.path.basename(os.path.dirname(
+                _main._folder_state_paths(target)[0]
+            )) == ".aelvo"
+
+
 class TestResolveFolderAndPrompt:
     def _args(self, prompt=None, workspace="", ask=""):
         return type("Args", (), {"prompt": prompt or [], "workspace": workspace, "ask": ask})()

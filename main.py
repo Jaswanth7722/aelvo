@@ -10,8 +10,9 @@ Supported Providers:
 
 Usage:
     1. Set your provider's API key in .env
-    2. python main.py [optional_workspace_name]
-    3. python main.py --config (to change provider)
+    2. python main.py               # opens the current folder
+    3. python main.py --folder path # opens any folder (same semantics as Aelvo)
+    4. python main.py --web         # launch the web dashboard
 """
 
 import os
@@ -39,7 +40,7 @@ from core.governance import MemoryEngine
 from core.provider_runtime import init_provider_runtime
 from tools import build_extended_tool_registry
 from core.orchestration import Orchestrator
-from core.startup import select_project, detect_provider
+from core.startup import detect_provider
 from core.system_prompt import get_system_prompt, configure_paths
 from cognition import CognitiveEngine, CognitiveEngineConfig
 from repo_intelligence import RepoIntelligenceEngine
@@ -149,6 +150,31 @@ def set_active_workspace(path: str) -> str:
             log.warning("Silenced exception: %s", _ex)
     log.info("Active folder set to %s", resolved)
     return resolved
+
+
+def _resolve_boot_folder() -> str:
+    """Resolve the folder to open for the web/full boot (CLI parity).
+
+    Priority:
+      1. ``AELVO_FOLDER`` env — explicit folder to open.
+      2. ``AELVO_PROJECT`` / ``--project`` — treated as a **folder path** when
+         it points to an existing directory (the named-workspace registry is
+         gone; the value is a folder).
+      3. Current working directory.
+
+    Returns the resolved absolute folder path.
+    """
+    for key in ("AELVO_FOLDER", "AELVO_PROJECT"):
+        candidate = os.environ.get(key, "").strip()
+        if candidate:
+            resolved = os.path.abspath(os.path.expanduser(candidate))
+            if os.path.isdir(resolved):
+                return resolved
+            log.warning(
+                "%s='%s' is not an existing folder; using the current directory.",
+                key, candidate,
+            )
+    return os.getcwd()
 
 
 def _folder_state_paths(folder: str) -> tuple[str, str, str]:
@@ -1266,31 +1292,19 @@ class SessionTracker:
 # MAIN LOOP
 # ============================================================================
 async def main_async():
-    # ---- Interactive Project Selection ----
+    # ---- Folder Selection (CLI parity: open any folder, state in .aelvo/) ----
     global _ws_name, DB_PATH, ANCHOR_PATH, WORKSPACE_PATH, BACKUP_DIR
-    _ws_name = select_project(os.environ.get("AELVO_PROJECT", "").strip() or None)
-
-    # ---- Map Paths based on Selection ----
-    WORKSPACE_PATH = os.path.join(WORKSPACE_BASE, _ws_name)
-    DB_PATH = os.path.join(WORKSPACE_PATH, "memory.db")
-    ANCHOR_PATH = os.path.join(WORKSPACE_PATH, "anchor.md")
-    BACKUP_DIR = os.path.join(WORKSPACE_PATH, "backups")
-    # Keep the system prompt module in sync with the active workspace.
+    target = _resolve_boot_folder()
+    _ws_name = os.path.basename(os.path.normpath(target)) or "default"
+    WORKSPACE_PATH = target
+    DB_PATH, ANCHOR_PATH, BACKUP_DIR = _folder_state_paths(target)
+    # Keep the system prompt module in sync with the active folder.
     configure_paths(db_path=DB_PATH, anchor_path=ANCHOR_PATH, workspace_path=WORKSPACE_PATH)
 
-    # Ensure project folder + anchor exist (fresh workspaces otherwise crash
-    # with "FATAL: Anchor file missing" inside AelvoKernel)
-    os.makedirs(WORKSPACE_PATH, exist_ok=True)
-    if not os.path.exists(ANCHOR_PATH):
-        with open(ANCHOR_PATH, "w", encoding="utf-8") as _anchor_f:
-            _anchor_f.write(
-                "---\n"
-                "constraints:\n"
-                "  DEV_NAME: {value: AELVO User, locked: true}\n"
-                "---\n"
-                f"# AELVO Workspace Anchor — {_ws_name}\n"
-            )
-        log.info("Scaffolded new workspace anchor: %s", ANCHOR_PATH)
+    # Scaffold hidden .aelvo/ state + anchor inside the opened folder (fresh
+    # folders otherwise crash with "FATAL: Anchor file missing" inside
+    # AelvoKernel) — identical semantics to the CLI boot.
+    _scaffold_folder_state(target, _ws_name)
 
     # ---- Detect Provider & API Key ----
     try:
@@ -1697,7 +1711,10 @@ def main():
                         help="Console log verbosity: debug|info|warning|error (default: critical, fully quiet)")
     parser.add_argument("--provider", type=str, default=None, help="Select LLM provider (e.g., openai, anthropic, groq)")
     parser.add_argument("--model", type=str, default=None, help="Override model selection (e.g., gpt-4, claude-3-opus)")
-    parser.add_argument("--project", type=str, default=None, help="Select workspace (default: most recently used)")
+    parser.add_argument("--folder", type=str, default=None,
+                        help="Open a specific folder (default: current working directory)")
+    parser.add_argument("--project", type=str, default=None,
+                        help="Alias for --folder (kept for compatibility)")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Web dashboard bind host")
     parser.add_argument("--port", type=int, default=8000, help="Web dashboard HTTP port")
     parser.add_argument("--ws-port", type=int, default=8765, help="WebSocket bridge port")
@@ -1716,6 +1733,8 @@ def main():
     if args.model:
         os.environ["LLM_MODEL"] = args.model
         os.environ["AELVO_MODEL"] = args.model
+    if args.folder:
+        os.environ["AELVO_FOLDER"] = args.folder
     if args.project:
         os.environ["AELVO_PROJECT"] = args.project
     if args.host:
