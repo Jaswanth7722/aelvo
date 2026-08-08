@@ -621,6 +621,21 @@ class AelvoFileSystem:
                 )
 
     def read_file(self, path: str) -> dict:
+        # Guard: reading a directory is almost always a model mistake (weak
+        # local models call read_file on '.' instead of list_files). Fail
+        # with a clear, actionable error instead of a confusing backend one.
+        try:
+            safe = self._validate_path_python(path)
+        except PermissionError as exc:
+            return {"status": "error", "logs": str(exc)}
+        if safe.is_dir():
+            return {
+                "status": "error",
+                "logs": (
+                    f"'{path}' is a directory — use list_files to list its "
+                    "contents, not read_file."
+                ),
+            }
         params = {"path": path}
         res = self._invoke_rust_sandbox("read_file", False, params)
         if res.get("success"):
@@ -630,6 +645,21 @@ class AelvoFileSystem:
         return {"status": "error", "logs": res.get("logs", "Read failed.")}
 
     def read_file_range(self, path: str, start_line: int = 1, end_line: int = 120) -> dict:
+        # Same directory guard as read_file: line ranges only make sense on
+        # real files, and a weak model should get a pointer to list_files.
+        try:
+            safe = self._validate_path_python(path)
+        except PermissionError as exc:
+            return {"status": "error", "logs": str(exc), "executed": {"path": path}}
+        if safe.is_dir():
+            return {
+                "status": "error",
+                "logs": (
+                    f"'{path}' is a directory — use list_files to list its "
+                    "contents, not read_file_range."
+                ),
+                "executed": {"path": path},
+            }
         params = {"path": path, "start_line": start_line, "end_line": end_line}
         res = self._invoke_rust_sandbox("read_file_range", False, params)
         if res.get("success"):

@@ -298,6 +298,86 @@ def test_tool_loop_empty_respond_no_prior_tools_gets_placeholder():
     assert answer.strip()
 
 
+def test_tool_loop_failed_tool_does_not_skip_respond_in_batch():
+    """A failed tool in a batch must NOT skip a respond that follows it in
+    the SAME batch: the turn still closes with the respond's message. The old
+    `break` on failure abandoned the rest of the batch, swallowed the final
+    answer, and forced another (often garbage) model round-trip."""
+    orch = _make_orchestrator(_fail)  # bash_exec always fails
+
+    class _BatchAgent:
+        def __init__(self):
+            self.follow_ups = 0
+
+        def feed_result(self, outcome):
+            pass
+
+        async def send_user_message_async(self, msg, on_token=None):
+            self.follow_ups += 1
+            return json.dumps([{"tool": "respond", "args": {"message": ""}}])
+
+    agent = _BatchAgent()
+    streamed: list = []
+    answer = asyncio.run(
+        orch._execute_tool_loop(
+            agent,
+            json.dumps([
+                {"tool": "bash_exec", "args": {"command": "nope"}},
+                {"tool": "respond", "args": {"message": "Here is the final answer."}},
+            ]),
+            session_tracker=None,
+            tui_session=None,
+            stream_callback=streamed.append,
+            token_callback=None,
+            mcp_cli=None,
+            db_path=":memory:",
+        )
+    )
+    # The respond closed the turn inside the first batch — never re-asked.
+    assert agent.follow_ups == 0
+    assert answer == "Here is the final answer."
+    assert streamed == ["Here is the final answer."]
+
+
+def test_tool_loop_breaker_does_not_clobber_respond_in_same_batch():
+    """A batch of >=3 failed tools followed by a respond must end with the
+    respond's message — the circuit breaker fires only AFTER batch_complete is
+    honored, so it never overwrites a completed turn's answer."""
+    orch = _make_orchestrator(_fail)  # bash_exec always fails
+
+    class _BatchAgent:
+        def __init__(self):
+            self.follow_ups = 0
+
+        def feed_result(self, outcome):
+            pass
+
+        async def send_user_message_async(self, msg, on_token=None):
+            self.follow_ups += 1
+            return json.dumps([{"tool": "respond", "args": {"message": ""}}])
+
+    agent = _BatchAgent()
+    answer = asyncio.run(
+        orch._execute_tool_loop(
+            agent,
+            json.dumps([
+                {"tool": "bash_exec", "args": {"command": "x"}},
+                {"tool": "bash_exec", "args": {"command": "x"}},
+                {"tool": "bash_exec", "args": {"command": "x"}},
+                {"tool": "respond", "args": {"message": "Done despite failures."}},
+            ]),
+            session_tracker=None,
+            tui_session=None,
+            stream_callback=None,
+            token_callback=None,
+            mcp_cli=None,
+            db_path=":memory:",
+        )
+    )
+    assert agent.follow_ups == 0  # respond closed the turn in the first batch
+    assert answer == "Done despite failures."  # never replaced by the breaker
+
+
 def test_tool_loop_same_batch_tools_then_empty_respond_renders():
     """The classic tiny-model pattern: tools + an empty respond in ONE batch.
     Tools must execute first, then the respond renders their results."""

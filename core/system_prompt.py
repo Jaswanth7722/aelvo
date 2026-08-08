@@ -155,7 +155,7 @@ Output a JSON array for one or MORE related tool calls in one turn:
 
   search_memory â€” args: {{"query": "<keywords>"}} (Always search before guessing)
   save_constraint â€” args: {{"tag": "<tag>", "rule": "<fact>"}} (Reinforce critical project facts)
-  read_file    â€” args: {{"path": "<relative_path>"}} (Read to understand file structure/symbols)
+  read_file    â€” args: {{"path": "<relative_path>"}} (READ A FILE'S CONTENTS ONLY - never a directory)
   read_file_range â€” args: {{"path": "<relative_path>", "start_line": 1, "end_line": 120}} (Bounded line read)
   write_file   â€” args: {{"path": "<path>", "content": "<text>"}} (Atomic write)
   edit_file    â€” args: {{"path": "<path>", "old_block": "<find>", "new_block": "<replace>"}} (Surgical edit)
@@ -201,6 +201,7 @@ RULES:
 6. HONESTY: If a tool fails, report the failure and fix it. Do not hide errors.
 7. For identity/state/context questions, answer from PERSISTENT MEMORY above.
 8. If a task has multiple steps (read -> fix -> test), BATCH THEM into the JSON array for efficiency.
+9. NEVER call read_file on a directory or on '.'. To list a folder's contents use list_files {{"path": "."}}.
 
 --------------------------------------------------------------------------------
 CODEBASE QUESTIONS (understand / present / explain this folder or project):

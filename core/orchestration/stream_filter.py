@@ -26,6 +26,13 @@ from typing import Callable, Optional
 #: not an answer.
 _TOOL_MARKERS = ("{", "[", "#")
 
+#: A response that OPENS with a markdown code fence is almost always a
+#: fenced tool-call JSON batch (````` ```json\n[...]`````) or a fenced
+#: kernel command — weak models wrap their machine output in fences. The
+#: sniff markers above only catch bare ``{``/``[``, so without this the raw
+#: JSON would stream to the terminal before the tool loop hides it.
+_FENCE_MARKER = "```"
+
 
 class TokenStreamFilter:
     """Stateful filter that forwards prose tokens live, hides tool JSON.
@@ -66,8 +73,9 @@ class TokenStreamFilter:
         # ── sniff mode ────────────────────────────────────────────────────
         self._buffer += token
         stripped = self._buffer.lstrip()
-        if stripped.startswith(_TOOL_MARKERS):
-            # JSON array/object of tool calls, or a '#command'. Suppress.
+        if stripped.startswith(_TOOL_MARKERS) or stripped.startswith(_FENCE_MARKER):
+            # JSON array/object of tool calls, a '#command', or a fenced
+            # (```json) tool batch. Suppress.
             self._mode = "suppressed"
             return
         if len(stripped) >= self._max_sniff:

@@ -1660,8 +1660,20 @@ class Orchestrator:
 
                     if outcome.get("status") == "error":
                         consecutive_failures += 1
-                        break
-                    consecutive_failures = 0
+                        # Do NOT break the batch: a ``respond`` that closes the
+                        # turn may follow the failed tool. Skipping the rest of
+                        # the batch would swallow the final answer and force
+                        # another (often garbage) model round-trip. The circuit
+                        # breaker below still stops the loop after enough
+                        # consecutive failures.
+                    else:
+                        consecutive_failures = 0
+
+                # A completed turn always wins: if the batch ended with a
+                # respond (even after tool failures), never replace its answer
+                # with the circuit-breaker message.
+                if batch_complete:
+                    break
 
                 # Circuit breaker: stop asking the model once its tool calls
                 # keep failing, and hand back a graceful answer instead of
@@ -1679,9 +1691,6 @@ class Orchestrator:
                     if session_tracker:
                         session_tracker.record_answer(final_answer)
                         session_tracker.save(db_path)
-                    break
-
-                if batch_complete:
                     break
 
                 # Ask the LLM what to do next. Stream prose tokens live so

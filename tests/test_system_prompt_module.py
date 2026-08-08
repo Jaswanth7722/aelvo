@@ -135,6 +135,18 @@ class TestPromptStructure:
         assert "FORMAT 1" in full and "FORMAT 1" not in chat
         assert "JSON array" in full and "JSON array" not in chat
 
+    def test_prompt_never_read_file_a_directory(self):
+        """The tool protocol must make read_file FILES ONLY and point
+        directory listing at list_files — the exact mistake the tiny model
+        made in the transcript (read_file on '.' for 'list the files')."""
+        prompt = get_system_prompt()
+        # The read_file entry is clarified (no more 'understand file structure').
+        assert "never a directory" in prompt
+        # Rule 9 explicitly forbids read_file on a directory / '.',
+        # and names list_files as the way to list a folder.
+        assert "NEVER call read_file on a directory" in prompt
+        assert "list_files" in prompt
+
 
 class TestConfigurePaths:
     """configure_paths() updates where the prompt reads state and anchors."""

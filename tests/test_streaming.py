@@ -141,6 +141,30 @@ class TestTokenStreamFilter:
         f.flush()
         assert sink == []  # flush must not leak suppressed content
 
+    def test_fenced_json_suppressed(self):
+        """A weak model that wraps its tool JSON in a ```json code fence must
+        be suppressed too — the fence started with a backtick, so the old
+        marker check ({/[) missed it and streamed raw JSON to the terminal."""
+        sink = []
+        f = TokenStreamFilter(sink.append)
+        f("```json\n")
+        f('[{"tool": "list_files", "args": {"path": "."}}]')
+        f("\n```")
+        f.flush()
+        assert sink == []
+        assert f.suppressed is True
+        assert f.streamed is False
+
+    def test_fenced_json_with_leading_whitespace_suppressed(self):
+        """Fences preceded by blank lines (common LLM formatting) still hide."""
+        sink = []
+        f = TokenStreamFilter(sink.append)
+        f("\n\n```json\n")
+        f('[{"tool": "read_file", "args": {"path": "x.py"}}]')
+        f.flush()
+        assert sink == []
+        assert f.suppressed is True
+
 
 # ── AelvoAgent._call_llm streaming ──────────────────────────────────────────
 

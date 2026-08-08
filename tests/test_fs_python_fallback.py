@@ -61,6 +61,26 @@ class TestFallbackFileOperations:
         assert res.get("status") == "success"
         assert res.get("data") == ["line2", "line3", "line4"]
 
+    def test_read_file_on_directory_returns_list_files_hint(self, fs_env):
+        """read_file on a directory (the tiny-model 'list the files' mistake:
+        read_file on '.') must fail with a clear pointer to list_files, not a
+        confusing backend error — and must never return success."""
+        res = fs_env.read_file(".")
+        assert res.get("status") == "error"
+        assert "list_files" in res.get("logs", "")
+        assert "directory" in res.get("logs", "")
+
+        res2 = fs_env.read_file_range(".")
+        assert res2.get("status") == "error"
+        assert "list_files" in res2.get("logs", "")
+
+    def test_read_file_normal_file_still_works(self, fs_env, tmp_path):
+        """The directory guard must not break reading real files."""
+        (tmp_path / "note.txt").write_text("content", encoding="utf-8")
+        res = fs_env.read_file("note.txt")
+        assert res.get("status") == "success"
+        assert res.get("data") == "content"
+
     def test_edit_file_block(self, fs_env, tmp_path):
         (tmp_path / "code.py").write_text("def old():\n    pass\n", encoding="utf-8")
         res = fs_env.edit_file_block("code.py", "def old():", "def new():")
