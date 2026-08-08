@@ -27,30 +27,6 @@ import os
 log = logging.getLogger("aelvo.cli.boot")
 
 
-def _register_workspace(name: str, path: str) -> None:
-    """Record an opened folder in the global projects DB (real path).
-
-    Keeps folder-opened sessions visible in ``/projects`` — purely a
-    convenience index; nothing depends on it for boot.
-    """
-    try:
-        import sqlite3
-
-        from config.settings import GLOBAL_DB_PATH
-
-        with sqlite3.connect(GLOBAL_DB_PATH) as db:
-            db.execute(
-                "INSERT OR IGNORE INTO projects (name, description, path) VALUES (?, ?, ?)",
-                (name, "", path),
-            )
-            db.execute(
-                "UPDATE projects SET last_opened = CURRENT_TIMESTAMP WHERE name = ?",
-                (name,),
-            )
-    except Exception as exc:  # pragma: no cover - defensive boot path
-        log.debug("Could not register folder %s: %s", name, exc)
-
-
 async def boot_backend(*, project: str = "", workspace_dir: str = "") -> dict:
     """Build the backend components the CLI needs; returns ``run_cli`` kwargs.
 
@@ -82,7 +58,6 @@ async def boot_backend(*, project: str = "", workspace_dir: str = "") -> dict:
     _main.DB_PATH, _main.ANCHOR_PATH, _main.BACKUP_DIR = _main._folder_state_paths(
         target
     )
-    _register_workspace(ws_name, target)
 
     # Keep the system prompt module in sync with the active folder.
     from core.system_prompt import configure_paths
@@ -240,7 +215,6 @@ async def boot_backend(*, project: str = "", workspace_dir: str = "") -> dict:
         "runtime_cli": runtime_cli,
         "provider_runtime": provider_runtime,
         "fs": fs,
-        "workspace_switcher": _main.set_active_workspace,
         "provider_name": provider_name,
         "model": model,
     }

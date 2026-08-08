@@ -1561,7 +1561,6 @@ async def main_async():
             runtime_cli=runtime_cli,
             provider_runtime=provider_runtime,
             fs=fs,
-            workspace_switcher=set_active_workspace,
             provider_name=provider_name,
             model=model,
             one_shot=_one_shot,

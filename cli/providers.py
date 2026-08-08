@@ -143,6 +143,9 @@ async def available_models(ctx, provider_key: str):
     cfg = get_registry().get(key)
     curated = provider_models(key)
     if cfg is not None:
+        # Local providers need no API key — ``resolve_api_key`` returns a
+        # truthy placeholder for them, so the live list is fetched straight
+        # from the local server (ollama / vLLM / LM Studio / llama.cpp).
         api_key = resolve_api_key(key, cfg.env_key)
         if api_key:
             from cli.live_models import fetch_live_models_async
@@ -175,6 +178,9 @@ def list_models_for(ctx, provider_key: str) -> list:
     cfg = get_registry().get(key)
     curated = provider_models(key)
     if cfg is not None:
+        # Local providers need no API key — ``resolve_api_key`` returns a
+        # truthy placeholder for them, so the live list is fetched straight
+        # from the local server (ollama / vLLM / LM Studio / llama.cpp).
         api_key = resolve_api_key(key, cfg.env_key)
         if api_key:
             from cli.live_models import fetch_live_models
@@ -195,6 +201,21 @@ def list_models_for(ctx, provider_key: str) -> list:
     return []
 
 
+# ── local provider helpers ───────────────────────────────────────────────────
+
+def _is_local(provider_key: str) -> bool:
+    """True for local runtimes (ollama / vLLM / LM Studio / llama.cpp).
+
+    Local providers need no API key — this single check keeps that policy in
+    one place so every caller (picker, switch, status, live list) agrees.
+    """
+    try:
+        cfg = get_registry().get((provider_key or "").lower())
+        return bool(cfg is not None and getattr(cfg, "local", False))
+    except Exception:
+        return False
+
+
 # ── credentials ──────────────────────────────────────────────────────────────
 
 def _vault_key(provider_key: str) -> str:
@@ -211,7 +232,14 @@ def _vault_key(provider_key: str) -> str:
 
 
 def resolve_api_key(provider_key: str, env_key: str) -> str:
-    """Find a usable key: environment first, then the encrypted vault."""
+    """Find a usable key: environment first, then the encrypted vault.
+
+    Local providers need no key — a placeholder is returned so callers that
+    branch on ``bool(api_key)`` (e.g. the live model list) treat them as
+    configured without ever asking for credentials.
+    """
+    if _is_local(provider_key):
+        return "local-trust-mode"
     key = os.environ.get(env_key, "").strip()
     if key:
         return key
@@ -221,9 +249,12 @@ def resolve_api_key(provider_key: str, env_key: str) -> str:
 def has_api_key(provider_key: str, env_key: str) -> bool:
     """Cheap presence check (no decryption): env var, else vault metadata.
 
+    Local providers always count as having a key (they don't need one).
     Avoids the expensive PBKDF2 decrypt per provider when rendering the
     provider table — only ``list_credentials`` metadata is read here.
     """
+    if _is_local(provider_key):
+        return True
     if os.environ.get(env_key, "").strip():
         return True
     try:
@@ -239,10 +270,13 @@ def has_api_key(provider_key: str, env_key: str) -> bool:
 def api_key_source(provider_key: str, env_key: str) -> str:
     """Where the provider's API key lives: ``'env'``, ``'vault'``, or ``''``.
 
-    Resolution order mirrors ``resolve_api_key`` (env first, then the
+    Local providers report ``'local'`` (no key needed). For cloud providers
+    the resolution order mirrors ``resolve_api_key`` (env first, then the
     encrypted vault) so ``/status`` can tell the user which source is
     actually in use without ever revealing the key itself.
     """
+    if _is_local(provider_key):
+        return "local"
     if os.environ.get(env_key, "").strip():
         return "env"
     # Env was empty and has_api_key is True ⇒ the vault has it.
@@ -528,9 +562,12 @@ async def switch_provider(
         ctx.console.print(Text(f"Unknown provider: {name} — use /provider to list.", style="aelvo.err"))
         return False
 
+    is_local = _is_local(name.lower())
     api_key = inline_key.strip() or resolve_api_key(name.lower(), cfg.env_key)
     key_was_new = False
-    if not api_key:
+    if is_local:
+        api_key = "local-trust-mode"  # local runtimes never need credentials
+    elif not api_key:
         api_key = await prompt_api_key(cfg.name)
         key_was_new = bool(api_key)
     if not api_key:
@@ -597,7 +634,10 @@ async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
     current = (ctx.provider_name or "").lower()
     items = []
     for key, cfg in sorted(get_registry().items()):
-        creds = "✓ key" if has_api_key(key, cfg.env_key) else "no key"
+        if _is_local(key):
+            creds = "local"
+        else:
+            creds = "✓ key" if has_api_key(key, cfg.env_key) else "no key"
         marker = " ● active" if key == current else ""
         label = f"{cfg.name:<20} {cfg.default_model}   [{creds}]{marker}"
         items.append((key, label))
@@ -615,45 +655,48 @@ async def pick_provider(ctx) -> Optional[Tuple[str, str]]:
     if cfg is None:
         return None
 
-    # The API key is entered as part of provider selection (before the model
-    # step), so a fresh key also powers the live model list.
-    if not resolve_api_key(picked, cfg.env_key):
-        api_key = await prompt_api_key(cfg.name)
-        if not api_key:
-            ctx.console.print(
-                Text(f"No API key provided for {cfg.name} — provider not switched.", style="aelvo.err")
+    # Local runtimes (ollama / vLLM / LM Studio / llama.cpp) need no API key —
+    # skip key entry and rotation entirely and go straight to the model step.
+    if not _is_local(picked):
+        # The API key is entered as part of provider selection (before the
+        # model step), so a fresh key also powers the live model list.
+        if not resolve_api_key(picked, cfg.env_key):
+            api_key = await prompt_api_key(cfg.name)
+            if not api_key:
+                ctx.console.print(
+                    Text(f"No API key provided for {cfg.name} — provider not switched.", style="aelvo.err")
+                )
+                return None
+            store_api_key(picked, cfg.name, api_key)
+        else:
+            # A key already exists — offer to replace/rotate it right here.
+            # Esc or "No" keeps the current key and continues to the model step.
+            rotate = await pick_item(
+                f"Replace the stored key for {cfg.name}?",
+                [("yes", "Yes — enter a new key"), ("no", "No — keep the existing key")],
+                subtitle="The current key stays in use until you replace it",
+                default="no",
             )
-            return None
-        store_api_key(picked, cfg.name, api_key)
-    else:
-        # A key already exists — offer to replace/rotate it right here. Esc or
-        # "No" keeps the current key and continues to the model step.
-        rotate = await pick_item(
-            f"Replace the stored key for {cfg.name}?",
-            [("yes", "Yes — enter a new key"), ("no", "No — keep the existing key")],
-            subtitle="The current key stays in use until you replace it",
-            default="no",
-        )
-        if rotate == "yes":
-            new_key = await prompt_api_key(cfg.name)
-            if new_key and store_api_key(picked, cfg.name, new_key):
-                ctx.console.print(
-                    Text(f"✓ API key for {cfg.name} replaced.", style="aelvo.ok")
-                )
-            elif new_key:
-                ctx.console.print(
-                    Text(
-                        f"Could not store the new key for {cfg.name} — keeping the existing one.",
-                        style="aelvo.err",
+            if rotate == "yes":
+                new_key = await prompt_api_key(cfg.name)
+                if new_key and store_api_key(picked, cfg.name, new_key):
+                    ctx.console.print(
+                        Text(f"✓ API key for {cfg.name} replaced.", style="aelvo.ok")
                     )
-                )
-            else:
-                ctx.console.print(
-                    Text(
-                        f"Key rotation cancelled for {cfg.name} — keeping the existing key.",
-                        style="aelvo.dim",
+                elif new_key:
+                    ctx.console.print(
+                        Text(
+                            f"Could not store the new key for {cfg.name} — keeping the existing one.",
+                            style="aelvo.err",
+                        )
                     )
-                )
+                else:
+                    ctx.console.print(
+                        Text(
+                            f"Key rotation cancelled for {cfg.name} — keeping the existing key.",
+                            style="aelvo.dim",
+                        )
+                    )
 
     model = await pick_model(ctx, picked)
     if not model:
@@ -768,7 +811,10 @@ def provider_table(ctx) -> Table:
     table.add_column("Creds", style="aelvo.snow")
     table.add_column("", style="aelvo.ok")
     for key, cfg in sorted(get_registry().items()):
-        creds = "✓" if has_api_key(key, cfg.env_key) else "—"
+        if _is_local(key):
+            creds = "local"
+        else:
+            creds = "✓" if has_api_key(key, cfg.env_key) else "—"
         active = "● active" if key == (ctx.provider_name or "").lower() else ""
         table.add_row(key, cfg.name, cfg.default_model, creds, active)
     return table

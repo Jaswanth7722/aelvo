@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from cli.commands import CliContext, handle_command, is_slash_command, parse_command
+from cli.commands import _ALIASES, _COMMANDS, CliContext, handle_command, is_slash_command, parse_command
 from cli.session import SessionRecorder, TerminalSession
 from cli.theme import build_console
 from runtime_next.models.events import EventType as RuntimeEventType
@@ -50,21 +50,27 @@ def test_is_slash_command():
 
 def test_parse_command():
     assert parse_command("/help") == ("help", "")
-    assert parse_command("/workspace /foo/bar") == ("workspace", "/foo/bar")
     assert parse_command("/ask  write a test ") == ("ask", "write a test")
 
 
 def test_parse_command_aliases():
     assert parse_command("/q")[0] == "exit"
     assert parse_command("/quit")[0] == "exit"
-    assert parse_command("/cd")[0] == "workspace"
-    assert parse_command("/open")[0] == "workspace"
     assert parse_command("/h")[0] == "help"
     assert parse_command("/switch nvidia")[0] == "provider"
     assert parse_command("/providers")[0] == "provider"
     assert parse_command("/sysinfo")[0] == "version"
     assert parse_command("/logs 20")[0] == "log"
     assert parse_command("/model gpt-4o")[0] == "model"
+
+
+def test_workspace_commands_are_removed():
+    """The workspace registry/switching commands are gone — AELVO opens any
+    folder directly, so /workspace /open /cd /projects must be unknown."""
+    for cmd in ("workspace", "open", "cd", "projects"):
+        assert cmd not in _COMMANDS, f"/{cmd} should have been removed"
+        assert cmd not in _ALIASES, f"{cmd} alias should have been removed"
+    assert "list" not in _ALIASES
 
 
 def test_unknown_command_returns_none():
@@ -148,46 +154,86 @@ def test_session_recorder_empty_query_skips(tmp_path):
             n = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
         assert n == 0
 
+# ── provider registry ───────────────────────────────────────────────────────
 
-# ── workspace slash command ─────────────────────────────────────────────────
+def test_provider_registry_has_all_providers():
+    """The picker must offer every provider from auth.config's registry,
+    including the local runtimes and cloud platforms (22+ total)."""
+    from cli.providers import get_registry
 
-def test_workspace_command_switches(tmp_path):
-    root = tmp_path / "proj"
-    root.mkdir()
-    calls = []
+    reg = get_registry()
+    expected = {
+        "openai", "anthropic", "google", "groq", "mistral", "cohere",
+        "xai", "deepseek", "together", "fireworks", "perplexity",
+        "openrouter", "huggingface", "ollama", "lm_studio", "vllm",
+        "llama_cpp", "azure", "bedrock", "vertex",
+    }
+    assert expected <= set(reg.keys()), f"missing: {expected - set(reg.keys())}"
+    assert len(reg) >= 20
 
-    def switcher(path):
-        calls.append(path)
-        return str(path)
 
-    class FakeOrchestrator:
-        def __init__(self):
-            self.root = None
+def test_local_providers_need_no_key():
+    """Local runtimes (ollama, lm_studio, vllm, llama_cpp) report a usable
+    key without any env var or vault entry, and never require one."""
+    import os
 
-        def set_workspace_root(self, path):
-            self.root = path
-            return path
+    from cli.providers import api_key_source, has_api_key, resolve_api_key
 
-    class FakeFS:
-        def __init__(self):
-            self.base = None
+    for key in ("ollama", "lm_studio", "vllm", "llama_cpp"):
+        assert resolve_api_key(key, "") == "local-trust-mode"
+        assert has_api_key(key, "") is True
+        assert api_key_source(key, "") == "local"
+    # A cloud provider must never report "local".
+    os.environ.pop("OPENAI_API_KEY", None)
+    assert api_key_source("openai", "OPENAI_API_KEY") != "local"
 
-        def set_base_path(self, path):
-            self.base = path
-            return path
 
-    orch = FakeOrchestrator()
-    ffs = FakeFS()
+def test_provider_table_marks_local():
+    from cli.providers import provider_table
+
     ctx = CliContext(
-        agent=None, orchestrator=orch, memory_engine=None, aelvo_kernel=None,
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
         console=build_console(), db_path="", workspace_path=".", project="t",
-        fs=ffs, workspace_switcher=switcher, provider_name=None, model=None,
+        provider_name="ollama", model="llama3.2",
     )
-    assert asyncio.run(handle_command(ctx, "workspace", str(root))) is None
-    assert orch.root == str(root)
-    assert ffs.base == str(root)
-    assert ctx.workspace_path == str(root)
-    assert calls == [str(root)]
+    themed = build_console()
+    with themed.capture() as cap:
+        themed.print(provider_table(ctx))
+    rendered = cap.get()
+    assert "ollama" in rendered
+    assert "local" in rendered
+
+
+def test_vault_is_universal_not_folder_scoped(tmp_path):
+    """API keys live in the global data dir, never inside the opened folder."""
+    from core.provider_runtime import DEFAULT_VAULT_PATH
+
+    assert str(tmp_path) not in str(DEFAULT_VAULT_PATH)
+    assert DEFAULT_VAULT_PATH.endswith("credential_vault.db")
+
+
+def test_switch_provider_local_skips_key_and_vault(monkeypatch):
+    """Switching to a local provider must not prompt for a key, must use the
+    local-trust placeholder, and must not write anything to the vault."""
+    from unittest.mock import AsyncMock, patch
+
+    from cli import providers
+
+    ctx = CliContext(
+        agent=None, orchestrator=None, memory_engine=None, aelvo_kernel=None,
+        console=build_console(), db_path="", workspace_path=".", project="t",
+        provider_name="openai", model="gpt-4o",
+    )
+    monkeypatch.setattr(providers, "prompt_api_key", AsyncMock(return_value="should-not-be-called"))
+    monkeypatch.setattr(providers, "store_api_key", lambda *a, **k: (_ for _ in ()).throw(AssertionError("store_api_key must not be called for local")))
+    with patch("cli.providers.build_agent") as mock_build:
+        mock_build.return_value = object()  # agent
+        result = asyncio.run(providers.switch_provider(ctx, "ollama"))
+    assert result is True
+    mock_build.assert_called_once()
+    args = mock_build.call_args.args
+    assert args[0] == "ollama"  # provider key
+    assert args[2] == "local-trust-mode"  # api_key positional
 
 
 def test_toolbar_builder_returns_prompt_toolkit_items():

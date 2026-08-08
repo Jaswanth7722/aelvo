@@ -2,8 +2,9 @@
 commands.py — Slash-command registry for the AELVO CLI.
 
 Slash commands are the terminal-native way to drive the agent without burning
-a token on a chat turn: switch workspaces, inspect status, list projects and
-models, clear history, and exit.
+a token on a chat turn: pick providers and models, inspect status, clear
+history, and exit. AELVO opens any folder directly — there is no workspace
+registry or switching command.
 
 Model selection lives in ``/provider`` (provider → its model picker) and
 ``/model`` — there is no separate ``/models`` listing command.
@@ -19,7 +20,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import sqlite3
 from typing import Any, Optional, Tuple
 
 from rich.table import Table
@@ -32,10 +32,8 @@ _ALIASES = {
     "help": "help", "h": "help", "?": "help",
     "exit": "exit", "quit": "exit", "q": "exit",
     "clear": "clear",
-    "workspace": "workspace", "open": "workspace", "cd": "workspace",
     "pwd": "pwd",
     "status": "status", "info": "status",
-    "projects": "projects", "list": "projects",
     "provider": "provider", "providers": "provider", "switch": "provider",
     "model": "model",
     "log": "log", "logs": "log",
@@ -48,10 +46,8 @@ _COMMANDS = {
     "help": ("Show this help", "/help"),
     "exit": ("Exit the CLI", "/exit"),
     "clear": ("Clear the screen ('/clear history' resets the conversation)", "/clear [history]"),
-    "workspace": ("Point the agent at a folder (re-jails file tools)", "/workspace <dir>"),
-    "pwd": ("Print the active workspace", "/pwd"),
-    "status": ("Provider, model, workspace + agent metrics", "/status"),
-    "projects": ("List known workspaces", "/projects"),
+    "pwd": ("Print the active folder", "/pwd"),
+    "status": ("Provider, model, folder + agent metrics", "/status"),
     "provider": ("Pick / switch the LLM provider; keys are asked inline and existing ones can be rotated", "/provider [name] [key]"),
     "model": ("Pick or switch the active model", "/model [name]"),
     "log": ("Tail the AELVO log file", "/log [lines]"),
@@ -79,7 +75,6 @@ class CliContext:
         runtime_cli=None,
         provider_runtime=None,
         fs=None,
-        workspace_switcher=None,
         provider_name=None,
         model=None,
     ):
@@ -95,7 +90,6 @@ class CliContext:
         self.runtime_cli = runtime_cli
         self.provider_runtime = provider_runtime
         self.fs = fs
-        self.workspace_switcher = workspace_switcher
         self.provider_name = provider_name
         self.model = model
         self.state: dict = {"last_prompt": ""}
@@ -142,14 +136,10 @@ async def handle_command(
         return ("exit", None)
     elif name == "clear":
         _cmd_clear(ctx, arg)
-    elif name == "workspace":
-        _cmd_workspace(ctx, arg)
     elif name == "pwd":
         ctx.console.print(Text(ctx.workspace_path or "-", style="aelvo.snow"))
     elif name == "status":
         _cmd_status(ctx)
-    elif name == "projects":
-        _cmd_projects(ctx)
     elif name == "provider":
         from cli.providers import pick_provider, provider_table, switch_provider
         parts = arg.split(maxsplit=1)
@@ -203,43 +193,12 @@ def _cmd_clear(ctx: CliContext, arg: str) -> None:
         )
 
 
-def _cmd_workspace(ctx: CliContext, arg: str) -> None:
-    if not arg.strip():
-        ctx.console.print(Text(ctx.workspace_path or "-", style="aelvo.snow"))
-        return
-    target = os.path.expanduser(arg.strip())
-    if not os.path.isabs(target):
-        target = os.path.abspath(target)
-    created = False
-    if not os.path.isdir(target):
-        os.makedirs(target, exist_ok=True)
-        created = True
-
-    if ctx.workspace_switcher is None:
-        ctx.console.print(Text("Workspace switching is unavailable in this mode.", style="aelvo.err"))
-        return
-
-    resolved = ctx.workspace_switcher(target)  # validates dir + invalidates prompt cache
-    try:
-        ctx.orchestrator.set_workspace_root(resolved)
-    except Exception as exc:
-        log.debug("Orchestrator workspace switch failed: %s", exc)
-    if ctx.fs is not None:
-        try:
-            ctx.fs.set_base_path(resolved)
-        except Exception as exc:
-            log.debug("fs.set_base_path failed: %s", exc)
-    ctx.workspace_path = resolved
-    note = " (created)" if created else ""
-    ctx.console.print(Text(f"✓ Workspace{note}: {resolved}", style="aelvo.ok"))
-
-
 def _cmd_status(ctx: CliContext) -> None:
     table = Table(title="AELVO status", title_style="aelvo.gold")
     table.add_column("Key", style="aelvo.purple")
     table.add_column("Value", style="aelvo.snow")
     table.add_row("Project", ctx.project or "-")
-    table.add_row("Workspace", ctx.workspace_path or "-")
+    table.add_row("Folder", ctx.workspace_path or "-")
     table.add_row("Provider", ctx.provider_name or "not configured")
     table.add_row("Model", ctx.model or "-")
     # Where the active provider's API key lives (env var vs encrypted vault).
@@ -249,7 +208,7 @@ def _cmd_status(ctx: CliContext) -> None:
         cfg = get_registry().get(ctx.provider_name.lower())
         if cfg is not None:
             source = api_key_source(ctx.provider_name.lower(), cfg.env_key)
-            key_label = {"env": "env var", "vault": "encrypted vault"}.get(
+            key_label = {"env": "env var", "vault": "encrypted vault", "local": "none needed"}.get(
                 source, "not configured"
             )
         else:
@@ -290,30 +249,6 @@ def _cmd_status(ctx: CliContext) -> None:
                 ctx.console.print(Text(result["msg"], style="aelvo.dim"))
         except Exception as exc:
             ctx.console.print(Text(f"runtime dashboard unavailable: {exc}", style="aelvo.dim"))
-
-
-def _cmd_projects(ctx: CliContext) -> None:
-    from config.settings import GLOBAL_DB_PATH
-
-    db = str(GLOBAL_DB_PATH)
-    table = Table(title="Recently opened folders", title_style="aelvo.gold")
-    table.add_column("Name", style="aelvo.brand")
-    table.add_column("Path", style="aelvo.snow")
-    table.add_column("Last opened", style="aelvo.dim")
-    try:
-        with sqlite3.connect(db) as conn:
-            rows = conn.execute(
-                "SELECT name, path, last_opened FROM projects ORDER BY last_opened DESC"
-            ).fetchall()
-    except Exception as exc:
-        ctx.console.print(Text(f"Could not list projects: {exc}", style="aelvo.err"))
-        return
-    if not rows:
-        ctx.console.print(Text("No folders opened yet.", style="aelvo.dim"))
-        return
-    for name, path, last_opened in rows:
-        table.add_row(name or "", path or "", str(last_opened or ""))
-    ctx.console.print(table)
 
 
 async def _cmd_model(ctx: CliContext, arg: str) -> None:
@@ -400,7 +335,7 @@ def _cmd_version(ctx: CliContext) -> None:
     table.add_row("Provider", ctx.provider_name or "not configured")
     table.add_row("Model", ctx.model or "-")
     table.add_row("Project", ctx.project or "-")
-    table.add_row("Workspace", ctx.workspace_path or "-")
+    table.add_row("Folder", ctx.workspace_path or "-")
     for mod_name in ("openai", "anthropic", "rich", "prompt_toolkit", "chromadb"):
         try:
             mod = __import__(mod_name)

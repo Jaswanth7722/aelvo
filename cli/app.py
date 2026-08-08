@@ -9,7 +9,7 @@ so the CLI and web are always in sync.
 Features:
     * Streaming REPL: Enter submits, Esc+Enter inserts a newline.
     * Live tool activity rendered as it executes (reads, writes, bash, …).
-    * Slash commands: /help /exit /clear /workspace /pwd /status /projects
+    * Slash commands: /help /exit /clear /pwd /status /provider /model
       /retry /ask.
     * Per-workspace command history + auto-suggest.
     * One-shot mode: ``python main.py --cli --ask "prompt"``.
@@ -93,12 +93,8 @@ def _make_completer() -> NestedCompleter:
             "/exit": None,
             "/quit": None,
             "/clear": None,
-            "/workspace": None,
-            "/open": None,
-            "/cd": None,
             "/pwd": None,
             "/status": None,
-            "/projects": None,
             "/provider": None,
             "/switch": None,
             "/model": None,
@@ -297,7 +293,6 @@ async def run_cli(
     runtime_cli=None,
     provider_runtime=None,
     fs=None,
-    workspace_switcher=None,
     provider_name: Optional[str] = None,
     model: Optional[str] = None,
     one_shot: str = "",
@@ -318,7 +313,6 @@ async def run_cli(
         runtime_cli=runtime_cli,
         provider_runtime=provider_runtime,
         fs=fs,
-        workspace_switcher=workspace_switcher,
         provider_name=provider_name,
         model=model,
     )

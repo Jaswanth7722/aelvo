@@ -42,7 +42,7 @@ AELVO solves this with **seven specialized agents** that collaborate through a s
 | **Memory Systems** | Dual-sync (SQLite + ChromaDB vector), cross-specialist memory |
 | **Learning Engine** | Pattern extraction from execution deltas, confidence calibration |
 | **Web + Terminal UI** | Web dashboard with chat/Files/agent metrics, plus a CodeBuff-style terminal CLI |
-| **Multi-Provider** | OpenAI, Anthropic, Google, Groq, Together, Mistral, NVIDIA, 20+ providers |
+| **Multi-Provider** | 22+ providers: OpenAI, Anthropic, Google, Groq, Mistral, Cohere, xAI, DeepSeek, Together, Fireworks, Perplexity, OpenRouter, Hugging Face, NVIDIA, Azure, Bedrock, Vertex + local (Ollama, LM Studio, vLLM, llama.cpp) |
 | **Long-Horizon Planning** | Session continuity, goal hierarchy, multi-session awareness |
 | **Plan Calibration** | Track outcomes vs plans, adjust future strategies automatically |
 
@@ -152,12 +152,20 @@ Force-route to specific specialists with `@SPECIALIST` prefixes:
 | `/help` | Show all commands |
 | `/exit` · `/quit` | Exit the CLI |
 | `/clear [history]` | Clear the screen; `/clear history` resets the conversation |
-| `/workspace <dir>` · `/open` · `/cd` | Point the agent at a folder (re-jails its tools) |
 | `/pwd` | Print the active folder |
-| `/status` | Provider, model, workspace + live agent metrics |
-| `/projects` | List known workspaces |
+| `/status` | Provider, model, folder + live agent metrics |
 | `/provider [name] [key]` | Two-step interactive picker: choose a provider, then one of its models (or `/provider <name> [key]` directly); the API key is asked inline as part of selection — existing keys can be replaced/rotated right in the picker — and stored in the encrypted vault |
 | `/model [name]` | Open an interactive picker to switch the active model (or `/model <name>` directly) |
+
+There is no workspace registry or `/workspace` command — `aelvo` opens any
+folder directly (the current directory by default, or `aelvo <folder>`), and
+per-folder state lives in `.aelvo/` inside that folder. API keys are stored
+in the universal AELVO space (`~/.aelvo`), never inside the opened folder.
+
+**Local runtimes** (Ollama, LM Studio, vLLM, llama.cpp) are first-class
+providers: pick them like any other — no API key needed. The model list is
+fetched live from your local server (`localhost:11434`, `:1234`, `:8000`,
+`:8080` respectively), with the curated catalog as fallback.
 | `/log [lines]` | Tail the AELVO log file |
 | `/version` | Show version and environment info |
 | `/retry` | Re-run the previous prompt |
