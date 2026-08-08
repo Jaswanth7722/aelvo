@@ -1,0 +1,20 @@
+# Compiled Python bytecode — never ship
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtualenv (created at install time)
+.venv/
+
+# Runtime state artifacts
+global_anchor.md
+workspace/
+.aelvo_runtime/
+
+# Full dev requirements (the lean CLI set ships as requirements-cli.txt)
+requirements.txt
+
+# Repo tooling
+ruff.toml
+pytest.ini
+validate.py

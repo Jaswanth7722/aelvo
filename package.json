@@ -48,6 +48,11 @@
     "*.py",
     "*.md",
     "*.txt",
-    "*.toml"
+    "*.toml",
+    "!**/__pycache__/",
+    "!**/tests/",
+    "!global_anchor.md",
+    "!requirements.txt",
+    "!ruff.toml"
   ]
 }
