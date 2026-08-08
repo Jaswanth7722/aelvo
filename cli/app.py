@@ -155,6 +155,7 @@ async def _execute_turn_task(ctx, user_input: str, recorder, terminal):
         session_tracker=recorder,
         tui_session=terminal,
         stream_callback=terminal.on_final_answer,
+        token_callback=terminal.on_token,
         mcp_cli=ctx.mcp_cli,
         db_path=ctx.db_path,
     )
@@ -185,6 +186,10 @@ async def _run_turn(ctx: CliContext, user_input: str) -> None:
     )
     turn = None
     terminal.start()
+    # Immediate feedback before the (silent) model generation starts — the
+    # stream filter hides tool-JSON responses, so without this line the
+    # terminal would show nothing for the whole request.
+    terminal.thinking()
     try:
         turn = await task
     except asyncio.CancelledError:
@@ -209,9 +214,14 @@ async def _run_turn(ctx: CliContext, user_input: str) -> None:
 
     answer = (turn.get("output") or "").strip()
     if answer:
-        ctx.console.print()
-        ctx.console.print(Markdown(answer))
-        ctx.console.print()
+        if terminal.streamed:
+            # The answer was already rendered live token-by-token — just
+            # close the line so the next prompt isn't glued to it.
+            ctx.console.print()
+        else:
+            ctx.console.print()
+            ctx.console.print(Markdown(answer))
+            ctx.console.print()
 
     specialists = turn.get("specialists_active") or []
     if specialists:

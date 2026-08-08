@@ -68,6 +68,31 @@ from runtime_next.monitoring.dashboard import RuntimeDashboard
 
 log = logging.getLogger(__name__)
 
+def _format_llm_error(exc: Exception) -> str:
+    """Turn a raw provider exception into a short, human-readable line.
+
+    Provider SDKs (openai/anthropic) raise exceptions that embed the full
+    HTTP error JSON; printing that raw text buries the actionable detail.
+    Map the common status codes to a clear message and keep the rest short.
+    """
+    status = getattr(exc, "status_code", None)
+    if status == 429:
+        return ("the provider is rate-limited (HTTP 429). Free-tier models "
+                "share a pool that fills up, so this is often transient — "
+                "wait a moment and try again, or switch models with /model.")
+    if status == 401:
+        return "the provider rejected the API key (HTTP 401). Re-enter it with /provider."
+    if status == 402:
+        return ("the provider rejected the request for billing reasons "
+                "(HTTP 402). Check your account balance with the provider.")
+    if status == 404:
+        return ("the model was not found (HTTP 404). Verify the model id with "
+                "/model.")
+    msg = getattr(exc, "message", None) or str(exc)
+    if len(msg) > 300:
+        msg = msg[:300] + "..."
+    return msg
+
 # --- Global Metadata Paths ---
 GLOBAL_DB_PATH = os.path.join(os.path.dirname(__file__), "global_memory.db")
 GLOBAL_ANCHOR_PATH = os.path.join(os.path.dirname(__file__), "global_anchor.md")
@@ -305,21 +330,43 @@ class AelvoAgent:
             "hash_mismatch": 0,
             "ttl_expired": 0,
         }
+
+        # Bounded HTTP timeouts. The SDKs default to a 600s request timeout
+        # with 2 automatic retries — a slow/queued upstream (e.g. OpenRouter
+        # ``:free`` models) can silently block for 10+ minutes with zero
+        # output, which looks exactly like a hang. Cap both so a stuck
+        # upstream surfaces as a clear error instead. Override via env.
+        self.llm_timeout = self._resolve_llm_timeout()
+        self.llm_max_retries = self._resolve_llm_max_retries()
         
         # PERSISTENT CLIENTS (Fix: Reuse connection to eliminate SSL/DNS lag)
         self.client = None
         if self.sdk_type == "openai":
             from openai import OpenAI
-            self.client = OpenAI(api_key=self.api_key, base_url=getattr(self.config, 'base_url', None))
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url=getattr(self.config, 'base_url', None),
+                timeout=self.llm_timeout,
+                max_retries=self.llm_max_retries,
+            )
         elif self.sdk_type == "anthropic":
             from anthropic import Anthropic
-            self.client = Anthropic(api_key=self.api_key)
+            self.client = Anthropic(
+                api_key=self.api_key,
+                timeout=self.llm_timeout,
+                max_retries=self.llm_max_retries,
+            )
 
-    def _call_llm(self, messages):
+    def _call_llm(self, messages, on_token=None):
         """Unified internal router for multi-provider support.
 
         Converts canonical (OpenAI-format) messages to the target
         provider's format using MessageAdapter before sending.
+
+        When ``on_token`` is provided the call uses the provider's native
+        streaming API and ``on_token(text_fragment)`` is invoked for every
+        content chunk as it arrives (from the calling thread). The full
+        response text is still returned and cached exactly as before.
         """
         # SPEED OPTIMIZATION: Only generate/inject system prompt once per user interaction.
         current_hash = ""
@@ -387,44 +434,93 @@ class AelvoAgent:
             # limited-balance accounts. The cap is configurable via
             # AELVO_MAX_TOKENS (default 4096).
             all_msgs = [{"role": "system", "content": system_prompt}] + list(provider_msgs)
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=all_msgs,
-                max_tokens=max_tokens,
-                temperature=0.1
-            )
-            if response.choices:
-                response_text = response.choices[0].message.content or ""
-            else:
-                log.error("OpenAI response contained no choices")
+            try:
+                if on_token is not None:
+                    stream = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=all_msgs,
+                        max_tokens=max_tokens,
+                        temperature=0.1,
+                        stream=True,
+                    )
+                    for chunk in stream:
+                        # Skip usage/metadata chunks that carry no choices.
+                        if not getattr(chunk, "choices", None):
+                            continue
+                        piece = chunk.choices[0].delta.content or ""
+                        if piece:
+                            response_text += piece
+                            on_token(piece)
+                else:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=all_msgs,
+                        max_tokens=max_tokens,
+                        temperature=0.1
+                    )
+                    if response.choices:
+                        response_text = response.choices[0].message.content or ""
+                    else:
+                        log.error("OpenAI response contained no choices")
+            except Exception as e:
+                log.error("OpenAI/OpenRouter request failed: %s", e)
+                raise RuntimeError(_format_llm_error(e)) from e
 
         elif self.sdk_type == "anthropic":
             # Anthtopic handles system separately
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                messages=provider_msgs,
-                system=system_prompt,
-                temperature=0.1
-            )
-            if response.content:
-                response_text = response.content[0].text or ""
+            if on_token is not None:
+                with self.client.messages.stream(
+                    model=self.model,
+                    max_tokens=max_tokens,
+                    messages=provider_msgs,
+                    system=system_prompt,
+                    temperature=0.1,
+                ) as stream:
+                    for text in stream.text_stream:
+                        response_text += text
+                        on_token(text)
             else:
-                log.error("Anthropic response contained no content blocks")
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=max_tokens,
+                    messages=provider_msgs,
+                    system=system_prompt,
+                    temperature=0.1
+                )
+                if response.content:
+                    response_text = response.content[0].text or ""
+                else:
+                    log.error("Anthropic response contained no content blocks")
 
         elif self.sdk_type == "google":
             # provider_msgs already in Google format ({role, parts}) from MessageAdapter
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
             model = genai.GenerativeModel(self.model, system_instruction=system_prompt)
-            response = model.generate_content(
-                provider_msgs,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,
-                    max_output_tokens=max_tokens,
+            if on_token is not None:
+                response = model.generate_content(
+                    provider_msgs,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.1,
+                        max_output_tokens=max_tokens,
+                    ),
+                    stream=True,
                 )
-            )
-            response_text = response.text
+                for chunk in response:
+                    # Chunks may be empty or carry tool/function parts only.
+                    piece = getattr(chunk, "text", "") or ""
+                    if piece:
+                        response_text += piece
+                        on_token(piece)
+            else:
+                response = model.generate_content(
+                    provider_msgs,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.1,
+                        max_output_tokens=max_tokens,
+                    )
+                )
+                response_text = response.text
 
         else:
             raise ValueError(f"SDK '{self.sdk_type}' not implemented.")
@@ -475,6 +571,66 @@ EPISODE HISTORY (last 10): {json.dumps(context['episodes'])}
     SYSTEM_PROMPT_CACHE_TTL = 300  # Seconds before system prompt cache is invalidated
     MAX_CONVERSATION_HISTORY = 100  # Prevent unbounded growth
     MAX_OUTPUT_TOKENS = 4096  # Per-call output cap; override via AELVO_MAX_TOKENS
+    LLM_TIMEOUT_SECONDS = 120  # Per-request HTTP timeout; override via AELVO_LLM_TIMEOUT
+    LLM_MAX_RETRIES = 0  # Automatic retries on transient failures; override via AELVO_LLM_MAX_RETRIES
+
+    def _resolve_llm_timeout(self) -> float:
+        """Resolve the per-request HTTP timeout.
+
+        The OpenAI/Anthropic SDK defaults (600s + 2 retries) let a slow or
+        queued upstream — OpenRouter's ``:free`` models in particular — block
+        silently for 10+ minutes, which users experience as an app hang.
+        ``AELVO_LLM_TIMEOUT`` (default 120) bounds it. Invalid env values
+        fall back to the class default.
+        """
+        raw = os.environ.get("AELVO_LLM_TIMEOUT", "").strip()
+        if raw:
+            try:
+                t = float(raw)
+            except ValueError:
+                log.warning(
+                    "Invalid AELVO_LLM_TIMEOUT=%r; falling back to %s",
+                    raw, self.LLM_TIMEOUT_SECONDS,
+                )
+            else:
+                if math.isfinite(t) and t > 0:
+                    return t
+                log.warning(
+                    "AELVO_LLM_TIMEOUT must be a positive finite value (got %r); "
+                    "falling back to %s",
+                    raw, self.LLM_TIMEOUT_SECONDS,
+                )
+        return self.LLM_TIMEOUT_SECONDS
+
+    def _resolve_llm_max_retries(self) -> int:
+        """Resolve the automatic retry count for transient API failures.
+
+        Defaults to 0: the OpenAI/Anthropic SDKs retry 429 rate-limits and
+        honor the server's ``retry-after`` header (up to 60s per retry). On a
+        rate-limited shared pool — OpenRouter's ``:free`` models in
+        particular — that turns a "temporarily rate-limited" error into a
+        minute-plus silent stall, which reads as a hang. Failing fast with a
+        clear error is better; set ``AELVO_LLM_MAX_RETRIES`` to re-enable
+        retries if you prefer.
+        """
+        raw = os.environ.get("AELVO_LLM_MAX_RETRIES", "").strip()
+        if raw:
+            try:
+                n = int(raw)
+            except ValueError:
+                log.warning(
+                    "Invalid AELVO_LLM_MAX_RETRIES=%r; falling back to %s",
+                    raw, self.LLM_MAX_RETRIES,
+                )
+            else:
+                if n >= 0:
+                    return n
+                log.warning(
+                    "AELVO_LLM_MAX_RETRIES must be >= 0 (got %r); "
+                    "falling back to %s",
+                    raw, self.LLM_MAX_RETRIES,
+                )
+        return self.LLM_MAX_RETRIES
 
     def _resolve_max_output_tokens(self) -> int:
         """Resolve the per-call max_tokens cap.
@@ -575,16 +731,44 @@ EPISODE HISTORY (last 10): {json.dumps(context['episodes'])}
                 )
         return self.SYSTEM_PROMPT_CACHE_TTL
 
-    def send_user_message(self, user_input: str) -> str:
-        """Direct user message â†’ LLM. Returns raw action string."""
+    def send_user_message(self, user_input: str, on_token=None) -> str:
+        """Direct user message â†’ LLM. Returns raw action string.
+
+        ``on_token`` is forwarded to ``_call_llm`` to enable true streaming:
+        each content fragment is delivered to the callback as it is
+        generated. History handling and the response cache are unchanged.
+        """
         self.conversation_history.append({"role": "user", "content": user_input})
         # Truncate oldest entries to prevent unbounded memory growth
         if len(self.conversation_history) > self.MAX_CONVERSATION_HISTORY * 2:
             self.conversation_history = self.conversation_history[-self.MAX_CONVERSATION_HISTORY:]
-        raw_output = self._call_llm(self.conversation_history)
+        raw_output = self._call_llm(self.conversation_history, on_token=on_token)
         self.conversation_history.append({"role": "assistant", "content": raw_output})
 
         return raw_output
+
+    async def send_user_message_async(
+        self,
+        user_input: str,
+        on_token=None,
+        timeout_margin: float = 30.0,
+    ) -> str:
+        """Threaded ``send_user_message`` with a bounded timeout.
+
+        ``send_user_message`` is synchronous (blocking HTTP), so asyncio
+        callers run it in a worker thread. Running a bare ``to_thread`` means
+        the blocking request can never be interrupted — Ctrl+C only cancels
+        the ``await`` while the HTTP call keeps hanging in the background
+        until the client's (previously 600s) timeout. This wrapper bounds the
+        wait at the agent's resolved LLM timeout plus ``timeout_margin``, so a
+        wedged upstream aborts the turn and returns control to the caller
+        instead of silently stalling.
+        """
+        bound = self._resolve_llm_timeout() + max(0.0, float(timeout_margin))
+        return await asyncio.wait_for(
+            asyncio.to_thread(self.send_user_message, user_input, on_token=on_token),
+            timeout=bound,
+        )
 
     def feed_result(self, result: dict):
         """Feed tool execution result back into conversation history."""

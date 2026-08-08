@@ -510,6 +510,8 @@ class RuntimePipeline:
         agent: Any,
         conversation_history: List[Dict[str, Any]],
         hermes_context: Optional[Any] = None,
+        stream_callback: Optional[Any] = None,
+        token_callback: Optional[Any] = None,
     ) -> PipelineResult:
         """Execute the full canonical pipeline.
 
@@ -578,10 +580,17 @@ class RuntimePipeline:
         )
 
         # 5. Execute ONE LLM call for the entire pipeline turn
-        #    (instead of N separate calls for each phase)
+        #    (instead of N separate calls for each phase). When the CLI
+        #    supplied a token callback, stream the response live (tool-call
+        #    JSON is sniffed out and suppressed; prose is rendered as it
+        #    generates).
         execution_start = time.time()
+        on_token = None
+        if token_callback is not None:
+            from core.orchestration.stream_filter import TokenStreamFilter
+            on_token = TokenStreamFilter(token_callback)
         raw_output = await self._execute_consolidated_turn(
-            agent, consolidated_prompt
+            agent, consolidated_prompt, on_token=on_token
         )
         execution_duration = (time.time() - execution_start) * 1000
 
@@ -924,8 +933,10 @@ class RuntimePipeline:
         """
         try:
             # Send the specialist prompt as the user message.
-            # agent.send_user_message handles appending to conversation_history
-            raw_output = await asyncio.to_thread(agent.send_user_message, specialist_prompt)
+            # agent.send_user_message handles appending to conversation_history.
+            # The bounded async wrapper means a wedged upstream times out
+            # instead of hanging the turn forever.
+            raw_output = await agent.send_user_message_async(specialist_prompt)
             if isinstance(raw_output, str):
                 return raw_output
             return str(raw_output)
@@ -1597,18 +1608,36 @@ class RuntimePipeline:
         self,
         agent: Any,
         consolidated_prompt: str,
+        on_token: Optional[Any] = None,
     ) -> str:
         """Execute ONE consolidated LLM call for the entire pipeline turn.
 
         Instead of making N separate agent.send_user_message() calls
         (one per phase), this makes a single call with the consolidated
-        prompt that covers all specialist roles.
+        prompt that covers all specialist roles. ``on_token`` (if given)
+        is forwarded to the agent to enable token streaming.
         """
         try:
-            raw_output = await asyncio.to_thread(agent.send_user_message, consolidated_prompt)
+            raw_output = await agent.send_user_message_async(
+                consolidated_prompt, on_token=on_token
+            )
+            if on_token is not None and hasattr(on_token, "flush"):
+                # Release short prose answers that never hit the sniff
+                # threshold; suppressed (tool JSON) stays hidden.
+                on_token.flush()
             if isinstance(raw_output, str):
                 return raw_output
             return str(raw_output)
+        except asyncio.TimeoutError:
+            log.error(
+                "Consolidated pipeline turn timed out — provider/model may be "
+                "overloaded or rate-limited"
+            )
+            return (
+                "Error: the LLM request timed out before producing a response. "
+                "The provider/model may be overloaded or rate-limited — "
+                "try again, or switch to a faster model with /model."
+            )
         except Exception as e:
             log.error(
                 "Consolidated pipeline turn execution failed: %s", e

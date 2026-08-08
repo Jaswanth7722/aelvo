@@ -67,6 +67,10 @@ class TerminalSession:
         self._lines: List[Any] = []
         self._status_text = ""  # kept for interface/tests; always empty now
         self.final_answer = ""
+        # True once any generation token was rendered live this turn; the
+        # REPL then skips the final Markdown re-print (already on screen).
+        self.streamed = False
+        self._streamed_text = ""
 
     # ── lifecycle ──────────────────────────────────────────────────────────
     def start(self) -> None:
@@ -75,15 +79,42 @@ class TerminalSession:
     def finish(self) -> None:
         pass
 
+    def thinking(self, note: str = "") -> None:
+        """Show a dim 'working…' line so a long, output-suppressed generation
+        (the model streams tool-call JSON, which the TokenStreamFilter hides)
+        doesn't look like a hang. Fast turns just get one harmless line.
+        """
+        suffix = f" {note}" if note else ""
+        self._append(Text(f"⏳ thinking…{suffix}", style="aelvo.dim"))
+
     # ── rendering helpers ──────────────────────────────────────────────────
     def _append(self, text: Text) -> None:
         """Record the line and print it to the terminal (real scrollback)."""
         self._lines.append(text)
         self.console.print(text)
 
-    # ── stream_callback hook (final answer) ────────────────────────────────
+    # ── streaming hooks (final answer + live tokens) ───────────────────────
+    def on_token(self, text: str) -> None:
+        """Render one generated token live (no newline).
+
+        Called from the LLM worker thread as chunks arrive, so the user
+        watches the answer being written instead of waiting for the whole
+        response. Marks the turn as ``streamed`` so the REPL does not
+        re-print the answer as Markdown afterwards.
+        """
+        if not text:
+            return
+        self.streamed = True
+        self._streamed_text += text
+        self.console.print(text, end="")
+
     def on_final_answer(self, message: str) -> None:
-        """Store the agent's final message; the REPL prints it as Markdown."""
+        """Store the agent's final message; the REPL prints it as Markdown.
+
+        Only used for answers that were NOT streamed token-by-token (e.g.
+        ``respond`` tool messages or plain pipeline output) — streamed
+        turns already rendered the text live and skip the Markdown pass.
+        """
         self.final_answer = message or ""
         self._status_text = ""
 

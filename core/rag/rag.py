@@ -411,7 +411,10 @@ class MemorySearcher:
     def __init__(self, chroma_collection, config: Optional[RAGConfig] = None):
         self.collection = chroma_collection
         self._engine = RAGEngine(chroma_collection, config=config)
-        self._rebuild_bm25()
+        # BM25 rebuild is deferred to the first search() so constructing a
+        # MemorySearcher at boot never touches the Chroma collection (the
+        # vector store is materialized lazily by MemoryEngine on first use).
+        self._bm25_ready = False
 
     # â”€â”€ Conflict Resolution (full backward compat) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -471,6 +474,7 @@ class MemorySearcher:
         where: Dict[str, Any] = None,
         strategy: Optional[RetrievalStrategy] = None,
     ) -> Dict[str, Any]:
+        self._ensure_bm25()
         ctx = self._engine.retrieve(
             query=query,
             top_k=n_results,
@@ -562,11 +566,19 @@ class MemorySearcher:
             log.error("Federated search failed: %s", e)
         return {"status": "success", "logs": "No conceptual matches found.", "executed": {"hit_count": 0}}
 
+    def _ensure_bm25(self) -> None:
+        """Build the sparse BM25 index lazily on the first search."""
+        if self._bm25_ready:
+            return
+        self._rebuild_bm25()
+
     def _rebuild_bm25(self) -> None:
         try:
             self._engine.rebuild_bm25()
         except Exception as e:
             log.debug("BM25 rebuild skipped: %s", e)
+        finally:
+            self._bm25_ready = True
 
     def __getattr__(self, name):
         if hasattr(self._engine, name):

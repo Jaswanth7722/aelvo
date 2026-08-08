@@ -497,6 +497,120 @@ class TestLazyHeavyImports:
         assert len(reqs) == 1 and reqs[0].url == "http://example.com"
 
 
+class TestMemoryEngineLazyChroma:
+    """MemoryEngine must defer the ~2.5s chromadb import + PersistentClient
+    init past __init__: boot wires up MemorySearcher / UserModelManager /
+    planning engines / ForgeMemory via ``memory_engine.memory_collection``
+    without ever touching the vector store. The cost is paid on the first
+    real memory operation (first touch)."""
+
+    def _engine(self, tmp_path):
+        import core.governance.kernel as k
+
+        return k.MemoryEngine(
+            db_path=str(tmp_path / "m.db"),
+            anchor_path=str(tmp_path / "a.md"),
+            tool_registry={},
+            project_name="lazy_probe",
+        )
+
+    def test_init_does_not_materialize_vector_store(self, tmp_path):
+        """After __init__ the client and collection are still unset and no
+        reconcile scan has run -- boot pays zero Chroma cost."""
+        engine = self._engine(tmp_path)
+        try:
+            assert engine._chroma_client is None
+            assert engine._chroma_collection is None
+            assert engine._chroma_reconciled is False
+        finally:
+            engine.db.close()
+
+    def test_property_returns_deferred_proxy_until_first_use(self, tmp_path):
+        """Reading memory_collection (boot wiring) yields a cheap proxy, not
+        a real collection."""
+        engine = self._engine(tmp_path)
+        try:
+            coll = engine.memory_collection
+            assert type(coll).__name__ == "_DeferredMemoryCollection"
+            assert engine._chroma_collection is None  # still not materialized
+        finally:
+            engine.db.close()
+
+    def test_first_operation_materializes_and_round_trips(self, tmp_path):
+        """The first real collection operation creates the store and data
+        round-trips through it."""
+        engine = self._engine(tmp_path)
+        try:
+            with engine.collection_guard() as coll:
+                coll.add(
+                    ids=["x"], documents=["hello world"],
+                    metadatas=[{"type": "fact"}],
+                )
+            assert engine._chroma_collection is not None
+            assert engine._chroma_client is not None
+            res = engine.memory_collection.get(ids=["x"])
+            assert res["ids"] == ["x"]
+            assert res["documents"][0] == "hello world"
+        finally:
+            engine.db.close()
+
+    def test_chroma_client_property_materializes(self, tmp_path):
+        """chroma_client resolves lazily to a real client on first read."""
+        engine = self._engine(tmp_path)
+        try:
+            client = engine.chroma_client
+            assert client is not None
+            assert engine._chroma_client is client
+        finally:
+            engine.db.close()
+
+    def test_reconcile_deferred_to_first_touch(self, tmp_path, monkeypatch):
+        """reconcile_databases must not run at init (it scans the vector
+        store); it runs exactly once on the first Chroma materialization."""
+        engine = self._engine(tmp_path)
+        calls = []
+        monkeypatch.setattr(engine, "reconcile_databases", lambda: calls.append(1))
+        try:
+            assert calls == []  # init did not reconcile
+            engine.memory_collection.query(query_texts=["x"], n_results=1)  # first touch
+            assert calls == [1]
+            # Subsequent touches reuse the store without re-syncing.
+            engine.memory_collection.query(query_texts=["x"], n_results=1)
+            assert calls == [1]
+        finally:
+            engine.db.close()
+
+    def test_collection_setter_still_injects_mocks(self, tmp_path):
+        """Tests inject mock collections via the setter -- must keep working."""
+        from unittest.mock import MagicMock
+
+        engine = self._engine(tmp_path)
+        try:
+            mock_coll = MagicMock()
+            engine.memory_collection = mock_coll
+            assert engine.memory_collection is mock_coll
+            assert engine._chroma_collection is mock_coll
+        finally:
+            engine.db.close()
+
+    def test_memory_searcher_construction_does_not_touch_collection(
+        self, tmp_path, monkeypatch
+    ):
+        """Building MemorySearcher at boot must not materialize the store
+        (its BM25 rebuild is deferred to the first search)."""
+        engine = self._engine(tmp_path)
+        try:
+            from core.rag import MemorySearcher
+
+            searcher = MemorySearcher(chroma_collection=engine.memory_collection)
+            assert engine._chroma_collection is None  # construction is cheap
+            result = searcher.search("hello world", n_results=1)
+            assert result["status"] == "success"
+            assert engine._chroma_collection is not None  # first search touched
+        finally:
+            engine.db.close()
+
+
 class TestMaxTokensCapped:
     """LLM calls must send a bounded max_tokens so aggregators like OpenRouter
     don't default to the model's full output budget (e.g. 65536), which wastes

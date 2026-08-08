@@ -560,7 +560,7 @@ class Orchestrator:
     # ------------------------------------------------------------------
     # Turn execution
     # ------------------------------------------------------------------
-    async def execute_turn(self, agent, user_input: str, session_tracker=None, tui_session=None, stream_callback=None, mcp_cli=None, db_path=None) -> Dict[str, Any]:
+    async def execute_turn(self, agent, user_input: str, session_tracker=None, tui_session=None, stream_callback=None, token_callback=None, mcp_cli=None, db_path=None) -> Dict[str, Any]:
         """Main orchestrator turn runner.
 
         Now delegates to the canonical RuntimePipeline which enforces:
@@ -619,6 +619,7 @@ class Orchestrator:
                 session_tracker=session_tracker,
                 tui_session=tui_session,
                 stream_callback=stream_callback,
+                token_callback=token_callback,
                 mcp_cli=mcp_cli,
                 db_path=db_path,
             )
@@ -688,6 +689,8 @@ class Orchestrator:
                 agent=agent,
                 conversation_history=conversation_history,
                 hermes_context=self.hermes_context,
+                stream_callback=stream_callback,
+                token_callback=token_callback,
             )
 
         # 4. Submit goal to CognitiveEngine for learning
@@ -813,6 +816,7 @@ class Orchestrator:
             session_tracker=session_tracker,
             tui_session=tui_session,
             stream_callback=stream_callback,
+            token_callback=token_callback,
             mcp_cli=mcp_cli,
             db_path=db_path,
         )
@@ -888,7 +892,7 @@ class Orchestrator:
     async def _execute_forced_route(
         self, agent, forced_names: List[str], task: str, task_id: str,
         session_tracker=None, tui_session=None, stream_callback=None,
-        mcp_cli=None, db_path=None
+        token_callback=None, mcp_cli=None, db_path=None
     ) -> Dict[str, Any]:
         """Execute a forced-route task using legacy graph dispatch.
 
@@ -967,6 +971,7 @@ class Orchestrator:
             session_tracker=session_tracker,
             tui_session=tui_session,
             stream_callback=stream_callback,
+            token_callback=token_callback,
             mcp_cli=mcp_cli,
             db_path=db_path,
         )
@@ -1213,6 +1218,7 @@ class Orchestrator:
         session_tracker=None,
         tui_session=None,
         stream_callback=None,
+        token_callback=None,
         mcp_cli=None,
         db_path=None,
     ) -> str:
@@ -1432,11 +1438,37 @@ class Orchestrator:
                 if batch_complete:
                     break
 
-                next_output = await asyncio.to_thread(
-                    agent.send_user_message,
-                    "Batch execution complete. If you need further tools, BATCH them into a JSON array for efficiency. "
-                    "If you are finished, use the 'respond' tool with your final answer."
-                )
+                # Ask the LLM what to do next. Stream prose tokens live so
+                # the final answer appears as it generates; tool-call JSON is
+                # sniffed out by TokenStreamFilter and never shown.
+                streamer = None
+                if token_callback is not None:
+                    from core.orchestration.stream_filter import TokenStreamFilter
+                    streamer = TokenStreamFilter(token_callback)
+                try:
+                    next_output = await agent.send_user_message_async(
+                        "Batch execution complete. If you need further tools, BATCH them into a JSON array for efficiency. "
+                        "If you are finished, use the 'respond' tool with your final answer.",
+                        on_token=streamer,
+                    )
+                except asyncio.TimeoutError:
+                    log.error(
+                        "Tool-loop follow-up LLM call timed out — provider/model "
+                        "may be overloaded or rate-limited"
+                    )
+                    final_answer = (
+                        "Error: the LLM request timed out before producing a "
+                        "response. The provider/model may be overloaded or "
+                        "rate-limited — try again, or switch to a faster model "
+                        "with /model."
+                    )
+                    if stream_callback:
+                        stream_callback(final_answer)
+                    break
+                if streamer is not None:
+                    # Release short prose answers that never hit the sniff
+                    # threshold; suppressed (tool JSON) stays hidden.
+                    streamer.flush()
 
                 n_type, n_payload = parse_llm_output(next_output)
                 if n_type == "tool_calls":

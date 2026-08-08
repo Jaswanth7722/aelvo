@@ -72,8 +72,11 @@ class MockAgent:
         self.conversation_history = []
         self.last_context = None
 
-    def send_user_message(self, msg: str) -> str:
+    def send_user_message(self, msg: str, on_token=None) -> str:
         return json.dumps([{"tool": "respond", "args": {"message": "Done."}}])
+
+    async def send_user_message_async(self, msg: str, on_token=None) -> str:
+        return self.send_user_message(msg, on_token=on_token)
 
     def feed_result(self, result: dict):
         self.conversation_history.append(result)
@@ -432,7 +435,7 @@ async def test_execute_turn_returns_expected_structure(shared_orchestrator, mock
     from core.orchestration.pipeline import PipelineResult, PipelinePhase
 
     class MockPipeline:
-        async def run(self, user_input, agent, conversation_history, hermes_context=None):
+        async def run(self, user_input, agent, conversation_history, hermes_context=None, stream_callback=None, token_callback=None):
             return PipelineResult(
                 success=True,
                 phases_executed=[PipelinePhase.CALIBRATION, PipelinePhase.REPORTING],
@@ -589,7 +592,7 @@ async def test_memory_engine_execute_turn_not_called(shared_orchestrator, mock_a
     )
 
     class MockPipeline:
-        async def run(self, user_input, agent, conversation_history, hermes_context=None):
+        async def run(self, user_input, agent, conversation_history, hermes_context=None, stream_callback=None, token_callback=None):
             return PipelineResult(
                 success=True,
                 phases_executed=[PipelinePhase.CALIBRATION, PipelinePhase.REPORTING],

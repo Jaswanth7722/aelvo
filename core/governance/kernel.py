@@ -124,6 +124,28 @@ class LocalChromaClient:
             self._collections[name] = LocalMemoryCollection()
         return self._collections[name]
 
+
+class _DeferredMemoryCollection:
+    """Lazy stand-in for ``MemoryEngine.memory_collection``.
+
+    Wiring at boot (MemorySearcher, UserModelManager, planning engines,
+    ForgeMemory, ...) reads ``memory_engine.memory_collection`` eagerly; that
+    must not initialize the Chroma vector store, which costs ~2.5s. This
+    proxy forwards every attribute/method to the real collection, materializing
+    it on the first actual use (the first real memory operation).
+    """
+
+    __slots__ = ("_engine",)
+
+    def __init__(self, engine: "MemoryEngine"):
+        self._engine = engine
+
+    def __getattr__(self, name: str):
+        return getattr(self._engine._ensure_chroma(), name)
+
+    def __repr__(self) -> str:
+        return "<DeferredMemoryCollection (uninitialized)>"
+
 def extract_yaml_frontmatter(text):
     if not text.startswith('---'):
         raise ValueError("FATAL: No YAML frontmatter found in anchor.")
@@ -153,21 +175,19 @@ class MemoryEngine:
         self.db.execute("PRAGMA journal_mode=WAL;")
         self.db.execute("PRAGMA synchronous=NORMAL;")
         
-        # Phase 1: Project-Specific Chroma Isolation
-        chroma_path = os.path.join(os.path.dirname(db_path), "chroma_db")
-        chromadb_mod = _load_chromadb()
-        self.chroma_client = (
-            chromadb_mod.PersistentClient(path=chroma_path)
-            if chromadb_mod
-            else LocalChromaClient()
-        )
-        
+        # Phase 1: Project-Specific Chroma Isolation -- DEFERRED to first use.
+        # ``import chromadb`` + PersistentClient creation costs ~2.5s, so the
+        # vector store is initialized lazily on the first real memory operation
+        # instead of at boot. ``memory_collection`` / ``chroma_client`` are
+        # properties backed by a deferred proxy (see _DeferredMemoryCollection).
+        self._chroma_path = os.path.join(os.path.dirname(db_path), "chroma_db")
         # Prevent cross-project memory bleed (Signal Extraction)
         safe_proj_name = re.sub(r'[^a-zA-Z0-9_-]', '_', project_name)
-        self.memory_collection = self.chroma_client.get_or_create_collection(
-            name=f"aelvo_memory_{safe_proj_name}"
-        )
-        
+        self._chroma_collection_name = f"aelvo_memory_{safe_proj_name}"
+        self._chroma_client = None
+        self._chroma_collection = None
+        self._chroma_reconciled = False
+
         self.session_failures = 0
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="aelvo_tool")
         # Serialize access to the shared Chroma collection. Tool calls execute on
@@ -176,7 +196,64 @@ class MemoryEngine:
         # asyncio.Lock would NOT protect against cross-thread races.
         self._collection_lock = threading.RLock()
         self._init_db(project_name)
-        self.reconcile_databases()
+        # NOTE: reconcile_databases() runs lazily on the first Chroma touch
+        # (_ensure_chroma) so boot never pays the vector-store scan.
+
+    def _ensure_chroma(self):
+        """Lazily create the Chroma client + collection on first use.
+
+        The ~2.5s chromadb import and PersistentClient initialization are
+        deferred past ``__init__`` so boot-to-TUI stays fast; the cost is
+        paid once, on the first real memory operation. Thread-safe: the first
+        caller under the collection lock does the work, later callers reuse
+        the cached client/collection.
+        """
+        if self._chroma_collection is not None:
+            return self._chroma_collection
+        with self._collection_lock:
+            if self._chroma_collection is not None:
+                return self._chroma_collection
+            chromadb_mod = _load_chromadb()
+            self._chroma_client = (
+                chromadb_mod.PersistentClient(path=self._chroma_path)
+                if chromadb_mod
+                else LocalChromaClient()
+            )
+            self._chroma_collection = self._chroma_client.get_or_create_collection(
+                name=self._chroma_collection_name
+            )
+            # Best-effort SQLite <-> Chroma sync, once, on first touch.
+            if not self._chroma_reconciled:
+                try:
+                    self.reconcile_databases()
+                except Exception as _ex:
+                    logging.warning("Silenced exception: %s", _ex)
+                finally:
+                    self._chroma_reconciled = True
+        return self._chroma_collection
+
+    @property
+    def memory_collection(self):
+        """The project's vector collection (materialized on first use)."""
+        if self._chroma_collection is not None:
+            return self._chroma_collection
+        return _DeferredMemoryCollection(self)
+
+    @memory_collection.setter
+    def memory_collection(self, value):
+        """Allow test mocks / external injection of the collection."""
+        self._chroma_collection = value
+
+    @property
+    def chroma_client(self):
+        """The Chroma client backing the memory collection (lazy)."""
+        if self._chroma_client is None:
+            self._ensure_chroma()
+        return self._chroma_client
+
+    @chroma_client.setter
+    def chroma_client(self, value):
+        self._chroma_client = value
 
     @contextlib.contextmanager
     def collection_guard(self):
