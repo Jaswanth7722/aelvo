@@ -2,6 +2,9 @@
 
 **Automated Engineering & Logic-Verification OS**
 
+[![npm](https://img.shields.io/npm/v/aelvo?color=cb3837&label=npm&logo=npm)](https://www.npmjs.com/package/aelvo)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 AELVO is a web + terminal multi-agent engineering system that plans and executes complex software engineering tasks using **seven specialized AI agents** coordinated through a canonical pipeline with cross-cutting verification, recovery, and memory.
 
 ```
@@ -54,7 +57,7 @@ AELVO solves this with **seven specialized agents** that collaborate through a s
 
 ```bash
 # One-liner — installs the CLI, creates a Python venv, and installs deps
-npm install -g aelvo
+npm install -g aelvo   # https://www.npmjs.com/package/aelvo
 
 # Activate from ANY folder — the command is the activation (claude/codex style)
 aelvo
