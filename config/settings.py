@@ -10,6 +10,28 @@ DEFAULT_BACKUP_DIR = BASE_DIR / "backups"
 GLOBAL_DB_PATH = BASE_DIR / "global_memory.db"
 GLOBAL_ANCHOR_PATH = BASE_DIR / "global_anchor.md"
 
+
+def get_data_dir() -> Path:
+    """Resolve the user-level data directory for global AELVO state.
+
+    ``AELVO_DATA_DIR`` (when set) relocates the global metadata DB, anchor,
+    credential vault, logs and LLM cache out of the package directory — this
+    is what lets an npm-installed ``Aelvo`` write state to ``~/.aelvo``
+    instead of a read-only ``node_modules`` tree. When unset, everything
+    stays in the repo (BASE_DIR) exactly as before.
+    """
+    env = os.environ.get("AELVO_DATA_DIR", "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
+    return BASE_DIR
+
+
+DATA_DIR = get_data_dir()
+# Global state lives in the data dir so npm/global installs stay writable.
+if str(DATA_DIR) != str(BASE_DIR):
+    GLOBAL_DB_PATH = DATA_DIR / "global_memory.db"
+    GLOBAL_ANCHOR_PATH = DATA_DIR / "global_anchor.md"
+
 # Ensure directories exist
 os.makedirs(WORKSPACE_BASE, exist_ok=True)
 os.makedirs(DEFAULT_BACKUP_DIR, exist_ok=True)

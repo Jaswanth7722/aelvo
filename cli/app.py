@@ -62,7 +62,7 @@ def _print_banner(console, ctx: CliContext) -> None:
         )
     )
     console.print(
-        Text(f"  workspace: {ctx.workspace_path}", style="aelvo.dim")
+        Text(f"  folder: {ctx.workspace_path}", style="aelvo.dim")
     )
     if not ctx.provider_name:
         console.print(
@@ -120,9 +120,12 @@ def _prompt_style() -> Style:
 
 
 def _make_prompt_session(ctx: CliContext) -> PromptSession:
-    hist_dir = ctx.workspace_path or "."
-    os.makedirs(hist_dir, exist_ok=True)
-    history = FileHistory(os.path.join(hist_dir, ".aelvo_history"))
+    # Keep command history inside the hidden .aelvo/ state dir so the user's
+    # project folder stays clean (works for any opened folder).
+    base = ctx.workspace_path or "."
+    state_dir = os.path.join(base, ".aelvo")
+    os.makedirs(state_dir, exist_ok=True)
+    history = FileHistory(os.path.join(state_dir, "history"))
     # NOTE: no ``mouse_support=True`` here — enabling VT mouse tracking makes
     # the terminal capture the scroll wheel instead of scrolling native
     # scrollback, so the user couldn't scroll up through past output. With it

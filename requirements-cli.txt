@@ -1,0 +1,31 @@
+# AELVO — CLI-only requirements (used by the npm `postinstall` venv)
+#
+# This is the lean set the terminal agent needs. The heavy web/scraping
+# stack (chromadb, scrapy, playwright, watchfiles, selectolax) is NOT here:
+# every one of those is imported lazily with a graceful fallback, so the CLI
+# works without them and `npm install -g Aelvo` stays fast.
+
+# Core Infrastructure Stack
+pydantic>=2.0.0
+python-dotenv
+pyyaml
+filelock
+requests
+httpx
+cryptography>=41.0.0
+
+# The Intelligence Engines (LLM SDKs)
+openai
+anthropic
+google-generativeai
+
+# Utilities
+tqdm
+aiohttp
+rich
+
+# Terminal Interaction (AELVO CLI REPL)
+prompt_toolkit>=3.0.0
+
+# Additional utilities
+typing-extensions

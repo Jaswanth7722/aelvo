@@ -293,10 +293,10 @@ def _cmd_status(ctx: CliContext) -> None:
 
 
 def _cmd_projects(ctx: CliContext) -> None:
-    from config.settings import BASE_DIR
+    from config.settings import GLOBAL_DB_PATH
 
-    db = os.path.join(BASE_DIR, "global_memory.db")
-    table = Table(title="Known workspaces", title_style="aelvo.gold")
+    db = str(GLOBAL_DB_PATH)
+    table = Table(title="Recently opened folders", title_style="aelvo.gold")
     table.add_column("Name", style="aelvo.brand")
     table.add_column("Path", style="aelvo.snow")
     table.add_column("Last opened", style="aelvo.dim")
@@ -309,7 +309,7 @@ def _cmd_projects(ctx: CliContext) -> None:
         ctx.console.print(Text(f"Could not list projects: {exc}", style="aelvo.err"))
         return
     if not rows:
-        ctx.console.print(Text("No workspaces yet.", style="aelvo.dim"))
+        ctx.console.print(Text("No folders opened yet.", style="aelvo.dim"))
         return
     for name, path, last_opened in rows:
         table.add_row(name or "", path or "", str(last_opened or ""))
@@ -369,9 +369,9 @@ def _cmd_log(ctx: CliContext, arg: str) -> None:
         n = max(1, min(200, int(arg.strip() or "40")))
     except ValueError:
         n = 40
-    log_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), ".aelvo_runtime", "aelvo.log"
-    )
+    from config.settings import get_data_dir
+
+    log_path = os.path.join(str(get_data_dir()), ".aelvo_runtime", "aelvo.log")
     if not os.path.exists(log_path):
         ctx.console.print(
             Text("No log file yet — boot AELVO once to generate .aelvo_runtime/aelvo.log", style="aelvo.dim")

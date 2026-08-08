@@ -43,10 +43,21 @@ def test_parse_args_ask_flag():
     assert args.ask == "hello agent"
 
 
-def test_parse_args_workspace_and_project_flags():
-    args = parse_args(["-w", "/tmp/x", "--project", "p"])
+def test_parse_args_workspace_flag():
+    args = parse_args(["-w", "/tmp/x"])
     assert args.workspace == "/tmp/x"
-    assert args.project == "p"
+
+
+def test_parse_args_folder_positional():
+    # The workspace-style --project flag was removed: folders replace named
+    # workspaces. A positional that is an existing directory opens that folder.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as folder:
+        args = parse_args([folder])
+        assert args.prompt == [folder]
+    args = parse_args(["fix the auth bug"])
+    assert args.prompt == ["fix the auth bug"]
 
 
 def test_parse_args_provider_and_model_flags():

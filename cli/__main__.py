@@ -5,13 +5,17 @@ Lets you run the terminal agent directly, without booting the whole web
 platform (no MCP discovery, no long-horizon planning, no repo scans — the
 lean boot in ``cli/boot.py`` spins up only what the REPL needs):
 
-    python -m cli                          # interactive REPL
-    python -m cli "fix the auth bug"       # one-shot prompt (positional)
-    python -m cli --ask "fix the auth bug" # one-shot prompt (explicit)
-    python -m cli -w path/to/folder        # open a folder as the workspace
-    python -m cli --provider openai --model gpt-4o
-    python -m cli --list-providers         # show providers + credential status
-    python -m cli --version
+    Aelvo                                # open the CURRENT folder
+    Aelvo path/to/folder                 # open ANY folder
+    Aelvo "fix the auth bug"             # one-shot prompt (current folder)
+    Aelvo --ask "fix the auth bug"       # one-shot prompt (explicit)
+    Aelvo --provider openai --model gpt-4o
+    Aelvo --list-providers               # show providers + credential status
+    Aelvo --version
+
+``Aelvo`` works from any folder — like claude/codex/codebuff, the command is
+the activation. Per-folder state lives in a hidden ``.aelvo/`` directory
+inside the opened folder.
 
 On Windows, ``aelvo.bat`` at the repo root is an alias for ``python -m cli``.
 """
@@ -23,23 +27,24 @@ import asyncio
 import os
 import platform
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="aelvo",
+        prog="Aelvo",
         description="AELVO terminal agent — plan, code, verify, report (CodeBuff style).",
         epilog="examples:\n"
-               "  python -m cli\n"
-               "  python -m cli \"refactor the auth module\"\n"
-               "  python -m cli -w ./my-project --provider openai",
+               "  Aelvo\n"
+               "  Aelvo ./my-project\n"
+               "  Aelvo \"refactor the auth module\"\n"
+               "  Aelvo ./my-project --provider openai",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "prompt",
         nargs="*",
-        help="prompt → one-shot mode (run once and exit)",
+        help="an existing folder to open, or a prompt → one-shot mode",
     )
     parser.add_argument(
         "--ask",
@@ -57,15 +62,10 @@ def parse_args(argv=None) -> argparse.Namespace:
         help="model override (e.g. gpt-4o, claude-3-5-sonnet-20241022)",
     )
     parser.add_argument(
-        "--project",
-        default="",
-        help="workspace/project name (default: most recently used)",
-    )
-    parser.add_argument(
         "-w",
         "--workspace",
         default="",
-        help="open a specific folder as the workspace (re-jails file tools)",
+        help="open a specific folder (same as passing the folder positionally)",
     )
     parser.add_argument(
         "--log-level",
@@ -144,6 +144,31 @@ def _print_providers() -> None:
     )
 
 
+def _resolve_folder_and_prompt(args) -> tuple[str, str]:
+    """Split positional args into (folder_to_open, one_shot_prompt).
+
+    Folder semantics (Claude Code style): a single positional that is an
+    existing directory opens that folder; anything else is a one-shot prompt
+    run in the current folder. ``--ask`` always wins for the prompt.
+    """
+    positionals = list(args.prompt or [])
+    folder = args.workspace or ""
+
+    if args.ask.strip():
+        return folder, args.ask.strip()
+
+    if len(positionals) == 1 and not folder:
+        candidate = os.path.abspath(os.path.expanduser(positionals[0]))
+        if os.path.isdir(candidate):
+            return candidate, ""
+
+    if folder and positionals:
+        return folder, " ".join(positionals).strip()
+    if not folder and positionals:
+        return "", " ".join(positionals).strip()
+    return folder, ""
+
+
 def main(argv=None) -> int:
     args = parse_args(argv)
 
@@ -158,8 +183,7 @@ def main(argv=None) -> int:
         _print_providers()
         return 0
 
-    # One-shot prompt: --ask wins over positional.
-    one_shot = (args.ask or " ".join(args.prompt)).strip()
+    folder, one_shot = _resolve_folder_and_prompt(args)
 
     # Map flags → env (same contract main.py's argument parser uses).
     if args.provider:
@@ -168,23 +192,21 @@ def main(argv=None) -> int:
     if args.model:
         os.environ["LLM_MODEL"] = args.model
         os.environ["AELVO_MODEL"] = args.model
-    if args.project:
-        os.environ["AELVO_PROJECT"] = args.project
 
     _configure_logging()
 
     try:
-        asyncio.run(_run(project=args.project, workspace_dir=args.workspace, one_shot=one_shot))
+        asyncio.run(_run(workspace_dir=folder, one_shot=one_shot))
     except KeyboardInterrupt:
         return 130
     return 0
 
 
-async def _run(project: str, workspace_dir: str, one_shot: str) -> None:
+async def _run(workspace_dir: str, one_shot: str) -> None:
     from cli.app import run_cli
     from cli.boot import boot_backend
 
-    backend = await boot_backend(project=project, workspace_dir=workspace_dir)
+    backend = await boot_backend(workspace_dir=workspace_dir)
     try:
         await run_cli(**backend, one_shot=one_shot)
     finally:

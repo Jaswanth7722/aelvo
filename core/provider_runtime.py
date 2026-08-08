@@ -55,7 +55,15 @@ logger = logging.getLogger("aelvo.provider_runtime")
 log = logger
 
 # Default paths
-DEFAULT_RUNTIME_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".aelvo_runtime")
+# Global runtime state (vault, health dbs) follows the user data dir so npm/
+# global installs stay writable even when the package tree is read-only.
+def _default_runtime_dir() -> str:
+    from config.settings import get_data_dir
+
+    return os.path.join(str(get_data_dir()), ".aelvo_runtime")
+
+
+DEFAULT_RUNTIME_DIR = _default_runtime_dir()
 DEFAULT_VAULT_PATH = os.path.join(DEFAULT_RUNTIME_DIR, "credential_vault.db")
 
 

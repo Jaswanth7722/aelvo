@@ -83,8 +83,23 @@ class AelvoFileSystem:
         self.base_path = new_root
         return str(new_root)
 
+    def _sandbox_available(self) -> bool:
+        """True when the compiled Rust sandbox binary is present."""
+        return os.path.exists(self._sandbox_binary_path())
+
     def _invoke_rust_sandbox(self, action: str, write_mode: bool, params: dict) -> dict:
-        """Invoke the compiled Rust sandbox core binary with a JSON-RPC request."""
+        """Invoke the compiled Rust sandbox core binary with a JSON-RPC request.
+
+        When the compiled binary is missing (fresh clone without a Rust
+        toolchain, npm installs that don't ship the binary), every action
+        transparently falls back to an equivalent pure-Python implementation
+        (``_python_fallback``) that mirrors the Rust response shapes and
+        enforces the same path jail + command policy, so the agent stays
+        fully usable anywhere.
+        """
+        if not self._sandbox_available():
+            return self._python_fallback(action, params)
+
         # Locate the compiled Rust sandbox executable
         binary_path = self._sandbox_binary_path()
         
@@ -126,6 +141,363 @@ class AelvoFileSystem:
                 "status": "error",
                 "logs": f"Rust Sandbox invocation failed: {e}"
             }
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Pure-Python sandbox fallback (used when the Rust binary is absent)
+    # ────────────────────────────────────────────────────────────────────────
+
+    # Mirror sandbox_core/src/policy.rs: only these command base names run.
+    _PY_ALLOWED_COMMANDS = {
+        "echo", "cat", "type", "dir", "more", "sort", "find", "findstr",
+        "where", "which", "head", "tail", "wc", "tee",
+        "ls", "pwd", "cd",
+        "cp", "copy", "move", "ren", "mkdir", "rmdir",
+        "touch", "chmod", "attrib",
+        "python", "python3", "node", "npm", "npx", "pnpm", "yarn",
+        "cargo", "rustc", "rustup", "gcc", "g++", "clang", "make",
+        "cmake", "go", "deno", "bun", "pip", "pip3", "poetry",
+        "git",
+        "grep", "awk", "sed",
+        "tar", "gzip", "gunzip", "zip", "unzip",
+        "ping", "curl", "wget", "nslookup",
+        "ps", "tasklist", "top", "htop",
+        "cmd", "sh", "bash", "powershell",
+        "xcopy", "robocopy", "rg", "ripgrep",
+    }
+
+    # Mirror sandbox_core/src/policy.rs blocked command patterns.
+    _PY_BLOCKED_PATTERNS = (
+        r"rm\s+-rf\s+/",
+        r"rm\s+-rf\s+--no-preserve-root",
+        r"mkfs\.",
+        r"dd\s+if=",
+        r":\(\)\s*\{",
+        r">\s*/dev/sda",
+        r"format\s+\w:\s*/q",
+        r"del\s+/[fFsS].*\\\*\.\*",
+        r"rd\s+/[sSqQ]\s+\\\\",
+        r"shutdown\s+/[rsp]",
+        r"taskkill\s+/[fF]\s+/[iI][mM]",
+        r"reg\s+(delete|add)\s+",
+        r"chmod\s+777\s+/",
+        r"chown\s+-[Rr]\s+",
+    )
+
+    # Mirror sandbox_core/src/policy.rs shell-injection patterns.
+    _PY_INJECTION_PATTERNS = (
+        r"\$\(.*\)",
+        r"`[^`]+`",
+        r";\s*rm\s",
+        r"\|\s*sh\b",
+        r"\|\s*bash\b",
+        r"\|\s*zsh\b",
+        r">>\s*/etc/",
+        r">\s*/etc/",
+    )
+
+    # Mirror sandbox_core/src/fs_jail.rs.
+    _PY_SOURCE_EXTENSIONS = {
+        "py", "ts", "tsx", "js", "jsx", "json", "md", "yaml", "yml",
+        "toml", "rs", "go", "html", "css", "sql",
+    }
+    _PY_IGNORED_DIRS = {
+        ".git", "__pycache__", "chroma_db", "backups", "node_modules",
+        ".venv", "dist", "target", ".aelvo",
+    }
+    _PY_MAX_SEARCH_FILE_SIZE = 10 * 1024 * 1024
+
+    def _python_fallback(self, action: str, params: dict) -> dict:
+        """Pure-Python implementations of the sandbox actions.
+
+        Returns the same response shapes the Rust binary produces so all
+        callers are agnostic to which backend ran. Every file action routes
+        through ``_validate_path_python`` (the existing jail mirror), and
+        command execution enforces the same allow/block/injection policy.
+        """
+        try:
+            if action in ("resolve_path",):
+                resolved = self._validate_path_python(params.get("path", ""))
+                return {
+                    "success": True,
+                    "data": {"resolved_path": str(resolved)},
+                }
+            if action == "read_file":
+                safe = self._validate_path_python(params.get("path", ""))
+                content = self._py_read_text(safe)
+                return {"success": True, "data": {"content": content}}
+            if action == "read_file_range":
+                safe = self._validate_path_python(params.get("path", ""))
+                start = max(1, int(params.get("start_line", 1)))
+                end = max(start, int(params.get("end_line", 120)))
+                lines = self._py_read_text(safe).splitlines()
+                sliced = "\n".join(lines[start - 1:end])
+                return {
+                    "success": True,
+                    "data": {
+                        "content": sliced,
+                        "start_line": start,
+                        "end_line": min(end, len(lines)),
+                    },
+                }
+            if action == "write_atomic":
+                safe = self._validate_path_python(params.get("path", ""))
+                safe.parent.mkdir(parents=True, exist_ok=True)
+                content = params.get("content", "")
+                tmp = safe.with_name(safe.name + ".aelvo_tmp")
+                tmp.write_text(content, encoding="utf-8")
+                tmp.replace(safe)
+                return {"success": True, "logs": f"Wrote {safe.name}."}
+            if action == "edit_file_block":
+                safe = self._validate_path_python(params.get("path", ""))
+                old = params.get("old_block", "")
+                new = params.get("new_block", "")
+                content = self._py_read_text(safe)
+                if old not in content:
+                    return {
+                        "success": False,
+                        "status": "error",
+                        "logs": "Edit failed: old block not found in file.",
+                    }
+                content = content.replace(old, new, 1)
+                tmp = safe.with_name(safe.name + ".aelvo_tmp")
+                tmp.write_text(content, encoding="utf-8")
+                tmp.replace(safe)
+                return {
+                    "success": True,
+                    "logs": f"Updated {safe.name} and logged diff.",
+                    "data": {"path": str(safe)},
+                }
+            if action == "delete_file":
+                safe = self._validate_path_python(params.get("path", ""))
+                if safe.is_file():
+                    safe.unlink()
+                return {"success": True, "logs": f"Deleted {safe.name}."}
+            if action == "list_directory":
+                safe = self._validate_path_python(params.get("path", "."))
+                if not safe.is_dir():
+                    return {"success": False, "status": "error", "logs": "Not a directory."}
+                entries = sorted(
+                    e.name for e in safe.iterdir() if not e.name.startswith(".aelvo")
+                )
+                return {
+                    "success": True,
+                    "data": {"path": str(safe), "entries": entries, "count": len(entries)},
+                }
+            if action == "grep_file":
+                return self._py_grep(params)
+            if action == "search_code":
+                return self._py_search_code(params)
+            if action == "find_files":
+                return self._py_find_files(params)
+            if action == "project_tree":
+                return self._py_project_tree(params)
+            if action in ("execute_command", "bash_exec"):
+                return self._py_execute(params)
+            return {
+                "success": False,
+                "status": "error",
+                "logs": f"Unknown action '{action}'.",
+            }
+        except PermissionError as exc:
+            return {
+                "success": False,
+                "status": "error",
+                "logs": f"Path validation denied by sandbox: {exc}",
+            }
+        except Exception as exc:
+            return {
+                "success": False,
+                "status": "error",
+                "logs": f"Sandbox fallback error: {exc}",
+            }
+
+    def _py_read_text(self, safe: Path) -> str:
+        """Read a text file with the 5 MB size cap (mirrors the Rust side)."""
+        if safe.stat().st_size > self.MAX_FILE_SIZE:
+            raise PermissionError(f"File exceeds size limit: {safe}")
+        return safe.read_text(encoding="utf-8", errors="replace")
+
+    def _py_grep(self, params: dict) -> dict:
+        safe = self._validate_path_python(params.get("path", ""))
+        if not safe.is_file():
+            return {"success": False, "status": "error", "logs": "Not a file."}
+        import re as _re
+
+        pattern = params.get("pattern", "")
+        case_sensitive = bool(params.get("case_sensitive", False))
+        max_matches = int(params.get("max_matches", 100))
+        flags = 0 if case_sensitive else _re.IGNORECASE
+        try:
+            regex = _re.compile(pattern, flags)
+        except _re.error as exc:
+            return {"success": False, "status": "error", "logs": f"Invalid regex: {exc}"}
+        matches = []
+        content = self._py_read_text(safe)
+        for line_no, line in enumerate(content.splitlines(), start=1):
+            if len(matches) >= max_matches:
+                break
+            if regex.search(line):
+                matches.append({"line": line_no, "text": line})
+        return {
+            "success": True,
+            "data": {
+                "matches": matches,
+                "match_count": len(matches),
+                "path": str(safe),
+            },
+        }
+
+    def _py_search_code(self, params: dict) -> dict:
+        import re as _re
+
+        query = params.get("query", "")
+        max_matches = int(params.get("max_matches", 100))
+        try:
+            regex = _re.compile(_re.escape(query), _re.IGNORECASE)
+        except _re.error:
+            return {"success": False, "status": "error", "logs": "Invalid query."}
+        matches = []
+        root = self.base_path.resolve()
+        for current, dirs, files in os.walk(root):
+            dirs[:] = [
+                d for d in dirs
+                if d not in self._PY_IGNORED_DIRS and not d.startswith(".aelvo")
+            ]
+            for name in files:
+                if len(matches) >= max_matches:
+                    break
+                ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+                if ext not in self._PY_SOURCE_EXTENSIONS:
+                    continue
+                path = Path(current) / name
+                try:
+                    if path.stat().st_size > self._PY_MAX_SEARCH_FILE_SIZE:
+                        continue
+                    content = path.read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    continue
+                rel = os.path.relpath(path, root)
+                for line_no, line in enumerate(content.splitlines(), start=1):
+                    if len(matches) >= max_matches:
+                        break
+                    if regex.search(line):
+                        matches.append({"file": rel, "line": line_no, "text": line})
+        return {
+            "success": True,
+            "data": {"matches": matches, "match_count": len(matches), "query": query},
+        }
+
+    def _py_find_files(self, params: dict) -> dict:
+        import fnmatch as _fnmatch
+
+        pattern = params.get("pattern", "*")
+        max_results = int(params.get("max_results", 200))
+        root = self.base_path.resolve()
+        files = []
+        for current, dirs, names in os.walk(root):
+            dirs[:] = [
+                d for d in dirs
+                if d not in self._PY_IGNORED_DIRS and not d.startswith(".aelvo")
+            ]
+            for name in names:
+                if len(files) >= max_results:
+                    break
+                if _fnmatch.fnmatch(name, pattern) or _fnmatch.fnmatch(name, f"*{pattern}*"):
+                    files.append(os.path.relpath(os.path.join(current, name), root))
+        return {
+            "success": True,
+            "data": {"files": files, "count": len(files), "pattern": pattern},
+        }
+
+    def _py_project_tree(self, params: dict) -> dict:
+        max_depth = int(params.get("max_depth", 2))
+        max_entries = int(params.get("max_entries", 300))
+        root = self.base_path.resolve()
+        lines = []
+        entry_count = 0
+
+        def _walk(directory: Path, depth: int) -> None:
+            nonlocal entry_count
+            if entry_count >= max_entries:
+                return
+            try:
+                entries = sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+            except Exception:
+                return
+            dirs = [e for e in entries if e.is_dir()]
+            files = [e for e in entries if not e.is_dir()]
+            indent = "  " * (depth + 1)
+            for entry in dirs + files:
+                if entry_count >= max_entries:
+                    break
+                if entry.name in self._PY_IGNORED_DIRS or entry.name.startswith(".aelvo"):
+                    continue
+                lines.append(f"{indent}{entry.name}/" if entry.is_dir() else f"{indent}{entry.name}")
+                entry_count += 1
+                if entry.is_dir() and depth + 1 < max_depth:
+                    _walk(entry, depth + 1)
+
+        if root.exists():
+            lines.append(f"{root.name}/")
+            _walk(root, 0)
+        return {
+            "success": True,
+            "data": {"tree": lines, "entry_count": entry_count, "max_depth": max_depth},
+        }
+
+    def _py_execute(self, params: dict) -> dict:
+        """Run a command with the Rust policy (allowlist + block + injection)."""
+        import re as _re
+
+        command = (params.get("command", "") or "").strip()
+        if not command:
+            return {"success": False, "status": "error", "logs": "Empty command."}
+        lower = command.lower()
+        for pat in self._PY_BLOCKED_PATTERNS:
+            if _re.search(pat, command, _re.IGNORECASE):
+                return {
+                    "success": False,
+                    "status": "error",
+                    "logs": f"Command contains blocked pattern: {pat}",
+                }
+        for pat in self._PY_INJECTION_PATTERNS:
+            if _re.search(pat, command, _re.IGNORECASE):
+                return {
+                    "success": False,
+                    "status": "error",
+                    "logs": f"Command contains injection pattern: {pat}",
+                }
+        base = command.split()[0].split("\\")[-1].split("/")[-1]
+        if base not in self._PY_ALLOWED_COMMANDS:
+            return {
+                "success": False,
+                "status": "error",
+                "logs": f"Command '{base}' not in the allowed command list.",
+            }
+        timeout = float(params.get("timeout_seconds", DEFAULT_TOOL_TIMEOUT_SECONDS))
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                cwd=str(self.base_path),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return {"success": False, "status": "timeout", "logs": "Command timed out."}
+        except Exception as exc:
+            return {"success": False, "status": "error", "logs": str(exc)}
+        exit_code = result.returncode if result.returncode is not None else -1
+        return {
+            "success": True,
+            "data": {
+                "stdout": result.stdout or "",
+                "stderr": result.stderr or "",
+                "exit_code": exit_code,
+            },
+            "logs": f"Command completed (exit code: {exit_code}).",
+        }
 
     def _validate_path(self, user_path: str, read_only: bool = False) -> Path:
         """Validate and resolve a path through the Rust Sandbox's path jailing.

@@ -220,6 +220,20 @@ class TestAgentStreaming:
             ),
         )
         monkeypatch.setitem(sys.modules, "google.generativeai", fake_genai)
+        # ``import google.generativeai as genai`` resolves through the parent
+        # ``google`` package attribute once the real SDK has been imported by
+        # an earlier test in the suite — patch that too so the fake always wins
+        # regardless of test order.
+        try:
+            import google as _google_pkg
+        except ImportError:
+            _google_pkg = None
+        if _google_pkg is not None:
+            # ``raising=False``: the attribute may not exist yet on the
+            # namespace package; set it either way so ``import
+            # google.generativeai as genai`` resolves to the fake regardless
+            # of whether the real SDK was imported earlier in the suite.
+            monkeypatch.setattr(_google_pkg, "generativeai", fake_genai, raising=False)
 
         tokens = []
         result = openai_agent._call_llm(

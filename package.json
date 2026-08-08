@@ -1,0 +1,53 @@
+{
+  "name": "aelvo",
+  "version": "2.1.0",
+  "description": "AELVO — the automated engineering & logic-verification agent. Plan, code, verify and report from any folder, like claude/codex/codebuff.",
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "coding-agent",
+    "llm",
+    "terminal"
+  ],
+  "license": "MIT",
+  "author": "aelvolabs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aelvolabs/Aelvo.git"
+  },
+  "bin": {
+    "Aelvo": "bin/aelvo.js",
+    "aelvo": "bin/aelvo.js"
+  },
+  "scripts": {
+    "postinstall": "node bin/install.js",
+    "start": "node bin/aelvo.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "files": [
+    "bin/",
+    "cli/",
+    "core/",
+    "config/",
+    "auth/",
+    "tools/",
+    "memory/",
+    "cognition/",
+    "repo_intelligence/",
+    "specialists/",
+    "planning/",
+    "runtime_next/",
+    "learning/",
+    "mcp/",
+    "environment/",
+    "experimental_graph/",
+    "sandbox_core/src/",
+    "*.py",
+    "*.md",
+    "*.txt",
+    "*.toml"
+  ]
+}

@@ -50,17 +50,32 @@ AELVO solves this with **seven specialized agents** that collaborate through a s
 
 ## Quickstart
 
-### Installation
+### Install via npm (recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/aelvo.git
-cd aelvo
+# One-liner — installs the CLI, creates a Python venv, and installs deps
+npm install -g Aelvo
 
-# Install Python dependencies
+# Activate from ANY folder — the command is the activation (claude/codex style)
+Aelvo
+```
+
+`Aelvo` opens the **current working directory**. `Aelvo <folder>` opens any
+folder. Per-folder state (memory, anchor, backups) lives in a hidden
+`.aelvo/` directory inside the opened folder, so your project tree stays
+clean and every folder gets its own isolated memory. Global state (credential
+vault, global memory, logs) lives in `~/.aelvo/` (`AELVO_DATA_DIR` to
+override). The Rust sandbox is optional — a pure-Python fallback provides the
+same file tools + policy when it's absent.
+
+### Install from source
+
+```bash
+git clone https://github.com/aelvolabs/Aelvo.git
+cd Aelvo
 pip install -r requirements.txt
 
-# Install the Rust sandbox (optional, for sandboxed execution)
+# Optional: compile the Rust sandbox for sandboxed execution
 cd sandbox_core && cargo build --release && cd ..
 ```
 
@@ -84,19 +99,17 @@ cp .env.example .env
 ### Launch
 
 ```bash
-# Dedicated terminal CLI — fast lean boot, skips the web platform
-python -m cli
+# Activate in the current folder (npm-installed or from source)
+Aelvo                 # opens the current directory
+Aelvo ./my-project    # opens any folder
+Aelvo "refactor the auth module"   # one-shot prompt in the current folder
 
-# One-shot CLI — run a single prompt and exit
-python -m cli "refactor the auth module to use async sessions"
-
-# Open a folder as the workspace, with an explicit provider/model
+# From source, these are equivalent:
+python -m cli                         # opens the current directory
+python -m cli ./my-project            # opens any folder
 python -m cli -w ./my-project --provider openai --model gpt-5
 
-# Windows: `aelvo` is an alias for `python -m cli` (aelvo.bat)
-aelvo --version
-
-# Full boot → CLI (default mode, runs the whole platform first)
+# Full boot → CLI (runs the whole platform first)
 python main.py
 
 # Launch the web dashboard instead
@@ -105,7 +118,7 @@ python main.py --web
 
 ---
 
-## Terminal CLI (`python -m cli`, or `python main.py`)
+## Terminal CLI (`Aelvo`, `python -m cli`)
 
 A dedicated interactive terminal agent in the spirit of CodeBuff / Claude
 Code, reusing the exact same backend as the web dashboard. `python -m cli`
@@ -140,7 +153,7 @@ Force-route to specific specialists with `@SPECIALIST` prefixes:
 | `/exit` · `/quit` | Exit the CLI |
 | `/clear [history]` | Clear the screen; `/clear history` resets the conversation |
 | `/workspace <dir>` · `/open` · `/cd` | Point the agent at a folder (re-jails its tools) |
-| `/pwd` | Print the active workspace |
+| `/pwd` | Print the active folder |
 | `/status` | Provider, model, workspace + live agent metrics |
 | `/projects` | List known workspaces |
 | `/provider [name] [key]` | Two-step interactive picker: choose a provider, then one of its models (or `/provider <name> [key]` directly); the API key is asked inline as part of selection — existing keys can be replaced/rotated right in the picker — and stored in the encrypted vault |

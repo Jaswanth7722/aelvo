@@ -1,17 +1,22 @@
 """
 boot.py — Lean backend bootstrap for the dedicated terminal CLI.
 
-``cli/__main__.py`` (``python -m cli``) boots *only* the components the
-terminal REPL actually uses — the kernel, jailed filesystem, hybrid memory
-engine, tool registry, LLM agent, orchestrator, provider runtime and the
-runtime status CLI — and skips the heavy optional subsystems the full web
-boot drags in (MCP platform discovery, long-horizon planning,
-repo-intelligence scans, cognitive engine). The prompt appears in a couple
-of seconds instead of after the whole platform boots.
+``cli/__main__.py`` (``Aelvo``) boots *only* the components the terminal
+REPL actually uses — the kernel, jailed filesystem, hybrid memory engine,
+tool registry, LLM agent, orchestrator, provider runtime and the runtime
+status CLI — and skips the heavy optional subsystems the full web boot drags
+in (MCP platform discovery, long-horizon planning, repo-intelligence scans,
+cognitive engine). The prompt appears in a couple of seconds instead of after
+the whole platform boots.
 
-The workspace/path globals live on ``main`` (the same module the web boot
-uses) so the workspace switcher, tool wrappers and system-prompt paths stay
+The working-folder/path globals live on ``main`` (the same module the web
+boot uses) so the folder switcher, tool wrappers and system-prompt paths stay
 in sync between the two entry points.
+
+Folder semantics: ``Aelvo`` opens the **current working directory**; ``Aelvo
+<folder>`` (or ``-w <folder>``) opens any folder. Per-folder state (memory
+DB, anchor, backups) lives in a hidden ``<folder>/.aelvo/`` directory so the
+user's project tree stays clean and each folder gets isolated memory.
 """
 
 from __future__ import annotations
@@ -23,10 +28,10 @@ log = logging.getLogger("aelvo.cli.boot")
 
 
 def _register_workspace(name: str, path: str) -> None:
-    """Record a ``-w`` workspace in the global projects DB (real path).
+    """Record an opened folder in the global projects DB (real path).
 
-    ``select_project`` registers project-name workspaces automatically; this
-    keeps folder-opened workspaces visible in ``/projects`` too.
+    Keeps folder-opened sessions visible in ``/projects`` — purely a
+    convenience index; nothing depends on it for boot.
     """
     try:
         import sqlite3
@@ -43,40 +48,43 @@ def _register_workspace(name: str, path: str) -> None:
                 (name,),
             )
     except Exception as exc:  # pragma: no cover - defensive boot path
-        log.debug("Could not register workspace %s: %s", name, exc)
+        log.debug("Could not register folder %s: %s", name, exc)
 
 
 async def boot_backend(*, project: str = "", workspace_dir: str = "") -> dict:
     """Build the backend components the CLI needs; returns ``run_cli`` kwargs.
 
+    Folder semantics (no more named-workspace registry):
+      * ``workspace_dir`` empty → open the **current working directory**.
+      * ``workspace_dir`` set → open that folder (``Aelvo <folder>`` / ``-w``).
+
+    Per-folder state lives in ``<folder>/.aelvo/`` (memory.db, anchor.md,
+    backups) so any folder can be opened and the user's tree stays clean.
+
     Args:
-        project: Workspace/project name (``select_project`` resolution when
-            ``workspace_dir`` is empty).
-        workspace_dir: Open a specific folder as the workspace (re-jails the
-            file tools there); skips the global project registry.
+        project: Accepted for web-boot compatibility; ignored by the CLI
+            (folders replace the named-project registry).
+        workspace_dir: Open a specific folder; defaults to ``os.getcwd()``.
     """
     import main as _main
 
-    # ── workspace resolution ──────────────────────────────────────────────
+    # ── folder resolution ────────────────────────────────────────────────
     if workspace_dir:
         target = os.path.abspath(os.path.expanduser(workspace_dir))
-        os.makedirs(target, exist_ok=True)
-        ws_name = os.path.basename(os.path.normpath(target)) or "default"
-        _main._ws_name = ws_name
-        _main.WORKSPACE_PATH = target
-        _register_workspace(ws_name, target)
     else:
-        from core.startup import select_project
+        target = os.getcwd()
+    os.makedirs(target, exist_ok=True)
+    if not os.path.isdir(target):
+        raise NotADirectoryError(f"Not a folder: {target}")
+    ws_name = os.path.basename(os.path.normpath(target)) or "default"
+    _main._ws_name = ws_name
+    _main.WORKSPACE_PATH = target
+    _main.DB_PATH, _main.ANCHOR_PATH, _main.BACKUP_DIR = _main._folder_state_paths(
+        target
+    )
+    _register_workspace(ws_name, target)
 
-        ws_name = select_project(project.strip() or None)
-        _main._ws_name = ws_name
-        _main.WORKSPACE_PATH = os.path.join(_main.WORKSPACE_BASE, ws_name)
-
-    _main.DB_PATH = os.path.join(_main.WORKSPACE_PATH, "memory.db")
-    _main.ANCHOR_PATH = os.path.join(_main.WORKSPACE_PATH, "anchor.md")
-    _main.BACKUP_DIR = os.path.join(_main.WORKSPACE_PATH, "backups")
-
-    # Keep the system prompt module in sync with the active workspace.
+    # Keep the system prompt module in sync with the active folder.
     from core.system_prompt import configure_paths
 
     configure_paths(
@@ -85,19 +93,9 @@ async def boot_backend(*, project: str = "", workspace_dir: str = "") -> dict:
         workspace_path=_main.WORKSPACE_PATH,
     )
 
-    # Scaffold workspace + anchor (fresh workspaces otherwise crash with
-    # "FATAL: Anchor file missing" inside AelvoKernel).
-    os.makedirs(_main.WORKSPACE_PATH, exist_ok=True)
-    if not os.path.exists(_main.ANCHOR_PATH):
-        with open(_main.ANCHOR_PATH, "w", encoding="utf-8") as _anchor_f:
-            _anchor_f.write(
-                "---\n"
-                "constraints:\n"
-                "  DEV_NAME: {value: AELVO User, locked: true}\n"
-                "---\n"
-                f"# AELVO Workspace Anchor — {ws_name}\n"
-            )
-        log.info("Scaffolded new workspace anchor: %s", _main.ANCHOR_PATH)
+    # Scaffold hidden .aelvo/ state + anchor (fresh folders otherwise crash
+    # with "FATAL: Anchor file missing" inside AelvoKernel).
+    _main._scaffold_folder_state(target, ws_name)
 
     # ── provider detection (env → encrypted vault) ────────────────────────
     # Use the same registry as cli/providers.py (/provider command) so the

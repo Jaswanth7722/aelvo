@@ -10,6 +10,8 @@ REPORT_ANALYZE.md
 
 # 2. Local State & Project Data
 workspace/
+.aelvo/
+node_modules/
 
 # Database files & runtime artifacts
 .aelvo_runtime/

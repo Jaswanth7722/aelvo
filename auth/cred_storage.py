@@ -153,10 +153,7 @@ class CredentialStore:
         passphrase: str = "",
         auto_lock_seconds: int = 300,
     ):
-        self.db_path = db_path or os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "auth_credentials.db"
-        )
+        self.db_path = db_path or self._default_db_path()
         self._master_secret = self._build_master_secret(passphrase)
         self._auto_lock_seconds = auto_lock_seconds
         self._lock = threading.RLock()
@@ -164,6 +161,17 @@ class CredentialStore:
         self._locked = False
 
         self._init_db()
+
+    @staticmethod
+    def _default_db_path() -> str:
+        """Default vault location, honoring ``AELVO_DATA_DIR``.
+
+        Falls back to the repo root when the env override is unset (the
+        historical behavior), so existing installs keep their vaults.
+        """
+        from config.settings import get_data_dir
+
+        return os.path.join(str(get_data_dir()), "auth_credentials.db")
 
     def _build_master_secret(self, passphrase: str) -> str:
         """Build the master secret from machine ID and optional user passphrase."""

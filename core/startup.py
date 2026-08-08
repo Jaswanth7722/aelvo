@@ -16,15 +16,18 @@ import logging
 import os
 import sqlite3
 
-from config.settings import BASE_DIR
+from config.settings import BASE_DIR, get_data_dir
 
 log = logging.getLogger("aelvo.startup")
 
-# Paths resolved via BASE_DIR (same convention as the old ui.menu)
-GLOBAL_DB_PATH = os.path.join(BASE_DIR, "global_memory.db")
-GLOBAL_ANCHOR_PATH = os.path.join(BASE_DIR, "global_anchor.md")
+# Paths resolved via BASE_DIR (same convention as the old ui.menu). Global
+# state (project registry, anchor, credential vault) follows the data dir so
+# npm/global installs stay writable outside node_modules.
+_DATA_DIR = get_data_dir()
+GLOBAL_DB_PATH = os.path.join(_DATA_DIR, "global_memory.db")
+GLOBAL_ANCHOR_PATH = os.path.join(_DATA_DIR, "global_anchor.md")
 WORKSPACE_BASE = os.path.join(BASE_DIR, "workspace")
-_VAULT_PATH = os.path.join(BASE_DIR, ".aelvo_runtime", "credential_vault.db")
+_VAULT_PATH = os.path.join(_DATA_DIR, ".aelvo_runtime", "credential_vault.db")
 
 # Placeholder keys that are never real credentials
 _PLACEHOLDER_KEYS = {"your-api-key-here", "your-anthropic-api-key-here", ""}

@@ -94,8 +94,16 @@ def _format_llm_error(exc: Exception) -> str:
     return msg
 
 # --- Global Metadata Paths ---
-GLOBAL_DB_PATH = os.path.join(os.path.dirname(__file__), "global_memory.db")
-GLOBAL_ANCHOR_PATH = os.path.join(os.path.dirname(__file__), "global_anchor.md")
+# Global state follows AELVO_DATA_DIR (default: repo root) so npm/global
+# installs can write state to ~/.aelvo instead of a read-only package tree.
+def _global_data_dir() -> str:
+    from config.settings import get_data_dir
+
+    return str(get_data_dir())
+
+
+GLOBAL_DB_PATH = os.path.join(_global_data_dir(), "global_memory.db")
+GLOBAL_ANCHOR_PATH = os.path.join(_global_data_dir(), "global_anchor.md")
 WORKSPACE_BASE = os.path.join(os.path.dirname(__file__), "workspace")
 
 # --- Default Fallbacks (will be updated by bootloader) ---
@@ -106,21 +114,29 @@ WORKSPACE_PATH = os.path.join(WORKSPACE_BASE, _ws_name)
 BACKUP_DIR = os.path.join(WORKSPACE_BASE, _ws_name, "backups")
 
 def set_active_workspace(path: str) -> str:
-    """Point the agent at a new workspace folder at runtime.
+    """Point the agent at a new folder at runtime.
 
-    Updates the module-level ``WORKSPACE_PATH`` used by the system prompt
-    (Workspace Jail) and invalidates the cached system prompt so the very
-    next LLM call reflects the new folder — giving the agent direct
-    folder/workspace access, like CLI/web/desktop coding agents.
+    Re-roots the module-level ``WORKSPACE_PATH`` (the system-prompt Workspace
+    Jail), moves the per-folder state (memory DB, anchor, backups) into a
+    hidden ``.aelvo/`` directory inside the target folder, scaffolds it, and
+    invalidates the cached system prompt so the very next LLM call reflects
+    the new folder — giving the agent direct folder access, like
+    CLI/web/desktop coding agents.
 
     Returns the resolved absolute path.
     """
-    global WORKSPACE_PATH
-    resolved = os.path.abspath(path)
+    global WORKSPACE_PATH, DB_PATH, ANCHOR_PATH, BACKUP_DIR
+    resolved = os.path.abspath(os.path.expanduser(path))
     if not os.path.isdir(resolved):
         raise NotADirectoryError(f"Not a folder: {resolved}")
     WORKSPACE_PATH = resolved
-    configure_paths(workspace_path=resolved)
+    DB_PATH, ANCHOR_PATH, BACKUP_DIR = _folder_state_paths(resolved)
+    _scaffold_folder_state(resolved, os.path.basename(resolved) or "folder")
+    configure_paths(
+        db_path=DB_PATH,
+        anchor_path=ANCHOR_PATH,
+        workspace_path=resolved,
+    )
     # Invalidate the cached system prompt so the new jail path is injected.
     # Delete (not None-out) the attribute so the next call is counted as a
     # fresh 'first_call' regeneration rather than a misleading 'ttl_expired'.
@@ -131,8 +147,49 @@ def set_active_workspace(path: str) -> str:
             agent.__dict__.pop("_cache_time", None)
         except Exception as _ex:
             log.warning("Silenced exception: %s", _ex)
-    log.info("Active workspace set to %s", resolved)
+    log.info("Active folder set to %s", resolved)
     return resolved
+
+
+def _folder_state_paths(folder: str) -> tuple[str, str, str]:
+    """Per-folder state paths inside a hidden ``.aelvo/`` directory.
+
+    ``<folder>/.aelvo/memory.db``, ``<folder>/.aelvo/anchor.md`` and
+    ``<folder>/.aelvo/backups`` keep the user's project folder clean while
+    still giving every opened folder its own isolated memory.
+    """
+    state = os.path.join(folder, ".aelvo")
+    return (
+        os.path.join(state, "memory.db"),
+        os.path.join(state, "anchor.md"),
+        os.path.join(state, "backups"),
+    )
+
+
+def _scaffold_folder_state(folder: str, name: str) -> None:
+    """Create the ``.aelvo/`` state dir + anchor inside an opened folder.
+
+    Fresh folders would otherwise crash with "FATAL: Anchor file missing"
+    inside AelvoKernel.
+    """
+    db_path, anchor_path, backup_dir = _folder_state_paths(folder)
+    try:
+        os.makedirs(backup_dir, exist_ok=True)
+        if not os.path.exists(anchor_path):
+            with open(anchor_path, "w", encoding="utf-8") as _anchor_f:
+                _anchor_f.write(
+                    "---\n"
+                    "constraints:\n"
+                    "  DEV_NAME: {value: AELVO User, locked: true}\n"
+                    "---\n"
+                    f"# AELVO Anchor — {name}\n"
+                )
+            log.info("Scaffolded anchor: %s", anchor_path)
+    except Exception as _ex:  # pragma: no cover - defensive
+        log.warning(
+            "Could not scaffold .aelvo/ state in %s: %s", folder, _ex
+        )
+    return db_path, anchor_path, backup_dir
 
 
 class _AgentRef:
@@ -257,7 +314,9 @@ class LLMCache:
     def __init__(self, db_path=None):
         import sqlite3
         if db_path is None:
-            db_path = os.path.join(os.path.dirname(__file__), "llm_cache.db")
+            from config.settings import get_data_dir
+
+            db_path = os.path.join(str(get_data_dir()), "llm_cache.db")
         self.db_path = db_path
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
@@ -1552,7 +1611,7 @@ async def main_async():
     aelvo_kernel.conn.close()
     memory_engine.db.close()
     return
-_LOG_FILE_PATH = os.path.join(os.path.dirname(__file__), ".aelvo_runtime", "aelvo.log")
+_LOG_FILE_PATH = os.path.join(_global_data_dir(), ".aelvo_runtime", "aelvo.log")
 _QUIET_THIRD_PARTY_LOGGERS = (
     "chromadb", "httpx", "httpcore", "openai", "anthropic", "urllib3",
     "scrapy", "twisted", "playwright", "asyncio", "watchfiles",
