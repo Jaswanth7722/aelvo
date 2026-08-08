@@ -54,13 +54,13 @@ AELVO solves this with **seven specialized agents** that collaborate through a s
 
 ```bash
 # One-liner — installs the CLI, creates a Python venv, and installs deps
-npm install -g Aelvo
+npm install -g aelvo
 
 # Activate from ANY folder — the command is the activation (claude/codex style)
-Aelvo
+aelvo
 ```
 
-`Aelvo` opens the **current working directory**. `Aelvo <folder>` opens any
+`aelvo` opens the **current working directory**. `aelvo <folder>` opens any
 folder. Per-folder state (memory, anchor, backups) lives in a hidden
 `.aelvo/` directory inside the opened folder, so your project tree stays
 clean and every folder gets its own isolated memory. Global state (credential
@@ -71,8 +71,8 @@ same file tools + policy when it's absent.
 ### Install from source
 
 ```bash
-git clone https://github.com/aelvolabs/Aelvo.git
-cd Aelvo
+git clone https://github.com/aelvolabs/aelvo.git
+cd aelvo
 pip install -r requirements.txt
 
 # Optional: compile the Rust sandbox for sandboxed execution
@@ -100,9 +100,9 @@ cp .env.example .env
 
 ```bash
 # Activate in the current folder (npm-installed or from source)
-Aelvo                 # opens the current directory
-Aelvo ./my-project    # opens any folder
-Aelvo "refactor the auth module"   # one-shot prompt in the current folder
+aelvo                 # opens the current directory
+aelvo ./my-project    # opens any folder
+aelvo "refactor the auth module"   # one-shot prompt in the current folder
 
 # From source, these are equivalent:
 python -m cli                         # opens the current directory
@@ -118,7 +118,7 @@ python main.py --web
 
 ---
 
-## Terminal CLI (`Aelvo`, `python -m cli`)
+## Terminal CLI (`aelvo`, `python -m cli`)
 
 A dedicated interactive terminal agent in the spirit of CodeBuff / Claude
 Code, reusing the exact same backend as the web dashboard. `python -m cli`
@@ -231,7 +231,7 @@ default interface; add `--no-browser` to run the server headless.
 
 ```text
 $ cd ~/projects/my-app          # open any folder — no workspace setup needed
-$ Aelvo
+$ aelvo
 AELVO
 ────────────────────────────────────────────────────────────────
   project: my-app   provider: nvidia   model: nvidia/nemotron-3-super
