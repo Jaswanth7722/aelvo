@@ -378,12 +378,19 @@ class AelvoAgent:
             provider_msgs = non_system_msgs
 
         response_text = ""
+        max_tokens = self._resolve_max_output_tokens()
         if self.sdk_type == "openai":
-            # OpenAI accepts system as a message
+            # OpenAI accepts system as a message.
+            # Cap max_tokens: without it, OpenRouter et al. default to the
+            # model's FULL output budget (e.g. 65536), which wastes credits,
+            # inflates latency, and can trigger 402 payment errors on
+            # limited-balance accounts. The cap is configurable via
+            # AELVO_MAX_TOKENS (default 4096).
             all_msgs = [{"role": "system", "content": system_prompt}] + list(provider_msgs)
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=all_msgs,
+                max_tokens=max_tokens,
                 temperature=0.1
             )
             if response.choices:
@@ -395,7 +402,7 @@ class AelvoAgent:
             # Anthtopic handles system separately
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=2048,
+                max_tokens=max_tokens,
                 messages=provider_msgs,
                 system=system_prompt,
                 temperature=0.1
@@ -412,7 +419,10 @@ class AelvoAgent:
             model = genai.GenerativeModel(self.model, system_instruction=system_prompt)
             response = model.generate_content(
                 provider_msgs,
-                generation_config=genai.types.GenerationConfig(temperature=0.1)
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.1,
+                    max_output_tokens=max_tokens,
+                )
             )
             response_text = response.text
 
@@ -464,6 +474,38 @@ EPISODE HISTORY (last 10): {json.dumps(context['episodes'])}
 
     SYSTEM_PROMPT_CACHE_TTL = 300  # Seconds before system prompt cache is invalidated
     MAX_CONVERSATION_HISTORY = 100  # Prevent unbounded growth
+    MAX_OUTPUT_TOKENS = 4096  # Per-call output cap; override via AELVO_MAX_TOKENS
+
+    def _resolve_max_output_tokens(self) -> int:
+        """Resolve the per-call max_tokens cap.
+
+        Priority:
+          1. ``AELVO_MAX_TOKENS`` env var (positive int)
+          2. ``MAX_OUTPUT_TOKENS`` class/instance attribute (default 4096)
+
+        The cap prevents aggregator providers (e.g. OpenRouter) from defaulting
+        to the model's full output budget (often 65536), which wastes credits,
+        inflates latency, and can trigger 402 payment errors on limited-balance
+        accounts. Invalid env values fall back to the class default.
+        """
+        raw = os.environ.get("AELVO_MAX_TOKENS", "").strip()
+        if raw:
+            try:
+                cap = int(raw)
+            except ValueError:
+                log.warning(
+                    "Invalid AELVO_MAX_TOKENS=%r; falling back to %s",
+                    raw, self.MAX_OUTPUT_TOKENS,
+                )
+            else:
+                if cap > 0:
+                    return cap
+                log.warning(
+                    "AELVO_MAX_TOKENS must be a positive integer (got %r); "
+                    "falling back to %s",
+                    raw, self.MAX_OUTPUT_TOKENS,
+                )
+        return self.MAX_OUTPUT_TOKENS
 
     def _record_prompt_cache_hit(self) -> None:
         """Count a system-prompt cache hit and log at debug level."""

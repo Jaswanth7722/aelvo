@@ -11,15 +11,28 @@ import threading
 import contextlib
 import re
 import os
-try:
-    import chromadb
-except ImportError:
-    chromadb = None
 
 # NOTE: Do NOT call logging.basicConfig() at import time here. It hijacks the
 # root logger globally (every aelvo.* module then prints INFO to the console,
 # flooding the terminal when main.py boots). Logging is configured explicitly
 # by main.py (_configure_logging) — console quiet by default, INFO+ to a file.
+
+# ``import chromadb`` costs ~2.7s of module-import time, so it is deferred to
+# first use (MemoryEngine.__init__) instead of being loaded at import time.
+# This keeps ``import main`` fast and only pays the cost when vector memory is
+# actually initialized.
+_chromadb = None
+
+def _load_chromadb():
+    """Import chromadb on first use (cached). Returns None when unavailable."""
+    global _chromadb
+    if _chromadb is None:
+        try:
+            import chromadb
+            _chromadb = chromadb
+        except ImportError:
+            _chromadb = False  # cache the miss so we don't retry every boot
+    return _chromadb or None
 
 
 class LocalMemoryCollection:
@@ -142,7 +155,12 @@ class MemoryEngine:
         
         # Phase 1: Project-Specific Chroma Isolation
         chroma_path = os.path.join(os.path.dirname(db_path), "chroma_db")
-        self.chroma_client = chromadb.PersistentClient(path=chroma_path) if chromadb else LocalChromaClient()
+        chromadb_mod = _load_chromadb()
+        self.chroma_client = (
+            chromadb_mod.PersistentClient(path=chroma_path)
+            if chromadb_mod
+            else LocalChromaClient()
+        )
         
         # Prevent cross-project memory bleed (Signal Extraction)
         safe_proj_name = re.sub(r'[^a-zA-Z0-9_-]', '_', project_name)

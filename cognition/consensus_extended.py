@@ -26,13 +26,25 @@ log = logging.getLogger("aelvo.cognition.consensus_extended")
 # to the web via the orchestrator's runtime EventBus instead of ui.events.
 HAS_UI_EVENTS = False
 
-# Try ChromaDB import
+# ChromaDB is imported lazily on first use (persist_to_chromadb) because a
+# module-level ``import chromadb`` costs ~2.7s of boot time even when vector
+# persistence is never invoked.
 _HAS_CHROMADB = False
-try:
-    import chromadb
-    _HAS_CHROMADB = True
-except ImportError as _ex:
-    log.warning("Silenced exception: %s", _ex)
+_chromadb = None
+
+
+def _load_chromadb():
+    """Import chromadb on first use (cached). Returns None when unavailable."""
+    global _HAS_CHROMADB, _chromadb
+    if _chromadb is None:
+        try:
+            import chromadb
+            _chromadb = chromadb
+            _HAS_CHROMADB = True
+        except ImportError as _ex:
+            log.warning("Silenced exception: %s", _ex)
+            _chromadb = False  # cache the miss so we don't retry every boot
+    return _chromadb or None
 
 
 # ============================================================================
@@ -766,13 +778,14 @@ class ExtendedConsensusEngine:
             True if persisted successfully, False on error or if ChromaDB
             is not available.
         """
-        if not _HAS_CHROMADB:
+        chromadb_mod = _load_chromadb()
+        if not chromadb_mod:
             log.debug("ChromaDB not available — skipping vector persistence")
             return False
 
         if collection is None:
             try:
-                client = chromadb.Client()
+                client = chromadb_mod.Client()
                 collection = client.get_or_create_collection("consensus_history")
             except Exception as e:
                 log.warning("Failed to create ChromaDB collection: %s", e)

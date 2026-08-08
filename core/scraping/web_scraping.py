@@ -9,17 +9,29 @@ import logging
 log = logging.getLogger(__name__)
 
 
-# The Industrial Speed Stack
-try:
-    import scrapy
-    from scrapy.crawler import CrawlerProcess
-except ImportError:
-    scrapy = None
-    CrawlerProcess = None
+# The Industrial Speed Stack.
+# scrapy is imported lazily (in _run_spider_process) because a module-level
+# import costs ~0.5s of boot time and is only needed for heavy crawls, which
+# run in a dedicated subprocess anyway.
 try:
     from selectolax.parser import HTMLParser
 except ImportError:
     HTMLParser = None
+
+
+_scrapy_mod = None
+
+def _load_scrapy():
+    """Import scrapy + CrawlerProcess on first use (cached). Returns (None, None) when unavailable."""
+    global _scrapy_mod
+    if _scrapy_mod is None:
+        try:
+            import scrapy
+            from scrapy.crawler import CrawlerProcess
+            _scrapy_mod = (scrapy, CrawlerProcess)
+        except ImportError:
+            _scrapy_mod = (None, None)
+    return _scrapy_mod
 
 
 def html_to_text(html: str) -> str:
@@ -51,10 +63,13 @@ def _url_scheme_allowed(url: str) -> bool:
     """SSRF guard: only http/https schemes may be fetched."""
     return urlparse(url).scheme.lower() in _ALLOWED_URL_SCHEMES
 
-class AelvoSpider(scrapy.Spider if scrapy else object):
+class AelvoSpider:
     """
     The High-Speed Asynchronous Spider (The Carpet Bomber).
     Configured for Playwright JS rendering and aggressive timeout/throttling.
+
+    Subclasses ``scrapy.Spider`` at runtime (in ``_run_spider_process``) so
+    scrapy stays a lazy import — the heavy crawl runs in a subprocess.
     """
     name = "aelvo_spider"
 
@@ -80,11 +95,17 @@ class AelvoSpider(scrapy.Spider if scrapy else object):
     }
 
     def __init__(self, target_url, result_queue, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        # This class inherits from object at module scope (scrapy is lazy);
+        # in the crawl subprocess it is dynamically re-based on scrapy.Spider,
+        # so resolve the real base at runtime instead of a stale super() cell.
+        scrapy, _ = _load_scrapy()
+        if scrapy is not None and isinstance(self, scrapy.Spider):
+            scrapy.Spider.__init__(self, *args, **kwargs)
         self.target_url = target_url
         self.result_queue = result_queue
 
     def start_requests(self):
+        scrapy, _ = _load_scrapy()
         yield scrapy.Request(
             url=self.target_url, 
             callback=self.parse,
@@ -136,6 +157,7 @@ class AelvoSpider(scrapy.Spider if scrapy else object):
 
 def _run_spider_process(url: str, result_queue: multiprocessing.Queue):
     """Isolates the Twisted Reactor with suppressed logging."""
+    scrapy, CrawlerProcess = _load_scrapy()
     if not scrapy or not CrawlerProcess:
         result_queue.put({"error": "Scrapy stack is not installed. Install with: pip install scrapy scrapy-playwright selectolax"})
         return
@@ -148,8 +170,21 @@ def _run_spider_process(url: str, result_queue: multiprocessing.Queue):
         _logging.getLogger(name).setLevel(_logging.CRITICAL)
         _logging.getLogger(name).propagate = False
     try:
+        # AelvoSpider inherits from object at module scope (scrapy is lazy);
+        # re-base it on scrapy.Spider here, inside the crawl subprocess.
+        # Drop the old class's __dict__/__weakref__ descriptors — copying them
+        # into the new namespace makes instance dicts resolve against the
+        # stale class and crashes scrapy.Spider.__init__.
+        Spider = type(
+            "AelvoSpider",
+            (scrapy.Spider,),
+            {
+                k: v for k, v in AelvoSpider.__dict__.items()
+                if k not in ("__dict__", "__weakref__")
+            },
+        )
         process = CrawlerProcess(settings={"LOG_ENABLED": False})
-        process.crawl(AelvoSpider, target_url=url, result_queue=result_queue)
+        process.crawl(Spider, target_url=url, result_queue=result_queue)
         process.start()
     except Exception as e:
         result_queue.put({"error": str(e)})
