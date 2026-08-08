@@ -1,6 +1,6 @@
 {
   "name": "aelvo",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "AELVO — the automated engineering & logic-verification agent. Plan, code, verify and report from any folder, like claude/codex/codebuff.",
   "keywords": [
     "ai",

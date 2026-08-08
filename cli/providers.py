@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any, Optional, Tuple
 
 from rich.table import Table
@@ -36,6 +37,26 @@ _TIER_SYMBOLS = {
     "standard": "$$",
     "premium": "$$$",
 }
+
+#: Local models at or below this size (billions of params) get a "tiny"
+#: warning in the picker — agentic tool calling is unreliable on them.
+_TINY_MODEL_THRESHOLD_B = 2.0
+
+
+def _model_size_gb(model_id: str) -> Optional[float]:
+    """Parameter size from a local model id, or ``None`` when unknown.
+
+    Local runtimes embed the size in the tag (``qwen2.5-coder:0.5b`` → 0.5,
+    ``llama3.2:3b`` → 3.0). Cloud ids (no ``:Nb`` suffix) return ``None``.
+    """
+    tag = model_id.rsplit(":", 1)[-1] if ":" in model_id else ""
+    match = re.match(r"^(\d+(?:\.\d+)?)([bB])$", tag)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
 
 
 # ── paths ────────────────────────────────────────────────────────────────────
@@ -745,6 +766,10 @@ async def pick_model(ctx, provider_key: str = "") -> str:
         manifest = get_model_manifest(provider_key, m)
         abilities = ", ".join(a.value.replace("_", " ") for a in manifest.abilities)
         hint = f"({abilities})" if abilities else ""
+        size = _model_size_gb(m)
+        if size is not None and size <= _TINY_MODEL_THRESHOLD_B:
+            # Heads-up for tiny local models: tool calling is unreliable.
+            hint = f"⚠ tiny ({size:g}B) {hint}".strip()
         # Context window + cost tier hint, e.g. "400k · $$".
         meta = (
             f"{format_context_window(manifest.context_window)} · "

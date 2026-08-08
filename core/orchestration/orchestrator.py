@@ -1263,6 +1263,12 @@ class Orchestrator:
             MAX_STEPS = 30
             current_batch = payload
             batch_complete = False
+            #: Stop the loop after this many consecutive tool failures. Weak
+            #: (often small local) models keep emitting broken tool calls, and
+            #: without a breaker the loop burns all MAX_STEPS asking them
+            #: again — the user sees a long wall of ✗ marks and gives up.
+            MAX_CONSECUTIVE_FAILURES = 3
+            consecutive_failures = 0
 
             for step in range(MAX_STEPS):
                 if batch_complete:
@@ -1418,13 +1424,23 @@ class Orchestrator:
 
                         if tui_session:
                             from runtime_next.models.events import EventType
-                            await tui_session.emit_tool(EventType.TOOL_COMPLETED, tool_name, str(tool_args)[:60], status, exit_code)
+                            preview = str(tool_args)[:60]
+                            if status == "failed":
+                                reason = " ".join(str(outcome.get("logs") or "").split())
+                                if reason:
+                                    # Show WHY the tool failed, not just the args
+                                    # (newlines collapsed so the ✗ line stays one line).
+                                    preview = f"{preview} — {reason[:70]}"
+                            await tui_session.emit_tool(EventType.TOOL_COMPLETED, tool_name, preview, status, exit_code)
 
                     except Exception as e:
                         outcome = {"status": "error", "logs": str(e), "executed": {}}
                         if tui_session:
                             from runtime_next.models.events import EventType
-                            await tui_session.emit_tool(EventType.TOOL_FAILED, tool_name, str(tool_args)[:60], "failed")
+                            await tui_session.emit_tool(
+                                EventType.TOOL_FAILED, tool_name,
+                                f"{str(tool_args)[:50]} — {' '.join(str(e).split())[:70]}", "failed",
+                            )
                         log.error("Tool %s failed: %s", tool_name, e)
 
                     agent.feed_result(outcome)
@@ -1433,7 +1449,27 @@ class Orchestrator:
                         session_tracker.save(db_path)
 
                     if outcome.get("status") == "error":
+                        consecutive_failures += 1
                         break
+                    consecutive_failures = 0
+
+                # Circuit breaker: stop asking the model once its tool calls
+                # keep failing, and hand back a graceful answer instead of
+                # burning the remaining steps on more broken calls.
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                    final_answer = (
+                        "⚠️ Stopped after several consecutive tool failures. "
+                        "The current model is having trouble calling tools — "
+                        "common with small local models. Switch to a larger "
+                        "model with /model, or use /ask for a direct answer "
+                        "without tools."
+                    )
+                    if stream_callback:
+                        stream_callback(final_answer)
+                    if session_tracker:
+                        session_tracker.record_answer(final_answer)
+                        session_tracker.save(db_path)
+                    break
 
                 if batch_complete:
                     break
