@@ -22,7 +22,7 @@ def test_package_json_exists_and_names_bin():
         pkg = json.load(f)
 
     assert pkg["name"].lower() == "aelvo"
-    assert pkg["version"] == "2.1.1"
+    assert pkg["version"] == "2.2.0"
     bins = pkg.get("bin", {})
     # The activation word the user asked for — case-insensitive npm lookup
     # resolves `npm install -g Aelvo` to the published `aelvo` package.
@@ -30,6 +30,19 @@ def test_package_json_exists_and_names_bin():
     assert "aelvo" in bins
     for script in bins.values():
         assert os.path.exists(os.path.join(ROOT, script)), f"missing bin: {script}"
+
+
+def test_publish_workflow_exists_and_gates_on_version():
+    """CI auto-publish: the workflow must exist, gate on a version change,
+    reference the NPM_TOKEN secret, and never hardcode a token."""
+    wf = os.path.join(ROOT, ".github", "workflows", "publish.yml")
+    assert os.path.exists(wf), "missing .github/workflows/publish.yml"
+    with open(wf, encoding="utf-8") as f:
+        content = f.read()
+    assert "npm publish" in content
+    assert "secrets.NPM_TOKEN" in content
+    assert "npm_fBmK" not in content  # never embed the real token
+    assert "check-version" in content and "publish" in content
 
 
 def test_bin_scripts_exist_and_are_valid_node():

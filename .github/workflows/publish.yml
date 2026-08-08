@@ -1,0 +1,100 @@
+name: Publish aelvo to npm
+
+# Auto-publish whenever package.json's version is bumped past the version
+# already on npm. The publish job is skipped when the version is unchanged,
+# so ordinary commits to main never touch the registry.
+#
+# To enable, add an npm access token (Automation or Granular with Publish
+# rights for the aelvo package) as a GitHub Actions secret named NPM_TOKEN.
+
+on:
+  push:
+    branches: [main]
+    # Only version bumps and packaging changes can trigger a publish.
+    paths:
+      - "package.json"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch: # manual trigger: publish the current package.json version
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  check-version:
+    name: Compare version to registry
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Check whether the version changed
+        id: check
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view aelvo version 2>/dev/null || echo "0.0.0")
+          echo "local=$LOCAL published=$PUBLISHED"
+          echo "version=$LOCAL" >> "$GITHUB_OUTPUT"
+          if [ "$LOCAL" != "$PUBLISHED" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tarball sanity (nothing that must not ship)
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          npm pack --dry-run --json > /tmp/pack.json
+          node - <<'EOF'
+          const fs = require('fs');
+          const j = JSON.parse(fs.readFileSync('/tmp/pack.json', 'utf8'));
+          const files = (j[0] && j[0].files || []).map(f => f.path);
+          const bad = files.filter(f =>
+            f.includes('__pycache__') || f.includes('/tests/') ||
+            /\.db$/.test(f) || f.includes('global_anchor')
+          );
+          if (bad.length) {
+            console.error('Forbidden files in tarball:\n' + bad.join('\n'));
+            process.exit(1);
+          }
+          console.log(`OK: ${files.length} files, no leaks`);
+          EOF
+          node --check bin/aelvo.js
+          node --check bin/install.js
+
+  publish:
+    name: Publish to npm
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      # publish does NOT run the postinstall venv bootstrap (that only runs
+      # when a consumer runs `npm install`), so this job is fast.
+      - name: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Confirm the published version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm view aelvo version
+          echo "published: ${{ needs.check-version.outputs.version }}"
