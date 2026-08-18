@@ -39,6 +39,15 @@ function findPython() {
 }
 
 function main() {
+  // ── Ensure POSIX bin files are executable ──────────────────────────────
+  // npm doesn't always preserve the execute bit from the tarball, which
+  // causes "zsh: permission denied" on macOS / Linux when running `aelvo`.
+  if (process.platform !== 'win32') {
+    for (const f of ['aelvo.js', 'install.js']) {
+      try { fs.chmodSync(path.join(PKG_ROOT, 'bin', f), 0o755); } catch (_) {}
+    }
+  }
+
   if (!fs.existsSync(REQS)) {
     log(`requirements-cli.txt not found (${REQS}); skipping dependency install.`);
     return;

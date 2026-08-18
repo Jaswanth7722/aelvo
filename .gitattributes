@@ -1,0 +1,18 @@
+# Ensure LF line endings for files with shebangs and scripts
+*.js    text eol=lf
+*.sh    text eol=lf
+*.bash  text eol=lf
+
+# Ensure LF for Python files
+*.py    text eol=lf
+
+# Ensure LF for config files
+*.json  text eol=lf
+*.toml  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Binary files
+*.png   binary
+*.jpg   binary
+*.ico   binary

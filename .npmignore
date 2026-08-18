@@ -1,20 +1,31 @@
-# Compiled Python bytecode — never ship
-__pycache__/
-*.pyc
-*.pyo
+# Prevent .gitignore and .npmignore from being included in the package
+# Use the "files" array in package.json to control what's published
 
-# Virtualenv (created at install time)
-.venv/
+# Always include bin/ and cli/ directories
+include bin/
+include cli/
 
-# Runtime state artifacts
-global_anchor.md
-workspace/
-.aelvo_runtime/
+# Exclude test and dev files
+exclude tests/
+exclude *_test.py
+exclude test_*.py
+exclude pytest.ini
+exclude ruff.toml
+exclude .gitignore
+exclude .gitattributes
+exclude validate.py
 
-# Full dev requirements (the lean CLI set ships as requirements-cli.txt)
-requirements.txt
+# Exclude CI/CD and docs
+exclude .github/
+exclude docs/
+exclude *.md
 
-# Repo tooling
-ruff.toml
-pytest.ini
-validate.py
+# Exclude node_modules and Python artifacts
+exclude node_modules/
+exclude __pycache__/
+exclude *.pyc
+exclude *.pyo
+exclude .venv/
+exclude dist/
+exclude build/
+exclude *.egg-info/
